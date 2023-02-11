@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "gl.h": "c",
+        "keyboard.h": "c",
+        "scene.h": "c",
+        "ios": "c",
+        "random": "c",
+        "glad.h": "c",
+        "complex": "c"
+    }
+}
