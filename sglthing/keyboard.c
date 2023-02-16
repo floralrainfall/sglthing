@@ -56,6 +56,7 @@ void init_kbd(GLFWwindow* window)
 void add_input(struct keyboard_mapping mapping)
 {
     mappings[mapping_count] = mapping;
+    mappings[mapping_count].value = 0.f;
     mapping_count++;
 }
 

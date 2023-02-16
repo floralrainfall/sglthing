@@ -6,6 +6,10 @@
         "ios": "c",
         "random": "c",
         "glad.h": "c",
-        "complex": "c"
+        "complex": "c",
+        "model.h": "c",
+        "*.ipp": "c",
+        "__locale": "c",
+        "locale": "c"
     }
 }

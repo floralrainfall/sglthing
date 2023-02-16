@@ -1,6 +1,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stdio.h>
+#include <ode/ode.h>
 
 #include "keyboard.h"
 #include "world.h"
@@ -28,6 +29,8 @@ int main(int argc, char** argv)
     glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
 
+    dInitODE2(0);
+    dAllocateODEDataForThread(dAllocateMaskAll);
     init_kbd(window);
     set_focus(window, true);
 
@@ -38,16 +41,20 @@ int main(int argc, char** argv)
     // main render loop
     int screen_width, screen_height;
     glfwGetFramebufferSize(window, &screen_width, &screen_height);
+    world->delta_time = 0.f;
     while(!glfwWindowShouldClose(window))
     {
+        double frame_start = glfwGetTime();
         glfwMakeContextCurrent(window);
         glViewport(0, 0, screen_width, screen_height);
-        glClearColor(0.1f, 0.39f, 0.88f, 1.f);
+        glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         world_frame(world);
 
         glfwSwapBuffers(window); 
+        float frame_end = glfwGetTime();
+        world->delta_time = (frame_end - frame_start);
         kbd_frame_end();    
         glfwPollEvents();   
     }

@@ -9,14 +9,6 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-struct model_vertex
-{
-    vec3 position;
-    vec3 normal;
-    vec4 color;
-    vec2 tex_coords;
-};
-
 struct model models[256] = {0};
 int models_loaded = 0;
 
@@ -73,12 +65,100 @@ static void model_load_textures(struct mesh* mesh, struct aiMesh* mesh_2, const 
     }
 }
 
+static void model_reset_vertex_bone_data(struct model_vertex* vtx_array, int vertex)
+{
+    for(int i = 0; i < 4; i++)
+    {
+        if(vtx_array[vertex].bone_ids[i] < 0)
+        {
+            vtx_array[vertex].bone_ids[i] = -1;
+            vtx_array[vertex].bone_ids[i] = 0.f;
+        }
+    }
+}
+
+struct model_bone_info* model_find_bone_data(struct mesh* mesh, char* name, int* id_out)
+{
+    for(int i = 0; i < mesh->bone_infos; i++)
+    {
+        if(strncmp(mesh->bone_info[i].name, name, 64) == 0)
+        {
+            if(id_out)
+                *id_out = i;
+            return &mesh->bone_info[i];
+        }
+    }
+    return 0;
+}
+
+static void model_set_vertex_bone_data(struct model_vertex* vtx_array, int vertex, int bone_id, float weight)
+{
+    for(int i = 0; i < 4; i++)
+    {
+        if(vtx_array[vertex].bone_ids[i] < 0)
+        {
+            vtx_array[vertex].bone_ids[i] = bone_id;
+            vtx_array[vertex].weights[i] = weight;
+            break;
+        }
+    }
+}
+
+static void assimp_convert_mat4(struct aiMatrix4x4 from, mat4 to)
+{
+    to[0][0] = from.a1; to[1][0] = from.a2; to[2][0] = from.a3; to[3][0] = from.a4;
+    to[0][1] = from.b1; to[1][1] = from.b2; to[2][1] = from.b3; to[3][1] = from.b4;
+    to[0][2] = from.c1; to[1][2] = from.c2; to[2][2] = from.c3; to[3][2] = from.c4;
+    to[0][3] = from.d1; to[1][3] = from.d2; to[2][3] = from.d3; to[3][3] = from.d4;
+}
+
+static void model_extract_bone_weights(struct mesh* i_mesh, struct model_vertex* vtx_array, struct aiMesh* mesh, const struct aiScene* scene)
+{
+    if(mesh->mNumBones == 0)
+        printf("sglthing: mesh has no bones\n");
+    for(int bone_index = 0; bone_index < mesh->mNumBones; ++bone_index)
+    {
+        int bone_id = -1;
+        int bone_data_id = 0;
+        struct model_bone_info* bone_data;
+        char* bone_name = mesh->mBones[bone_index]->mName.data;
+        bone_data = model_find_bone_data(i_mesh, bone_name, &bone_data_id);
+        if(bone_data_id == i_mesh->bone_infos)
+        {
+            struct model_bone_info new_bone_info;
+            new_bone_info.id = i_mesh->bone_counter;
+            assimp_convert_mat4(mesh->mBones[bone_index]->mOffsetMatrix,new_bone_info.offset);
+            i_mesh->bone_info[i_mesh->bone_infos++] = new_bone_info;
+            bone_id = i_mesh->bone_counter;
+            i_mesh->bone_counter++;
+        }
+        else
+        {
+            bone_id = bone_data->id;
+        }
+
+        ASSERT(bone_id != -1);
+
+        struct aiVertexWeight* weights = mesh->mBones[bone_index]->mWeights;
+        int num_weights = mesh->mBones[bone_index]->mNumWeights;
+
+        for(int weight_index = 0; weight_index < num_weights; ++weight_index)
+        {
+            int vertex_id = weights[weight_index].mVertexId;
+            float weight =  weights[weight_index].mWeight;
+            model_set_vertex_bone_data(i_mesh->vtx_data, vertex_id, bone_id, weight);
+        }
+    }
+}
+
 static void model_parse_mesh(struct model_vertex* vtx_array, int* vtx_count, unsigned int* idx_array, int* idx_count, struct aiMesh* mesh, const struct aiScene* scene)
 {
     for(unsigned int i = 0; i < mesh->mNumVertices; i++)
     {
         struct model_vertex* curr_vtx = &vtx_array[i];
         (*vtx_count)++;
+
+        model_reset_vertex_bone_data(vtx_array, i);
 
         curr_vtx->position[0] = mesh->mVertices[i].x;
         curr_vtx->position[1] = mesh->mVertices[i].y;
@@ -123,6 +203,7 @@ static void model_parse_mesh(struct model_vertex* vtx_array, int* vtx_count, uns
     printf("parsed mesh with %i vertices %i faces... \n", mesh->mNumVertices, mesh->mNumFaces);
 }
 
+// FIXME: only until recently i had figured out that vertex array switching is an expensive operation
 int create_model_vao(struct model_vertex* vtx_array, int vtx_count, int* idx_array, int idx_count, int* vertex_buffer, int* element_buffer)
 {
     int vertex_array;
@@ -151,6 +232,12 @@ int create_model_vao(struct model_vertex* vtx_array, int vtx_count, int* idx_arr
     // vec2: uv
     sglc(glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, tex_coords)));
     sglc(glEnableVertexAttribArray(3));
+    // ivec4: bone_ids
+    sglc(glVertexAttribIPointer(4, 4, GL_INT, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, bone_ids)));
+    sglc(glEnableVertexAttribArray(3));
+    // vec4: weights
+    sglc(glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, weights)));
+    sglc(glEnableVertexAttribArray(3));
 
     sglc(glBindVertexArray(0));
 
@@ -176,10 +263,13 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
         model->meshes[model->mesh_count].element_buffer = element_buffer;
         model->meshes[model->mesh_count].vertex_buffer = vertex_buffer;
         model->meshes[model->mesh_count].element_count = idx_count;
+        model->meshes[model->mesh_count].vtx_data = vtx_array;
+        model->meshes[model->mesh_count].vtx_data_count = vtx_count;
         model_load_textures(&model->meshes[model->mesh_count], mesh, scene);
         model->mesh_count++;
 
-        free(vtx_array);
+        model_extract_bone_weights(&model->meshes[model->mesh_count], vtx_array, mesh, scene);
+
         free(idx_array);
     }
     for(int i = 0; i < node->mNumChildren; i++)

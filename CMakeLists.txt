@@ -5,10 +5,15 @@ add_subdirectory(deps/assimp)
 
 find_package(glfw3 REQUIRED)
 find_package(cglm REQUIRED)
+find_package(PkgConfig REQUIRED)
+
+pkg_check_modules(ODE REQUIRED ode)
 
 project(sglthing)
 
 add_executable(sglthing
+sglthing/primitives.h
+sglthing/primitives.c 
     sglthing/sglthing.h
     sglthing/sglthing.c
     sglthing/keyboard.h
@@ -19,22 +24,27 @@ add_executable(sglthing
     sglthing/graphic.c
     sglthing/shader.h
     sglthing/shader.c 
-    sglthing/player.h
-    sglthing/player.c 
     sglthing/world.h
     sglthing/world.c 
     sglthing/model.h
     sglthing/model.c 
+    sglthing/map.h
+    sglthing/map.c 
     sglthing/ui.h
     sglthing/ui.c 
 )
 
-target_link_libraries(sglthing
+target_include_directories(sglthing PUBLIC
+    ${ODE_INCLUDE_DIRS}
+)
+
+target_link_libraries(sglthing PUBLIC
     glfw
     glad
     cglm
     assimp
     m
+    ${ODE_LIBRARIES}
 )
 
 target_compile_options(sglthing PUBLIC

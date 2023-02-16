@@ -7,19 +7,33 @@
 #include "shader.h"
 #include "texture.h"
 
+#define MAX_CHARACTERS_STRING 65535
+
 void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
 {
-    vec2 points[512][2] = {};
+    if(ui->ui_elements > 128)
+        return;
+
+    vec2 points[MAX_CHARACTERS_STRING][2] = {};
     int point_count = 0;
 
     float size = 8;
+    int line = 0;
+    int keys = 0;
 
     for(int i = 0; i < strlen(text); i++)
     {
-        vec2 v_up_left    = {position_x+i*size,position_y+size*2};
-        vec2 v_up_right   = {position_x+i*size+size,position_y+size*2};
-        vec2 v_down_left  = {position_x+i*size,position_y};
-        vec2 v_down_right = {position_x+i*size+size,position_y};
+        if(text[i] == '\n')
+        {
+            keys = 0;
+            line++;
+            continue;
+        }
+        vec2 v_up_left    = {position_x+keys*size,position_y+size*2-line*(size*2)};
+        vec2 v_up_right   = {position_x+keys*size+size,position_y+size*2-line*(size*2)};
+        vec2 v_down_left  = {position_x+keys*size,position_y-line*(size*2)};
+        vec2 v_down_right = {position_x+keys*size+size,position_y-line*(size*2)};
+        keys++;
 
         // tri 1
 
@@ -83,12 +97,15 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
     sglc(glUseProgram(ui->ui_program));
+    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"time"), (float)glfwGetTime()));
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"waviness"), ui->waviness));
     sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_program,"projection"), 1, GL_FALSE, ui->projection[0]));    
     sglc(glActiveTexture(GL_TEXTURE0));
     sglc(glBindTexture(GL_TEXTURE_2D, ui->ui_font));
     sglc(glDrawArrays(GL_TRIANGLES, 0, point_count));
+    ui->ui_elements++;
 }
 
 bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
@@ -110,7 +127,7 @@ void ui_init(struct ui_data* ui)
     glBindVertexArray(ui->ui_vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, ui->ui_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 2 * 512 * 2, NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 2 * MAX_CHARACTERS_STRING * 2, NULL, GL_DYNAMIC_DRAW);
 
     // vec2: position
     sglc(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2) * 2, (void*)0));
@@ -123,17 +140,25 @@ void ui_init(struct ui_data* ui)
     glBindVertexArray(0);
 
     glm_ortho(0.f, 640.f, 0.f, 480.f, 0.1f, 1000.f, ui->projection);
+    ui->background_color[0] = 0.5f;
+    ui->background_color[1] = 0.5f;
+    ui->background_color[2] = 0.5f;
+    ui->background_color[3] = 0.2f;
+    ui->waviness = 0.f;
 }
 
-void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, vec3 camera_front, vec3 position, float fov, mat4 mvp, char* text)
+void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, vec3 camera_front, vec3 position, float fov, mat4 m, mat4 vp, char* text)
 {
     vec3 dest_position;
     vec3 direction;
-    glm_vec3_sub(position,camera_position,direction);
-    float angle = glm_vec3_angle(camera_front, direction) / M_PI_180f;
+    vec3 mm_position;
+    glm_mat4_mulv3(m,position,1.f,mm_position);
+    glm_vec3_sub(camera_position,mm_position,direction);
+    float angle = glm_vec3_dot(camera_front, direction) / M_PI_180f;
     if(angle < fov)
     {
-        glm_project((vec3){0.0f, 1.f, 0.0f}, mvp, viewport, dest_position);
-        ui_draw_text(ui, dest_position[0], dest_position[1], text, dest_position[2]);
+        float dist = glm_vec3_distance(camera_position, position);
+        glm_project(mm_position, vp, viewport, dest_position);
+        ui_draw_text(ui, dest_position[0], dest_position[1], text, dist);
     }
 }

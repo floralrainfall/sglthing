@@ -37,7 +37,7 @@ void load_texture(char* file)
         sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
         sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
 
-        sglc(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data));
+        sglc(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB4, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data));
         sglc(glGenerateMipmap(GL_TEXTURE_2D));
         strncpy(texture->file,file,64);
         printf("sglthing: loaded texture %s, %ix%i, %i channels\n", file, image_width, image_height, image_channels);

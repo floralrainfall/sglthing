@@ -9,6 +9,9 @@ struct keyboard_mapping
     int key_positive;
     int key_negative;
 
+    bool key_positive_down;
+    bool key_negative_down;
+
     float value;
     char name[16];
 };

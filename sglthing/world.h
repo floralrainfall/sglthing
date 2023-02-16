@@ -1,9 +1,12 @@
 #ifndef WORLD_H
 #define WORLD_H
 #include <cglm/cglm.h>
+#include <ode/ode.h>
 #include "graphic.h"
 #include "model.h"
+#include "map.h"
 #include "ui.h"
+#include "primitives.h"
 
 struct world {
     struct {
@@ -16,24 +19,60 @@ struct world {
         float fov;
     } cam;
 
+    struct {
+        float fog_maxdist;
+        float fog_mindist;
+        vec4 fog_color;
+        vec4 clear_color;
+        int banding_effect;
+    } gfx;
+
+    struct {
+        bool paused;
+        dWorldID world;
+        dSpaceID space;
+        dBodyID body;
+        dGeomID geom;
+        dMass m;
+        dJointGroupID contactgroup;
+    } physics;
+
     mat4 v;
     mat4 p;
     mat4 vp;
     vec4 viewport;
 
     int normal_shader;
+    int debug_shader;
+    int cloud_shader;
 
     struct ui_data* ui;
 
     struct model* test_object;
+    struct map* test_map;
+    struct primitives primitives;
 
     int render_count;
+
+    dBodyID player_body;
+    dGeomID player_geom;
+    dMass player_mass;
+    
+    double delta_time;
 };
 
 struct world* world_init();
 
 void world_frame(struct world* world);
 void world_draw(struct world* world, int count, int vertex_array, int shader_program, mat4 model_matrix);
-void world_draw_model(struct world* world, struct model* model, int shader_program, mat4 model_matrix);
+void world_draw_model(struct world* world, struct model* model, int shader_program, mat4 model_matrix, bool set_textures);
+
+enum primitive_type
+{
+    PRIMITIVE_BOX,
+    PRIMITIVE_ARROW,
+    PRIMITIVE_PLANE,
+};
+void world_draw_primitive(struct world* world, int shader, int fill, enum primitive_type type, mat4 model_matrix, vec4 color);
 
 #endif
