@@ -35,6 +35,8 @@ struct world {
         dGeomID geom;
         dMass m;
         dJointGroupID contactgroup;
+
+        int collisions_in_frame;
     } physics;
 
     mat4 v;
@@ -45,6 +47,7 @@ struct world {
     int normal_shader;
     int debug_shader;
     int cloud_shader;
+    int sky_shader;
 
     struct ui_data* ui;
 

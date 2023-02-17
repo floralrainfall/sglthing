@@ -67,9 +67,12 @@ float plane_data[] = {
 // BUG: only the last primitive set up is rendered
 #define PRIM_SETUP(x) \
     sglc(glGenBuffers(1, &prims.x##_primitive)); \
+    sglc(glBindVertexArray(prims.debug_arrays)); \
     sglc(glBindBuffer(GL_ARRAY_BUFFER, prims.x##_primitive)); \
     sglc(glBufferData(GL_ARRAY_BUFFER, sizeof(x##_data), &x##_data[0], GL_STATIC_DRAW)); \
     prims.x##_vertex_count = sizeof(x##_data)/sizeof(float);
+//    sglc(glBindBuffer(GL_ARRAY_BUFFER, 0)); \
+//    sglc(glBindVertexArray(0));
 
 struct primitives create_primitives()
 {

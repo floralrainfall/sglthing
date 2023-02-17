@@ -19,6 +19,7 @@ static void world_physics_callback(void* data, dGeomID o1, dGeomID o2)
     if (dCollide (o1,o2,1,&contact.geom,sizeof(dContact))) {
         dJointID c = dJointCreateContact (world->physics.world,world->physics.contactgroup,&contact);
         dJointAttach (c,b1,b2);
+        world->physics.collisions_in_frame++;
     }
 }
 
@@ -41,6 +42,10 @@ struct world* world_init()
     v = compile_shader("../shaders/cloud.vs", GL_VERTEX_SHADER);
     f = compile_shader("../shaders/cloud.fs", GL_FRAGMENT_SHADER);
     world->cloud_shader = link_program(v,f);
+
+    v = compile_shader("../shaders/sky.vs", GL_VERTEX_SHADER);
+    f = compile_shader("../shaders/sky.fs", GL_FRAGMENT_SHADER);
+    world->sky_shader = link_program(v,f);
 
     v = compile_shader("../shaders/dbg.vs", GL_VERTEX_SHADER);
     f = compile_shader("../shaders/dbg.fs", GL_FRAGMENT_SHADER);
@@ -79,7 +84,7 @@ struct world* world_init()
     world->gfx.fog_color[2] = world->gfx.clear_color[2];
     world->gfx.fog_color[3] = world->gfx.clear_color[3];
 
-    world->gfx.fog_maxdist = 50.f;
+    world->gfx.fog_maxdist = 256.f;
     world->gfx.fog_mindist = 32.1f;
     world->gfx.banding_effect = 0xff8;
 
@@ -123,7 +128,7 @@ struct world* world_init()
         dGeomSetBody(geom, body);
         dMassSetBox (&mass,(i+1)/1,1,1,1);
         dBodySetMass (body,&mass);
-        dBodySetPosition(body, 0, i*2+1, i*1);
+        dBodySetPosition(body, sin(i/10.0)*5.0, 5, i*2);
         dGeomSetData(geom, get_model("../resources/box.obj"));
     }
 
@@ -138,7 +143,7 @@ void world_frame(struct world* world)
 
     world->cam.yaw = fmodf(world->cam.yaw, 360.f);
 
-    glm_perspective(world->cam.fov * M_PI_180f, 640.f/480.f, 0.1f, 100.f, world->p);
+    glm_perspective(world->cam.fov * M_PI_180f, 640.f/480.f, 0.1f, world->gfx.fog_maxdist, world->p);
 
     world->cam.front[0] = cosf(world->cam.yaw * M_PI_180f) * cosf(world->cam.pitch * M_PI_180f);
     world->cam.front[1] = sinf(world->cam.pitch * M_PI_180f);
@@ -215,6 +220,8 @@ void world_frame(struct world* world)
 
     dBodyAddForce(world->player_body,player_force[0],0,player_force[1]);
 
+
+
     world->cam.position[0] = player_position[0];
     world->cam.position[1] = player_position[1] + 1.f;
     world->cam.position[2] = player_position[2];
@@ -238,7 +245,7 @@ void world_frame(struct world* world)
     char dbg_info[256];
     int old_elements = world->ui->ui_elements;
     world->ui->ui_elements = 0;
-    snprintf(dbg_info, 256, "DEBUG\n\ncam: V=(%.2f,%.2f,%.2f)\nY=%.2f,P=%.2f\nU=(%.2f,%.2f,%.2f)\nF=(%.2f,%.2f,%.2f)\nR=(%.f,%.f,%.f)\nF=%.f\nr (scene)=%i,r (ui)=%i\nt=%f, d=%f\n\nphysics pause=%s\nphysics geoms=%i\n",
+    snprintf(dbg_info, 256, "DEBUG\n\ncam: V=(%.2f,%.2f,%.2f)\nY=%.2f,P=%.2f\nU=(%.2f,%.2f,%.2f)\nF=(%.2f,%.2f,%.2f)\nR=(%.f,%.f,%.f)\nF=%.f\nr (scene)=%i,r (ui)=%i\nt=%f, d=%f\n\nphysics pause=%s\nphysics geoms=%i\ncollisions in frame=%i\n",
         world->cam.position[0], world->cam.position[1], world->cam.position[2],
         world->cam.yaw, world->cam.pitch,
         world->cam.up[0], world->cam.up[1], world->cam.up[2],
@@ -249,9 +256,11 @@ void world_frame(struct world* world)
         old_elements,
         glfwGetTime(), world->delta_time,
         world->physics.paused?"true":"false",
-        dSpaceGetNumGeoms(world->physics.space));
+        dSpaceGetNumGeoms(world->physics.space),
+        world->physics.collisions_in_frame);
     ui_draw_text(world->ui, 0.f, 480.f-(16.f*3), dbg_info, 1.f);
 
+    world->physics.collisions_in_frame = 0;
     if(!world->physics.paused && world->delta_time != 0.0)
     {
         dSpaceCollide(world->physics.space,(void*)world,&world_physics_callback);

@@ -1,13 +1,10 @@
 cmake_minimum_required(VERSION 3.4)
 
 add_subdirectory(glad)
+add_subdirectory(deps/ODE)
 add_subdirectory(deps/assimp)
-
-find_package(glfw3 REQUIRED)
-find_package(cglm REQUIRED)
-find_package(PkgConfig REQUIRED)
-
-pkg_check_modules(ODE REQUIRED ode)
+add_subdirectory(deps/glfw)
+add_subdirectory(deps/cglm)
 
 project(sglthing)
 
@@ -44,7 +41,7 @@ target_link_libraries(sglthing PUBLIC
     cglm
     assimp
     m
-    ${ODE_LIBRARIES}
+    ODE
 )
 
 target_compile_options(sglthing PUBLIC
