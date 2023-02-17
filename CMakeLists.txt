@@ -2,26 +2,39 @@ cmake_minimum_required(VERSION 3.4)
 
 add_subdirectory(glad)
 
-find_package(glfw3)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(ODE ode)
+# im temporarily disabling this because when u cross compiole it doesn't like it
 
-if(NOT glfw3_FOUND)
-    add_subdirectory(deps/glfw)
-endif()
+#find_package(glfw3)
+#find_package(cglm)
+#find_package(assimp)
+#find_package(PkgConfig REQUIRED)
+#pkg_check_modules(ODE ode)
+set(ODE_FOUND OFF)
+
 set(ODE_LIBRARY ${ODE_LIBRARIES})
 if(NOT ODE_FOUND)
+    message(STATUS "ODE not found, using deps/ODE")   
     add_subdirectory(deps/ODE)
     set(ODE_LIBRARY ODE)
 endif()
-add_subdirectory(deps/assimp)
-add_subdirectory(deps/cglm)
+if(NOT glfw3_FOUND)
+    message(STATUS "glfw3 not found, using deps/glfw")   
+    add_subdirectory(deps/glfw)
+endif()
+if(NOT assimp_FOUND)
+    message(STATUS "assimp not found, using deps/assimp")   
+    add_subdirectory(deps/assimp)
+endif()
+if(NOT cglm_FOUND)
+    message(STATUS "cglm not found, using deps/cglm")
+    add_subdirectory(deps/cglm)
+endif()
 
 project(sglthing)
 
 add_executable(sglthing
-sglthing/primitives.h
-sglthing/primitives.c 
+    sglthing/primitives.h
+    sglthing/primitives.c 
     sglthing/sglthing.h
     sglthing/sglthing.c
     sglthing/keyboard.h

@@ -7,14 +7,14 @@
 #include "shader.h"
 #include "texture.h"
 
-#define MAX_CHARACTERS_STRING 65535
+#define MAX_CHARACTERS_STRING 32767
 
 void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
 {
     if(ui->ui_elements > 128)
         return;
 
-    vec2 points[MAX_CHARACTERS_STRING][2] = {};
+    vec2 points[MAX_CHARACTERS_STRING][2] = {0};
     int point_count = 0;
 
     float size = 8;
@@ -144,7 +144,7 @@ void ui_init(struct ui_data* ui)
     ui->background_color[1] = 0.5f;
     ui->background_color[2] = 0.5f;
     ui->background_color[3] = 0.2f;
-    ui->waviness = 0.f;
+    ui->waviness = 1.f;
 }
 
 void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, vec3 camera_front, vec3 position, float fov, mat4 m, mat4 vp, char* text)

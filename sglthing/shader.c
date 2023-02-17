@@ -11,12 +11,12 @@ int compile_shader(const char* shader_name, int type)
     FILE* shader_file = fopen(shader_name, "r");
     if(shader_file)
     {       
-        int data_read = fread(shader_data, 65535, 1, shader_file);
+        int data_read = fread(shader_data, 1, 65535, shader_file);
         fclose(shader_file);
-        
+
         int shader_id = glCreateShader(type);
         int success;
-        sglc(glShaderSource(shader_id, 1, &shader_data, NULL));        
+        sglc(glShaderSource(shader_id, 1, &shader_data, &data_read));        
         printf("sglthing: compiling shader  %s\n", shader_name);
         sglc(glCompileShader(shader_id));
         sglc(glGetShaderiv(shader_id, GL_COMPILE_STATUS, &success));
