@@ -1,9 +1,20 @@
 cmake_minimum_required(VERSION 3.4)
 
 add_subdirectory(glad)
-add_subdirectory(deps/ODE)
+
+find_package(glfw3)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(ODE ode)
+
+if(NOT glfw3_FOUND)
+    add_subdirectory(deps/glfw)
+endif()
+set(ODE_LIBRARY ${ODE_LIBRARIES})
+if(NOT ODE_FOUND)
+    add_subdirectory(deps/ODE)
+    set(ODE_LIBRARY ODE)
+endif()
 add_subdirectory(deps/assimp)
-add_subdirectory(deps/glfw)
 add_subdirectory(deps/cglm)
 
 project(sglthing)
@@ -31,17 +42,13 @@ sglthing/primitives.c
     sglthing/ui.c 
 )
 
-target_include_directories(sglthing PUBLIC
-    ${ODE_INCLUDE_DIRS}
-)
-
 target_link_libraries(sglthing PUBLIC
     glfw
     glad
     cglm
     assimp
     m
-    ODE
+    ${ODE_LIBRARY}
 )
 
 target_compile_options(sglthing PUBLIC

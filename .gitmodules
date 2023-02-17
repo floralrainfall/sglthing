@@ -3,7 +3,7 @@
 	url = https://github.com/assimp/assimp
 [submodule "deps/glfw"]
 	path = deps/glfw
-	url = https:/github.com/glfw/glfw
+	url = https://github.com/glfw/glfw
 [submodule "deps/cglm"]
 	path = deps/cglm
 	url = https://github.com/recp/cglm
