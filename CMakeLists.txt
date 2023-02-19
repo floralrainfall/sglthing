@@ -53,6 +53,8 @@ add_executable(sglthing
     sglthing/map.c 
     sglthing/ui.h
     sglthing/ui.c 
+    sglthing/io.h
+    sglthing/io.c 
 )
 
 target_link_libraries(sglthing PUBLIC

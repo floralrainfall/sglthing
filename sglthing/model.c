@@ -2,6 +2,7 @@
 #include "graphic.h"
 #include "texture.h"
 #include "sglthing.h"
+#include "io.h"
 #include <string.h>
 #include <cglm/cglm.h>
 #include <glad/glad.h>
@@ -285,7 +286,9 @@ void load_model(char* file)
     struct model* sel_model = &models[models_loaded];
     sel_model->mesh_count = 0;
     
-    const struct aiScene *scene = aiImportFile(file, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
+    char path[256];
+    file_get_path(path,256,file);
+    const struct aiScene *scene = aiImportFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
     if(!scene)
     {
         printf("sglthing: model %s not found\n", file);
@@ -297,6 +300,7 @@ void load_model(char* file)
     printf("\n");
 
     strncpy(&sel_model->name[0], file, 64);
+    sel_model->scene = scene;
 
     models_loaded++;
 }

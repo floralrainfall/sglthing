@@ -4,6 +4,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "graphic.h"
+#include "io.h"
 
 #define MAX_TEXTURES 512
 
@@ -18,13 +19,15 @@ int loaded_textures = 0;
 
 void load_texture(char* file)
 {   
-    int existing_texture = get_texture(file);
+    char path[256];
+    file_get_path(path, 256, file);
+    int existing_texture = get_texture(path);
     if(existing_texture)
         return;
     int image_width;
     int image_height;
     int image_channels;
-    char* data = (char*)stbi_load(file, &image_width, &image_height, &image_channels, 4);
+    char* data = (char*)stbi_load(path, &image_width, &image_height, &image_channels, 4);
     if(data)
     {
         struct texture* texture = &textures[loaded_textures];

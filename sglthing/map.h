@@ -1,7 +1,7 @@
 #ifndef MAP_H
 #define MAP_H
 
-#define MAP_SIZE 512
+#define MAP_SIZE 16
 #define MAP_MESHES 7
 
 struct world;
@@ -13,7 +13,7 @@ struct map {
     struct model* map_meshes[MAP_MESHES];
 };
 
-void new_map(struct map* map);
+void new_map(struct world* world, struct map* map);
 void draw_map(struct world* world, struct map* map, int shader);
 
 #endif

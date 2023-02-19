@@ -47,6 +47,7 @@ struct model
     char name[64];
     struct mesh meshes[64];
     int mesh_count;
+    struct aiScene *scene;
 };
 
 #endif

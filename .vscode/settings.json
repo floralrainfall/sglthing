@@ -10,6 +10,8 @@
         "model.h": "c",
         "*.ipp": "c",
         "__locale": "c",
-        "locale": "c"
+        "locale": "c",
+        "stb_image.h": "c",
+        "stb_image_write.h": "c"
     }
 }

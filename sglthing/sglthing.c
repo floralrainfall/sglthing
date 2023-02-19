@@ -26,29 +26,29 @@ int main(int argc, char** argv)
     if(!window)
         return -2;    
     printf("sglthing: window created\n");
+
+    fs_add_directory("resources");
+    fs_add_directory("../resources");
+
     glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
 
     dInitODE2(0);
     dAllocateODEDataForThread(dAllocateMaskAll);
     init_kbd(window);
-    set_focus(window, false);
+    set_focus(window, true);
 
     world = world_init();
 
     printf("sglthing: ok\n");
 
     // main render loop
-    int screen_width, screen_height;
-    glfwGetFramebufferSize(window, &screen_width, &screen_height);
     world->delta_time = 0.f;
     while(!glfwWindowShouldClose(window))
     {
         double frame_start = glfwGetTime();
+        glfwGetFramebufferSize(window, &world->gfx.screen_width, &world->gfx.screen_height);
         glfwMakeContextCurrent(window);
-        glViewport(0, 0, screen_width, screen_height);
-        glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         world_frame(world);
 

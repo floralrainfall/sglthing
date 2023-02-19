@@ -1,5 +1,6 @@
 #include "shader.h"
 #include "graphic.h"
+#include "io.h"
 #include <stdio.h>
 #include <string.h>
 #include <glad/glad.h>
@@ -8,7 +9,7 @@ int compile_shader(const char* shader_name, int type)
 {
     void* shader_data = malloc(65535);
     memset(shader_data, 0, 65535);
-    FILE* shader_file = fopen(shader_name, "r");
+    FILE* shader_file = file_open(shader_name, "r");
     if(shader_file)
     {       
         int data_read = fread(shader_data, 1, 65535, shader_file);
@@ -43,8 +44,18 @@ int link_program(int vertex, int fragment)
 {
     int program = glCreateProgram();
     int success;
-    sglc(glAttachShader(program, vertex));
-    sglc(glAttachShader(program, fragment));
+    if(vertex)
+    {
+        sglc(glAttachShader(program,vertex));
+    }
+    else
+        printf("sglthing: no vertex shader set\n");
+    if(fragment)
+    {
+        sglc(glAttachShader(program,fragment));
+    }
+    else
+        printf("sglthing: no fragment shader set\n");
     sglc(glLinkProgram(program));
 
     glGetProgramiv(program, GL_LINK_STATUS, &success);

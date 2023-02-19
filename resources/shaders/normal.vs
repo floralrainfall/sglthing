@@ -3,6 +3,7 @@
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform vec4 viewport;
 uniform float time;
 uniform vec3 camera_position;
 
@@ -40,7 +41,7 @@ void main()
     f_color = v_color;
     f_pos = (model * vec4(v_pos, 1.0)).xyz;
     f_m_pos = v_pos;
-    gl_Position = snap(projection * view * model * vec4(v_pos, 1.0),vec2(640/4,480/4));
+    gl_Position = snap(projection * view * model * vec4(v_pos, 1.0),vec2(320,240));
 
     vec4 vertex_view = view * model * vec4(v_pos, 1.0);
     float dist = length(vertex_view);

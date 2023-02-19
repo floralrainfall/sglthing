@@ -6,12 +6,13 @@
 #include "sglthing.h"
 #include "shader.h"
 #include "texture.h"
+#include "keyboard.h"
 
 #define MAX_CHARACTERS_STRING 32767
 
 void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
 {
-    if(ui->ui_elements > 128)
+    if(ui->ui_elements > 128 || keys_down[GLFW_KEY_GRAVE_ACCENT])
         return;
 
     vec2 points[MAX_CHARACTERS_STRING][2] = {0};
@@ -110,17 +111,20 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 
 bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
 {
+    if(ui->ui_elements > 128 || keys_down[GLFW_KEY_GRAVE_ACCENT])
+        return;
+
     ui_draw_text(ui, position_x, position_y, text, depth);
 }
 
 void ui_init(struct ui_data* ui)
 {
-    int ui_vertex = compile_shader("../shaders/ui.vs", GL_VERTEX_SHADER);
-    int ui_frag = compile_shader("../shaders/ui.fs", GL_FRAGMENT_SHADER);
+    int ui_vertex = compile_shader("shaders/ui.vs", GL_VERTEX_SHADER);
+    int ui_frag = compile_shader("shaders/ui.fs", GL_FRAGMENT_SHADER);
     ui->ui_program = link_program(ui_vertex, ui_frag);
 
-    load_texture("../resources/font.png");
-    ui->ui_font = get_texture("../resources/font.png");
+    load_texture("uiassets/font.png");
+    ui->ui_font = get_texture("uiassets/font.png");
 
     glGenVertexArrays(1,&ui->ui_vao);    
     glGenBuffers(1,&ui->ui_vbo);
@@ -139,16 +143,18 @@ void ui_init(struct ui_data* ui)
 
     glBindVertexArray(0);
 
-    glm_ortho(0.f, 640.f, 0.f, 480.f, 0.1f, 1000.f, ui->projection);
     ui->background_color[0] = 0.5f;
     ui->background_color[1] = 0.5f;
     ui->background_color[2] = 0.5f;
     ui->background_color[3] = 0.2f;
-    ui->waviness = 1.f;
+    ui->waviness = 0.f;
 }
 
 void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, vec3 camera_front, vec3 position, float fov, mat4 m, mat4 vp, char* text)
 {
+    if(ui->ui_elements > 128 || keys_down[GLFW_KEY_GRAVE_ACCENT])
+        return;
+        
     vec3 dest_position;
     vec3 direction;
     vec3 mm_position;

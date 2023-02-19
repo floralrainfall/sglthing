@@ -25,6 +25,8 @@ struct world {
         vec4 fog_color;
         vec4 clear_color;
         int banding_effect;
+        int screen_width;
+        int screen_height;
     } gfx;
 
     struct {
@@ -48,6 +50,7 @@ struct world {
     int debug_shader;
     int cloud_shader;
     int sky_shader;
+    int blur_shader;
 
     struct ui_data* ui;
 
@@ -62,11 +65,17 @@ struct world {
     dMass player_mass;
     
     double delta_time;
+
+    int hdr_fbo;
+    int color_buffers[2];
+    int pingpong_fbo[2];
+    int pingpong_buffers[2];
 };
 
 struct world* world_init();
 
 void world_frame(struct world* world);
+void world_frame_render(struct world* world);
 void world_draw(struct world* world, int count, int vertex_array, int shader_program, mat4 model_matrix);
 void world_draw_model(struct world* world, struct model* model, int shader_program, mat4 model_matrix, bool set_textures);
 
