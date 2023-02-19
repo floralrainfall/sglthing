@@ -27,6 +27,7 @@ struct world {
         int banding_effect;
         int screen_width;
         int screen_height;
+        struct model* sky_ball;
     } gfx;
 
     struct {

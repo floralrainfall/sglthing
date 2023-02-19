@@ -95,11 +95,9 @@ void main()
     pos.x = f_m_pos.x/10.0+time/10000.0+1000;
     pos.y = f_m_pos.z/10.0+1000;
     pos.z = time/100000.0;
-    float v2 = atan(snoise(pos*30.0))+0.5;
+    float v2 = snoise(pos*30.0)+0.5;
 
-    v = v/2;
-    v2 = v2/2;
-    v = v + v2;
+    v = v * v2;
 
     float dist = distance(vec3(0,0,0),f_m_pos)*25;
 

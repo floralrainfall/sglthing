@@ -40,6 +40,7 @@ struct world* world_init()
     world->cam.up[1] = 1.f;
     world->cam.up[2] = 0.f;
     world->cam.fov = 60.f;
+    world->cam.yaw = 0.f;
 
     int v = compile_shader("shaders/normal.vs", GL_VERTEX_SHADER);
     int f = compile_shader("shaders/fragment.fs", GL_FRAGMENT_SHADER);
@@ -65,6 +66,8 @@ struct world* world_init()
     world->test_object = get_model("test.obj");
     if(!world->test_object)
         printf("sglthing: model load fail\n");
+    load_model("skyball.obj");
+    world->gfx.sky_ball = get_model("skyball.obj");
         
     glEnable(GL_DEPTH_TEST);  
     glEnable(GL_BLEND);
@@ -83,9 +86,9 @@ struct world* world_init()
 
     world->delta_time = 0.0;
 
-    world->gfx.clear_color[0] = 0.37f;
-    world->gfx.clear_color[1] = 0.69f;
-    world->gfx.clear_color[2] = 0.78f; 
+    world->gfx.clear_color[0] = 135.f/255.f;
+    world->gfx.clear_color[1] = 206.f/255.f;
+    world->gfx.clear_color[2] = 250.f/255.f; 
     world->gfx.clear_color[3] = 1.f;
 
     world->gfx.fog_color[0] = world->gfx.clear_color[0];
@@ -199,7 +202,13 @@ void world_frame(struct world* world)
     glm_translate(cloud_matrix, (vec3){world->cam.position[0],world->cam.position[1]+1.0f,world->cam.position[2]});
     glm_scale(cloud_matrix, (vec3){100.f,1.f,100.f});
 
+    mat4 sky_matrix;
+    glm_mat4_identity(sky_matrix);
+    glm_translate(sky_matrix, (vec3){world->cam.position[0],world->cam.position[1],world->cam.position[2]});
+    glm_scale(sky_matrix, (vec3){1.f,1.f,1.f});
+
     glDisable(GL_DEPTH_TEST);
+    world_draw_model(world, world->gfx.sky_ball, world->sky_shader, sky_matrix, false);
     world_draw_primitive(world, world->cloud_shader, GL_FILL, PRIMITIVE_PLANE, cloud_matrix, (vec4){1.f,1.f,1.f,1.f});
     glEnable(GL_DEPTH_TEST);
 
