@@ -174,8 +174,6 @@ struct world* world_init()
 void world_frame_render(struct world* world)
 {    
     script_frame_render(world,world->script);
-
-    draw_map(world, world->test_map, world->normal_shader);
     //world_draw_model(world, world->test_object, world->normal_shader, test_model, true);
 }
 
