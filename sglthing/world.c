@@ -42,7 +42,7 @@ struct world* world_init()
     world->cam.fov = 60.f;
     world->cam.yaw = 0.f;
 
-    world->script = script_init("scripts/game.s7");
+    world->script = script_init("scripts/game.scm");
 
     int v = compile_shader("shaders/normal.vs", GL_VERTEX_SHADER);
     int f = compile_shader("shaders/fragment.fs", GL_FRAGMENT_SHADER);
