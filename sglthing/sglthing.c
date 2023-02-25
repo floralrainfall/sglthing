@@ -38,7 +38,7 @@ int main(int argc, char** argv)
     dInitODE2(0);
     dAllocateODEDataForThread(dAllocateMaskAll);
     init_kbd(window);
-    set_focus(window, false);
+    set_focus(window, true);
 
     world = world_init();
 

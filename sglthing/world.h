@@ -32,7 +32,6 @@ struct world {
         int banding_effect;
         int screen_width;
         int screen_height;
-        struct model* sky_ball;
 
         int depth_map_fbo;
         int depth_map_texture;
@@ -42,12 +41,6 @@ struct world {
     mat4 p;
     mat4 vp;
     vec4 viewport;
-
-    int normal_shader;
-    int debug_shader;
-    int cloud_shader;
-    int sky_shader;
-    int blur_shader;
 
     struct ui_data* ui;
 

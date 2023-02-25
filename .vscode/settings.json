@@ -17,6 +17,7 @@
         "extern.h": "c",
         "perl.h": "c",
         "neko.h": "c",
-        "neko_vm.h": "c"
+        "neko_vm.h": "c",
+        "cstring": "c"
     }
 }

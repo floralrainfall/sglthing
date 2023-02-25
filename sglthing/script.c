@@ -2,38 +2,50 @@
 #include "io.h"
 #include "s7/s7.h"
 #include <stdlib.h>
+#include <string.h>
 #include "sglthing.h"
 #include "s7/script_functions.h"
+#include "s7/transform.h"
+#include "world.h"
 
 struct script_system
 {
     s7_scheme* scheme;
+    struct transform* player_transform;
+    int player_transform_gc;
 };
-
-static s7_pointer __s7_engine_print(s7_scheme *sc, s7_pointer args)
-{
-    if(s7_is_string(s7_car(args)))
-    {
-        const char* str = s7_string(s7_car(args));
-        printf("s7: '%s'\n", str);
-        return s7_make_integer(sc, 1);
-    }
-  return(s7_wrong_type_arg_error(sc, "engine-print", 1, s7_car(args), "a string"));
-}
 
 struct script_system* script_init(char* file)
 {
-    char rsc_path[64];
+    char rsc_path[64] = {0};
+    char rsc_dir[64] = {0};
     if(file_get_path(rsc_path,64,file))
     {
-        printf("sglthing: starting script system on file %s\n", rsc_path);
+        char* last = strrchr(rsc_path, '/');
+        if(last != NULL)
+        {
+            int len = strlen(rsc_path) - strlen(last);
+            strncpy(rsc_dir, rsc_path, MIN(len,64));
+        }
+
+        printf("sglthing: starting script system on file %s (env: %s)\n", rsc_path, rsc_dir);
         struct script_system* system = malloc(sizeof(struct script_system));
         system->scheme = s7_init();
 
-        s7_define_function(system->scheme, "engine-print", __s7_engine_print, 1, 0, false, "(engine-print string) prints string to log");
-        s7_define_variable(system->scheme, "math-pi", s7_make_real(system->scheme, M_PIf));
-
+        s7_add_to_load_path(system->scheme, rsc_dir);
         sgls7_add_functions(system->scheme);
+        
+        system->player_transform = malloc(sizeof(struct transform));
+        system->player_transform->px = 0.f;
+        system->player_transform->py = 0.f;
+        system->player_transform->pz = 0.f;
+        system->player_transform->rx = 0.f;
+        system->player_transform->ry = 0.f;
+        system->player_transform->rz = 0.f;
+        system->player_transform->rw = 0.f;
+        system->player_transform->sx = 0.f;
+        system->player_transform->sy = 0.f;
+        system->player_transform->sz = 0.f;
 
         s7_pointer code = s7_load(system->scheme, rsc_path);
         s7_pointer response;
@@ -51,11 +63,42 @@ struct script_system* script_init(char* file)
 void script_frame(void* world, struct script_system* system)
 {
     ASSERT(system);
-    s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame"), s7_cons(system->scheme, s7_make_integer(system->scheme, world), s7_nil(system->scheme)));
+    s7_gc_on(system->scheme, false);
+    struct world* actual_world = (struct world*)world;
+
+    system->player_transform->px = actual_world->cam.position[0];
+    system->player_transform->py = actual_world->cam.position[1];
+    system->player_transform->pz = actual_world->cam.position[2];
+
+    system->player_transform->rx = actual_world->cam.pitch;
+    system->player_transform->ry = actual_world->cam.yaw;
+
+    struct transform* new_transform = (struct transform*)malloc(sizeof(struct transform));
+    memcpy(new_transform, system->player_transform, sizeof(struct transform));
+    s7_pointer transform = s7_make_c_object(system->scheme, sgls7_transform_type(), new_transform);     
+    s7_int gc_i = s7_gc_protect(system->scheme,transform);   
+    s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame"),   s7_cons(system->scheme, s7_make_c_pointer(system->scheme, world), 
+                                                                                s7_cons(system->scheme, transform, s7_nil(system->scheme))));
+    s7_gc_unprotect_at(system->scheme,gc_i);
+    
+
+    actual_world->cam.position[0] = new_transform->px;
+    actual_world->cam.position[1] = new_transform->py;
+    actual_world->cam.position[2] = new_transform->pz;
+
+    actual_world->cam.pitch = new_transform->rx;
+    actual_world->cam.yaw = new_transform->ry;
+    s7_gc_on(system->scheme, true);
 }
 
 void script_frame_render(void* world, struct script_system* system)
 {
     ASSERT(system);
-    s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame-render"), s7_cons(system->scheme, s7_make_integer(system->scheme, world), s7_nil(system->scheme)));
+    s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame-render"), s7_cons(system->scheme, s7_make_c_pointer(system->scheme, world), s7_nil(system->scheme)));
+}
+
+void script_frame_ui(void* world, struct script_system* system)
+{
+    ASSERT(system);
+    s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame-ui"), s7_cons(system->scheme, s7_make_c_pointer(system->scheme, world), s7_nil(system->scheme)));
 }
