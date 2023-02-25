@@ -39,30 +39,13 @@ void new_map(struct world* world, struct map* map)
             map->map_data[i][j] = rand()%MAP_MESHES;
             // create collision shape
             dGeomID floor_geom = dCreateBox(world->physics.space,32.0,56.0,32.0);
-            //dBodyID tile_body = dBodyCreate(world->physics.world);
-            //dBodyID mesh_body = dBodyCreate(world->physics.world);
-
-            //dGeomSetBody(floor_geom, tile_body);
-            dGeomSetPosition(floor_geom, i*32.0,-0.5 - (56.0/2.0),j*32.0);
-
-            switch(map->map_data[i][j])
-            {
-                case 1:
-                    dGeomID building_geom = dCreateBox(world->physics.space,32.0,56.0,32.0);
-                    dGeomSetPosition(building_geom, i*32.0,28.0,j*32.0);
-                    //dGeomSetBody(building_geom, tile_body);
-                    break;
-                case 4:
-                    dGeomID cone_geom = dCreateBox(world->physics.space,1.0,1.0,1.0);
-                    dGeomSetPosition(cone_geom, i*32.0,0.0,j*32.0);
-                    //dGeomSetBody(cone_geom, tile_body);
-                    break;
-            }
+            dGeomSetPosition(floor_geom,i*32.0,-26.0,j*32.0);
 
             map->map_textures[i][j] = rand_textures[rand()%RAND_TEXTURES];
         }
     }
     map->map_data[0][0] = 2;
+    map->area = light_create_area();
 }
 
 void draw_map(struct world* world, struct map* map, int shader)
@@ -83,15 +66,39 @@ void draw_map(struct world* world, struct map* map, int shader)
                 vec3 mm_position;
                 glm_vec3_sub(world->cam.position,position,direction);
                 float angle = glm_vec3_dot(world->cam.front, direction) / M_PI_180f;
-                if(angle < world->cam.fov || distance < world->gfx.fog_mindist)
+                if(angle < world->cam.fov || distance < 64.f)
                 {
                     int tile = map->map_data[i][j];
                     int texture = map->map_textures[i][j];
                     glm_mat4_identity(model_matrix);
+                    char linfo[255];
+                    for(int i = 0; i < MAX_LIGHTS; i++)
+                    {
+                        if(map->area->active_lights[i])
+                        {
+                            snprintf(linfo,255,"c:%f,l:%f,q:%f\na:(%0.2f,%0.2f,%0.2f),d:(%0.2f,%0.2f,%0.2f),s:(%0.2f,%0.2f,%0.2f),f:%02x",
+                                map->area->active_lights[i]->constant,
+                                map->area->active_lights[i]->linear,
+                                map->area->active_lights[i]->quadratic,
+                                map->area->active_lights[i]->ambient[0],
+                                map->area->active_lights[i]->ambient[1],
+                                map->area->active_lights[i]->ambient[2],
+                                map->area->active_lights[i]->diffuse[0],
+                                map->area->active_lights[i]->diffuse[1],
+                                map->area->active_lights[i]->diffuse[2],
+                                map->area->active_lights[i]->specular[0],
+                                map->area->active_lights[i]->specular[1],
+                                map->area->active_lights[i]->specular[2],
+                                map->area->active_lights[i]->flags);
+                            ui_draw_text_3d(world->ui, world->viewport, world->cam.position, world->cam.front, map->area->active_lights[i]->position, world->cam.fov, model_matrix, world->vp, linfo);
+                        }
+                    }
                     glm_translate(model_matrix,position);
                     glm_rotate_y(model_matrix,M_PIf*(0.50*(i*j)),model_matrix);
                     glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D, texture);
+                    light_update(map->area,position);
+                    world->render_area = map->area;
                     world_draw_model(world,map->map_meshes[tile],shader,model_matrix,false);
                     snprintf(txbuf,64,"x=%i, y=%i, type=%i, %.2fu away", i, j, tile, distance);
                     ui_draw_text_3d(world->ui, world->viewport, world->cam.position, world->cam.front, (vec3){0.f,10.f,0.f}, world->cam.fov, model_matrix, world->vp, txbuf);

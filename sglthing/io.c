@@ -6,6 +6,15 @@ int archives_loaded = 0;
 
 int file_get_path(char* dest, int n, char* resource_path)
 {    
+    {
+        FILE* early_test = fopen(resource_path, "r");
+        if(early_test)
+        {
+            fclose(early_test);
+            strncpy(dest, resource_path, n);
+            return 1;
+        }        
+    }
     for(int i = archives_loaded; i >= 0; i--)
     {
         char path[256];
@@ -24,6 +33,11 @@ int file_get_path(char* dest, int n, char* resource_path)
 
 FILE* file_open(char* resource_path, char* modes)
 {
+    {
+        FILE* early_test = fopen(resource_path, "r");
+        if(early_test)
+            return early_test;
+    }
     for(int i = 0; i < archives_loaded; i++)
     {
         char path[256];

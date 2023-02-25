@@ -23,10 +23,6 @@ out float f_affine;
 
 vec4 snap(vec4 vertex, vec2 resolution)
 {
-//  float dist = distance(camera_position, f_pos) * 0.01;
-//  vertex.x += sin(v_pos.y + dist + time) * 0.025;
-//  vertex.y += cos(v_pos.x + dist +time) * 0.025;
-//  vertex.z += sin(v_pos.y + dist +time) * 0.025;
     vec4 snappedPos = vertex;
     snappedPos.xyz = vertex.xyz / vertex.w; // convert to normalised device coordinates (NDC)
     snappedPos.xy = floor(resolution * snappedPos.xy) / resolution; // snap the vertex to the lower-resolution grid

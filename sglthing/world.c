@@ -42,6 +42,8 @@ struct world* world_init()
     world->cam.fov = 60.f;
     world->cam.yaw = 0.f;
 
+    world->script = script_init("scripts/game.s7");
+
     int v = compile_shader("shaders/normal.vs", GL_VERTEX_SHADER);
     int f = compile_shader("shaders/fragment.fs", GL_FRAGMENT_SHADER);
     world->normal_shader = link_program(v,f);
@@ -96,8 +98,8 @@ struct world* world_init()
     world->gfx.fog_color[2] = world->gfx.clear_color[2];
     world->gfx.fog_color[3] = world->gfx.clear_color[3];
 
-    world->gfx.fog_maxdist = 256.f;
-    world->gfx.fog_mindist = 32.1f;
+    world->gfx.fog_maxdist = 128.f;
+    world->gfx.fog_mindist = 128.f-32.f;
     world->gfx.banding_effect = 0xff8;
 
     world->primitives = create_primitives();
@@ -127,8 +129,8 @@ struct world* world_init()
     world->physics.paused = false;
 
     world->player_body = dBodyCreate(world->physics.world);
-    world->player_geom = dCreateBox(world->physics.space, 1.0, 1.0, 1.0);
-    dMassSetBox (&world->player_mass, 0.5, 1.0, 1.0, 1.0);
+    world->player_geom = dCreateCapsule(world->physics.space, 1.0, 2.0);
+    dMassSetCapsule (&world->player_mass, 0.5, 1.0, 1.0, 1.0);
     dBodySetMass (world->player_body,&world->player_mass);
     dGeomSetBody (world->player_geom,world->player_body);
     dBodySetPosition(world->player_body, 10.0, 10.0, 10.0);
@@ -147,23 +149,34 @@ struct world* world_init()
         dGeomSetData(geom, get_model("box.obj"));
     }
 
+    // init shadow map
+    /*sglc(glGenFramebuffers(1, &world->gfx.depth_map_fbo));  
+    sglc(glGenTextures(1, &world->gfx.depth_map_texture));
+    sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.depth_map_texture));
+    sglc(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+        SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT,
+        NULL));
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)); 
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));  
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
+    sglc(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, world->gfx.depth_map_texture, 0));
+    sglc(glDrawBuffer(GL_NONE));
+    sglc(glReadBuffer(GL_NONE));
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));*/  
+
+    world->render_area = 0;
+
     return world;
 }
 
 void world_frame_render(struct world* world)
 {    
-    const dReal *pos = dGeomGetPosition (world->physics.geom);
-    dQuaternion quat;
-    dGeomGetQuaternion (world->physics.geom, quat);
-    mat4 test_model;
-    glm_mat4_identity(test_model);
-    glm_translate(test_model,(vec3){pos[0],pos[1],pos[2]});
-    mat4 test_model_rotation;
-    glm_quat_mat4((vec4){quat[1],quat[2],quat[3],quat[0]}, test_model_rotation);
-    glm_mul(test_model, test_model_rotation, test_model);
+    script_frame_render(world,world->script);
 
     draw_map(world, world->test_map, world->normal_shader);
-    world_draw_model(world, world->test_object, world->normal_shader, test_model, true);
+    //world_draw_model(world, world->test_object, world->normal_shader, test_model, true);
 }
 
 void world_frame(struct world* world)
@@ -173,12 +186,22 @@ void world_frame(struct world* world)
     glViewport(0, 0, world->gfx.screen_width, world->gfx.screen_height);
     world->viewport[2] = (float)world->gfx.screen_width;
     world->viewport[3] = (float)world->gfx.screen_height;
-        
+    
+    //glm_ortho(-10.f,10.f,-10.f,10.f,1.0f,7.5f,world->p);
+    //glm_lookat((vec3){-2.f,4.f,-1.f},(vec3){0.f,0.f,0.f},(vec3){0.f,1.f,0.f},world->v);
+
     glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     glClear(GL_DEPTH_BUFFER_BIT);
 
+    // shadow pass
+    //glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT);
+    //glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo);
+    //glClear(GL_DEPTH_BUFFER_BIT);
+    //world_frame_render(world);
+    //glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
     glm_perspective(world->cam.fov * M_PI_180f, world->gfx.screen_width/world->gfx.screen_height, 0.1f, world->gfx.fog_maxdist, world->p);
     glm_ortho(0.f, world->viewport[2], 0.f, world->viewport[3], 0.1f, 1000.f, world->ui->projection);
 
@@ -196,7 +219,9 @@ void world_frame(struct world* world)
     glm_vec3_add(world->cam.position, world->cam.front, target);
 
     glm_lookat(world->cam.position, target, world->cam.up, world->v);
-    
+    //glm_lookat((vec3){world->cam.position[0]-10.f,world->cam.position[1]+10.f,world->cam.position[2]-10.f},(vec3){world->cam.position[0],world->cam.position[1],world->cam.position[2]},(vec3){0.f,1.f,0.f},world->v);
+
+
     mat4 cloud_matrix;
     glm_mat4_identity(cloud_matrix);
     glm_translate(cloud_matrix, (vec3){world->cam.position[0],world->cam.position[1]+1.0f,world->cam.position[2]});
@@ -206,11 +231,6 @@ void world_frame(struct world* world)
     glm_mat4_identity(sky_matrix);
     glm_translate(sky_matrix, (vec3){world->cam.position[0],world->cam.position[1],world->cam.position[2]});
     glm_scale(sky_matrix, (vec3){1.f,1.f,1.f});
-
-    glDisable(GL_DEPTH_TEST);
-    world_draw_model(world, world->gfx.sky_ball, world->sky_shader, sky_matrix, false);
-    world_draw_primitive(world, world->cloud_shader, GL_FILL, PRIMITIVE_PLANE, cloud_matrix, (vec4){1.f,1.f,1.f,1.f});
-    glEnable(GL_DEPTH_TEST);
 
     mat4 geom_matrix;
     for(int i = 0; i < dSpaceGetNumGeoms(world->physics.space); i++)
@@ -279,10 +299,20 @@ void world_frame(struct world* world)
         world->cam.pitch = -85.f;
     //glm_lookat(world->cam.position, (vec3){0.f,16.f,0.f}, world->cam.up, world->v);
 
+    script_frame(world, world->script);
+
+    // render pass
+    glViewport(0, 0, world->gfx.screen_width, world->gfx.screen_height);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
+    world_draw_model(world, world->gfx.sky_ball, world->sky_shader, sky_matrix, false);
+    world_draw_primitive(world, world->cloud_shader, GL_FILL, PRIMITIVE_PLANE, cloud_matrix, (vec4){1.f,1.f,1.f,1.f});
+    glEnable(GL_DEPTH_TEST);
     world_frame_render(world);
+
     // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
 
-    ui_draw_text(world->ui, 0.f, 480.f-16.f, "sglthing dev", 1.f);
+    ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, "sglthing dev", 1.f);
 
     char dbg_info[256];
     int old_elements = world->ui->ui_elements;
@@ -301,12 +331,12 @@ void world_frame(struct world* world)
         world->physics.paused?"true":"false",
         dSpaceGetNumGeoms(world->physics.space),
         world->physics.collisions_in_frame);
-    ui_draw_text(world->ui, 0.f, 480.f-(16.f*3), dbg_info, 1.f);
+    ui_draw_text(world->ui, 0.f, world->gfx.screen_height-(16.f*3), dbg_info, 1.f);
 
     for(int i = 0; i < archives_loaded; i++)
     {
         snprintf(dbg_info, 256, "FS Archive %i: %s", i, archives[i].directory);
-        ui_draw_text(world->ui, 640.f/2.f, 480.f-(16.f*3)-(i*16.f), dbg_info, 1.f);
+        ui_draw_text(world->ui, world->gfx.screen_width/2, world->gfx.screen_height-(16.f*3)-(i*16.f), dbg_info, 1.f);
     }
 
     world->physics.collisions_in_frame = 0;
@@ -373,6 +403,8 @@ void world_draw_model(struct world* world, struct model* model, int shader_progr
         sglc(glUseProgram(shader_program));
 
         __easy_uniforms(world, shader_program, model_matrix);
+        if(world->render_area)
+            light_area_set_uniforms(world->render_area, shader_program);
         struct mesh* mesh_sel = &model->meshes[i];
         vec3 src_position = {0.f, 1.f, 0.f};
         

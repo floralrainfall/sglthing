@@ -7,6 +7,11 @@
 #include "map.h"
 #include "ui.h"
 #include "primitives.h"
+#include "light.h"
+#include "script.h"
+
+#define SHADOW_WIDTH 1024
+#define SHADOW_HEIGHT 1024
 
 struct world {
     struct {
@@ -28,19 +33,10 @@ struct world {
         int screen_width;
         int screen_height;
         struct model* sky_ball;
+
+        int depth_map_fbo;
+        int depth_map_texture;
     } gfx;
-
-    struct {
-        bool paused;
-        dWorldID world;
-        dSpaceID space;
-        dBodyID body;
-        dGeomID geom;
-        dMass m;
-        dJointGroupID contactgroup;
-
-        int collisions_in_frame;
-    } physics;
 
     mat4 v;
     mat4 p;
@@ -57,6 +53,8 @@ struct world {
 
     struct model* test_object;
     struct map* test_map;
+    struct light_area* render_area;
+    struct script_system* script;
     struct primitives primitives;
 
     int render_count;
@@ -71,6 +69,18 @@ struct world {
     int color_buffers[2];
     int pingpong_fbo[2];
     int pingpong_buffers[2];
+    
+    struct {
+        bool paused;
+        dWorldID world;
+        dSpaceID space;
+        dBodyID body;
+        dGeomID geom;
+        dMass m;
+        dJointGroupID contactgroup;
+
+        int collisions_in_frame;
+    } physics;
 };
 
 struct world* world_init();

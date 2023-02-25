@@ -1,0 +1,4 @@
+(define (script-frame world)
+    ())
+(define (script-frame-render world)
+    ())

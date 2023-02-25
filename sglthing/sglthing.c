@@ -5,6 +5,7 @@
 
 #include "keyboard.h"
 #include "world.h"
+#include "io.h"
 
 static void glerror(int error, const char* description)
 {
@@ -31,12 +32,13 @@ int main(int argc, char** argv)
     fs_add_directory("../resources");
 
     glfwMakeContextCurrent(window);
+    glfwSwapInterval(0);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
 
     dInitODE2(0);
     dAllocateODEDataForThread(dAllocateMaskAll);
     init_kbd(window);
-    set_focus(window, true);
+    set_focus(window, false);
 
     world = world_init();
 

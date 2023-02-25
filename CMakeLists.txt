@@ -4,11 +4,11 @@ add_subdirectory(glad)
 
 # im temporarily disabling this because when u cross compiole it doesn't like it
 
-#find_package(glfw3)
-#find_package(cglm)
-#find_package(assimp)
-#find_package(PkgConfig REQUIRED)
-#pkg_check_modules(ODE ode)
+find_package(glfw3)
+find_package(cglm)
+find_package(assimp)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(ODE ode)
 set(ODE_FOUND OFF)
 
 set(ODE_LIBRARY ${ODE_LIBRARIES})
@@ -33,6 +33,11 @@ endif()
 project(sglthing)
 
 add_executable(sglthing
+    sglthing/s7/script_functions.h
+    sglthing/s7/script_functions.c
+    sglthing/s7/s7.h
+    sglthing/s7/s7.c
+
     sglthing/primitives.h
     sglthing/primitives.c 
     sglthing/sglthing.h
@@ -45,8 +50,12 @@ add_executable(sglthing
     sglthing/graphic.c
     sglthing/shader.h
     sglthing/shader.c 
+    sglthing/script.h
+    sglthing/script.c 
     sglthing/world.h
     sglthing/world.c 
+    sglthing/light.h
+    sglthing/light.c 
     sglthing/model.h
     sglthing/model.c 
     sglthing/map.h
@@ -55,6 +64,10 @@ add_executable(sglthing
     sglthing/ui.c 
     sglthing/io.h
     sglthing/io.c 
+)
+
+target_include_directories(sglthing PUBLIC
+    ${ODE_INCLUDE_DIR}
 )
 
 target_link_libraries(sglthing PUBLIC

@@ -4,6 +4,8 @@
 #include <cglm/cglm.h>
 #include <glad/glad.h>
 
+#include <signal.h>
+
 struct vertex_normal
 {
     vec3 position;
@@ -11,11 +13,12 @@ struct vertex_normal
 };
 
 #define sglc(f) {\
-    { f; };\ 
+    { f; };\
     int x = glGetError();\
     if(x)\
     {\
         printf("sglthing: gl error %i above from %s:%i\n", x, __FILE__, __LINE__);\
+        raise(SIGINT);\
         exit(-1);\
     }\
 }
