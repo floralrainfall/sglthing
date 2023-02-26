@@ -5,6 +5,8 @@ Estimated Requirements
 - a graphics card capable of OpenGL 3.2 core
 - a computer
 
+![The last screenshot in this repo](https://github.com/floralrainfall/sglthing/raw/trunk/screenshot.png)
+
 ## Windows Cross-Compilation Notes
 
 Assimp doesn't copy itself over to the build directory for some reason. Just do cp deps/assimp/bin/libassimp-5.dll . to get it in.
