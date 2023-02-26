@@ -4,7 +4,6 @@
 #include <ode/ode.h>
 #include "graphic.h"
 #include "model.h"
-#include "map.h"
 #include "ui.h"
 #include "primitives.h"
 #include "light.h"

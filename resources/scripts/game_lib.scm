@@ -22,3 +22,5 @@
     (set! (transform-pz camera) (+ (transform-pz camera) (* z-axis-input (* 10.0 (* (sin (* (transform-ry camera) math-pi-180)) delta-time)))))
     (set! (transform-rx camera) (- (transform-rx camera) (* 30.0 (* (cadr mouse-position) delta-time)))) ; pitch
     (set! (transform-ry camera) (+ (transform-ry camera) (* 30.0 (* (car mouse-position) delta-time))))) ; yaw
+
+(engine-print "GameLib loaded")

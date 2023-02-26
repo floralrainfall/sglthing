@@ -47,3 +47,5 @@
     (world-draw-object world sky-shader sky-ball sky-transform)
     (world-draw-primitive world cloud-shader 2 cloud-transform)
     (gl-yes-depth))
+
+(engine-print "GFX-Utils loaded")

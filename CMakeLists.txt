@@ -62,8 +62,6 @@ add_executable(sglthing
     sglthing/light.c 
     sglthing/model.h
     sglthing/model.c 
-    sglthing/map.h
-    sglthing/map.c 
     sglthing/ui.h
     sglthing/ui.c 
     sglthing/io.h

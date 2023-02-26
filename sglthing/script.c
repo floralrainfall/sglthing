@@ -106,6 +106,6 @@ void script_frame_ui(void* world, struct script_system* system)
     struct world* actual_world = (struct world*)world;
     char sfui_dbg[256];
     snprintf(sfui_dbg,256,"s7 running script %s",system->script_name);
-    ui_draw_text(actual_world->ui, actual_world->viewport[2]/3.f, actual_world->viewport[3]/1.25f, sfui_dbg, 1.f);
+    ui_draw_text(actual_world->ui, actual_world->viewport[2]/3.f, 0.f, sfui_dbg, 1.f);
     s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame-ui"), s7_cons(system->scheme, s7_make_c_pointer(system->scheme, world), s7_nil(system->scheme)));
 }
