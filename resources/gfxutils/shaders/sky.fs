@@ -10,7 +10,7 @@ uniform vec3 camera_position;
 
 void main()
 {   
-  vec4 out_color = vec4(0.0/255.0,204.0/255.0,255.0/255.0,1);
+  vec4 out_color = vec4(255.0/255.0,204.0/255.0,51.0/255.0,1);
 
   out_color.w = f_m_pos.y + 0.2;
 

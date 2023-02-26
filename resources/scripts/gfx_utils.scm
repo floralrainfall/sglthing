@@ -11,6 +11,13 @@
     (load-model f)
     (get-model f))
     
+(define (quick-load-texture f)
+    (load-texture f)
+    (get-texture f))
+
+(io-add-directory "resources/gfxutils")
+(io-add-directory "../resources/gfxutils")
+    
 (define normal-shader (compile-shaders "shaders/normal.vs" "shaders/fragment.fs"))
 (define normal-simple-shader (compile-shaders "shaders/normal.vs" "shaders/fragment_simple.fs"))
 (define debug-shader  (compile-shaders "shaders/dbg.vs" "shaders/dbg.fs"))

@@ -32,9 +32,6 @@ struct world {
         int banding_effect;
         int screen_width;
         int screen_height;
-
-        int depth_map_fbo;
-        int depth_map_texture;
     } gfx;
 
     mat4 v;
@@ -44,32 +41,18 @@ struct world {
 
     struct ui_data* ui;
 
-    struct model* test_object;
-    struct map* test_map;
     struct light_area* render_area;
     struct script_system* script;
     struct primitives primitives;
 
     int render_count;
-
-    dBodyID player_body;
-    dGeomID player_geom;
-    dMass player_mass;
     
     double delta_time;
-
-    int hdr_fbo;
-    int color_buffers[2];
-    int pingpong_fbo[2];
-    int pingpong_buffers[2];
     
     struct {
         bool paused;
         dWorldID world;
         dSpaceID space;
-        dBodyID body;
-        dGeomID geom;
-        dMass m;
         dJointGroupID contactgroup;
 
         int collisions_in_frame;

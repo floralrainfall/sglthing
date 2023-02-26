@@ -122,6 +122,7 @@ void sgls7_transform_register(s7_scheme* sc)
     s7_define_function(sc, "make-transform", make_transform, 0, 0, false, "(make-transform) makes a new transform");
     s7_define_function(sc, "update-transform", update_transform, 1, 0, false, "(update-transform t) updates a transform");
     s7_define_function(sc, "transform?", is_transform, 1, 0, false, "(transform? anything) returns #t if its argument is a transform object");
+    s7_define_function(sc, "transform-set-euler", is_transform, 4, 0, false, "(transform-set-euler t x y z)");
 
     SET_TRANSFORM_TYPE(sc,px);
     SET_TRANSFORM_TYPE(sc,py);

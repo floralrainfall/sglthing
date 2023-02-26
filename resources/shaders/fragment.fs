@@ -66,17 +66,20 @@ vec3 calc_point_light(light i, vec3 normal, vec3 frag_pos, vec3 view_dir)
 
 void main()
 {   
+    // ambient lighting
+    vec3 ambient = 0.25 * vec3(30.0/255.0,26.0/255.0,117.0/255.0);
+
     // calculate diffuse lighting
     vec3 norm = normalize(f_normal);
     vec3 light_dir = -normalize(vec3(1.,-0.75,-0.5)*100000.0 - f_pos);
     float diff = max(dot(norm, light_dir),0.1);
-    vec3 diffuse = diff * vec3(0.77,0.8,0.9);
+    vec3 diffuse = diff * vec3(227.0/255.0,168.0/255.0,87.0/255.0);
 
     // calculate specular lighting
     vec3 view_dir = normalize(camera_position - f_pos);
     vec3 reflect_dir = reflect(-light_dir, norm);  
     float spec = pow(max(dot(view_dir, reflect_dir), 0.0), 4);
-    vec3 specular = 0.5 * spec * vec3(0.9,0.95,1.0);  
+    vec3 specular = 0.5 * spec * vec3(255.0/255.0,204.0/255.0,51.0/255.0);  
 
     ivec2 coord = ivec2(gl_FragCoord.xy - 0.5);
 
@@ -91,7 +94,7 @@ void main()
     for(int i = 0; i < MAX_LIGHTS; i++)
         combined_light_result += calc_point_light(lights[i], f_normal, f_pos, view_dir);
 
-    out_color *= vec4(diffuse + specular + combined_light_result,1.0);
+    out_color *= vec4(ambient + diffuse + specular + combined_light_result,1.0);
 
     // color banding effect
     vec4 out_color_raw = out_color;

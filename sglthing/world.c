@@ -61,9 +61,9 @@ struct world* world_init()
 
     world->delta_time = 0.0;
 
-    world->gfx.clear_color[0] = 135.f/255.f;
-    world->gfx.clear_color[1] = 206.f/255.f;
-    world->gfx.clear_color[2] = 250.f/255.f; 
+    world->gfx.clear_color[0] = 250.f/255.f;
+    world->gfx.clear_color[1] = 214.f/255.f;
+    world->gfx.clear_color[2] = 165.f/255.f; 
     world->gfx.clear_color[3] = 1.f;
 
     world->gfx.fog_color[0] = world->gfx.clear_color[0];
@@ -87,41 +87,6 @@ struct world* world_init()
 
     world->physics.space = dHashSpaceCreate(0);
     world->physics.contactgroup = dJointGroupCreate (0);
-
-    world->physics.body = dBodyCreate (world->physics.world);
-    world->physics.geom = dCreateSphere (world->physics.space,0.5);
-    dMassSetSphere (&world->physics.m,100,0.5);
-    dBodySetMass (world->physics.body,&world->physics.m);
-    dGeomSetBody (world->physics.geom,world->physics.body);
-    dGeomSetPosition(world->physics.geom, 2.0, 1.0, 0.0);
-    dBodyEnable(world->physics.body);
-    //dCreatePlane(world->physics.space,0,1,0,0);
-    world->physics.paused = false;
-
-    world->player_body = dBodyCreate(world->physics.world);
-    world->player_geom = dCreateCapsule(world->physics.space, 1.0, 2.0);
-    dMassSetCapsule (&world->player_mass, 0.5, 1.0, 1.0, 1.0);
-    dBodySetMass (world->player_body,&world->player_mass);
-    dGeomSetBody (world->player_geom,world->player_body);
-    dBodySetPosition(world->player_body, 10.0, 10.0, 10.0);
-    dBodySetMaxAngularSpeed(world->player_body, 0.0);
-
-    // init shadow map
-    /*sglc(glGenFramebuffers(1, &world->gfx.depth_map_fbo));  
-    sglc(glGenTextures(1, &world->gfx.depth_map_texture));
-    sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.depth_map_texture));
-    sglc(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
-        SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT,
-        NULL));
-    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)); 
-    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));  
-    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
-    sglc(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, world->gfx.depth_map_texture, 0));
-    sglc(glDrawBuffer(GL_NONE));
-    sglc(glReadBuffer(GL_NONE));
-    sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));*/  
 
     world->render_area = 0;
 

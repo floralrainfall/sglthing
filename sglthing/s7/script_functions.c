@@ -57,7 +57,7 @@ static s7_pointer __get_texture(s7_scheme *sc, s7_pointer args)
         return(s7_wrong_type_arg_error(sc, "get-texture", 0, s7_car(args), "a texture name"));
 
     const char* str = s7_string(s7_car(args));
-    return s7_make_integer(sc, get_texture(str));
+    return s7_make_integer(sc, get_texture((char*)str));
 }
 
 #include "../shader.h"
@@ -168,6 +168,17 @@ static s7_pointer __render_primitive(s7_scheme* sc, s7_pointer args)
     return s7_nil(sc);
 }
 
+#include "../io.h"
+
+static s7_pointer __io_add_directory(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_string(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "io-add-directory", 0, s7_car(args), "path"));
+    const char* str = s7_string(s7_car(args));
+    fs_add_directory(str);
+    return s7_nil(sc);
+}
+
 #include <glad/glad.h>
 
 static s7_pointer __gl_no_depth(s7_scheme* sc, s7_pointer args)
@@ -179,6 +190,21 @@ static s7_pointer __gl_no_depth(s7_scheme* sc, s7_pointer args)
 static s7_pointer __gl_yes_depth(s7_scheme* sc, s7_pointer args)
 {
     glEnable(GL_DEPTH_TEST);
+    return s7_nil(sc);
+}
+
+static s7_pointer __gl_bind_texture(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_integer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "gl-bind-texture", 0, s7_car(args), "texture slot"));
+    int texture_slot = s7_integer(s7_car(args));
+
+    if(!s7_is_integer(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "gl-bind-texture", 1, s7_cadr(args), "texture id"));
+    int texture_id = s7_integer(s7_cadr(args));
+
+    glActiveTexture(GL_TEXTURE0 + texture_slot);
+    glBindTexture(GL_TEXTURE_2D, texture_id);
     return s7_nil(sc);
 }
 
@@ -217,7 +243,21 @@ static s7_pointer __ui_draw_text(s7_scheme* sc, s7_pointer args)
 
 static s7_pointer __input_add_axis(s7_scheme* sc, s7_pointer args)
 {
-
+    if(!s7_is_string(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "input-get-axis", 0, s7_car(args), "axis name"));
+    const char* axis = s7_string(s7_car(args));
+    if(!s7_is_integer(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "input-get-axis", 1, s7_cadr(args), "positive key"));
+    int positive_key = s7_integer(s7_car(args));
+    if(!s7_is_integer(s7_caddr(args)))
+        return(s7_wrong_type_arg_error(sc, "input-get-axis", 2, s7_caddr(args), "negative key"));
+    int negative_key = s7_integer(s7_cadr(args));
+    struct keyboard_mapping k;
+    strncpy(k.name,axis,16);
+    k.key_positive = positive_key;
+    k.key_negative = negative_key;
+    add_input(k);
+    return s7_nil(sc);
 }
 
 static s7_pointer __input_get_axis(s7_scheme* sc, s7_pointer args)
@@ -246,6 +286,23 @@ static s7_pointer __input_get_focus(s7_scheme* sc, s7_pointer args)
     return s7_make_boolean(sc, get_focus());
 }
 
+#include <ode/ode.h>
+
+static s7_pointer __physics_set_transform(s7_scheme* sc, s7_pointer args)
+{
+
+}
+
+static s7_pointer __physics_create_body(s7_scheme* sc, s7_pointer args)
+{
+
+}
+
+static s7_pointer __physics_create_geom(s7_scheme* sc, s7_pointer args)
+{
+
+}
+
 void sgls7_add_functions(s7_scheme* sc)
 {
     sgls7_transform_register(sc);
@@ -265,11 +322,15 @@ void sgls7_add_functions(s7_scheme* sc)
     s7_define_function(sc, "world-time", __world_time, 0, 0, false, "(world-time) gets time of glfw");
     s7_define_function(sc, "world-delta-time", __world_delta_time, 1, 0, false, "(world-delta-time w) gets delta time of glfw window");
 
+    s7_define_function(sc, "io-add-directory", __io_add_directory, 1, 0, false, "(io-add-directory d)");
+
     s7_define_function(sc, "gl-no-depth", __gl_no_depth, 0, 0, false, "(gl-no-depth) disables depth testing");
     s7_define_function(sc, "gl-yes-depth", __gl_yes_depth, 0, 0, false, "(gl-yes-depth) enables depth testing");
+    s7_define_function(sc, "gl-bind-texture", __gl_bind_texture, 2, 0, false, "(gl-bind-texture s t) sets texture slot s to texture id t");
 
     s7_define_function(sc, "ui-draw-text", __ui_draw_text, 4, 0, false, "(ui-draw-text u x y t)");
 
+    s7_define_function(sc, "input-add-axis", __input_add_axis, 3, 0, false, "(input-get-mouse s p n) creates axis named s using positive glfw key p and negative glfw key n");
     s7_define_function(sc, "input-get-mouse", __input_get_mouse, 0, 0, false, "(input-get-mouse) returns list, x = 1st element, y = 2nd element");
     s7_define_function(sc, "input-get-axis", __input_get_axis, 1, 0, false, "(input-get-axis a) returns real num");
     s7_define_function(sc, "input-get-key", __input_get_key, 1, 0, false, "(input-get-mouse k) returns #t/#f");
