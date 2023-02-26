@@ -43,6 +43,10 @@ If ODE complains about not finding "Windows.h", just set the name of the include
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
+## s7 License
+
+    sglthing/s7/s7.c & sglthing/s7/s7.h is licensed under the 0BSD license.
+
 ## GLFW License
 
     Copyright © 2002-2006 Marcus Geelnard

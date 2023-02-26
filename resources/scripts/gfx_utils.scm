@@ -1,3 +1,6 @@
+; GFX-Utils for sglthing
+; This file is Public Domain, but credit would be appreciated!
+
 (define (compile-shaders v f)
     (let (
         (vs (compile-shader v GL_VERTEX_SHADER))
@@ -9,6 +12,7 @@
     (get-model f))
     
 (define normal-shader (compile-shaders "shaders/normal.vs" "shaders/fragment.fs"))
+(define normal-simple-shader (compile-shaders "shaders/normal.vs" "shaders/fragment_simple.fs"))
 (define debug-shader  (compile-shaders "shaders/dbg.vs" "shaders/dbg.fs"))
 (define sky-shader    (compile-shaders "shaders/sky.vs" "shaders/sky.fs"))
 (define cloud-shader  (compile-shaders "shaders/cloud.vs" "shaders/cloud.fs"))
@@ -16,8 +20,9 @@
 (define sky-ball (quick-load-model "skyball.obj"))
 (define sky-transform (make-transform))
 (define cloud-transform (make-transform))
-(set! (transform-sx cloud-transform) 10.0)
-(set! (transform-sz cloud-transform) 10.0)
+(set! (transform-sx cloud-transform) 50.0)
+(set! (transform-sz cloud-transform) 50.0)
+(update-transform cloud-transform)
 
 (define (gfxutils-frame world camera)
     (set! (transform-px cloud-transform) (transform-px camera))

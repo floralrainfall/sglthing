@@ -34,9 +34,9 @@ static void __kbd_callback(GLFWwindow* window, int key, int scancode, int action
         }
         else if(action == GLFW_RELEASE)
         {
-            if(mappings[i].key_positive == key)
+            if(mappings[i].key_positive == key && mappings[i].value != -1.f)
                 mappings[i].value = 0.f;
-            if(mappings[i].key_negative == key)
+            if(mappings[i].key_negative == key && mappings[i].value != 1.f)
                 mappings[i].value = -0.f;
         }
     }

@@ -106,19 +106,6 @@ struct world* world_init()
     dBodySetPosition(world->player_body, 10.0, 10.0, 10.0);
     dBodySetMaxAngularSpeed(world->player_body, 0.0);
 
-    load_model("box.obj");
-    for(int i = 0; i < 512; i++)
-    {
-        dGeomID geom = dCreateBox(world->physics.space,2,2,2);
-        dBodyID body = dBodyCreate(world->physics.world);
-        dMass mass;
-        dGeomSetBody(geom, body);
-        dMassSetBox (&mass,(i+1)/1,1,1,1);
-        dBodySetMass (body,&mass);
-        dBodySetPosition(body, floor(cos(i/2.0)*50.0)+8.0*32.0, i, floor(sin(i/2.0)*50.0)+8.0*32.0);
-        dGeomSetData(geom, get_model("box.obj"));
-    }
-
     // init shadow map
     /*sglc(glGenFramebuffers(1, &world->gfx.depth_map_fbo));  
     sglc(glGenTextures(1, &world->gfx.depth_map_texture));
@@ -173,10 +160,13 @@ void world_frame(struct world* world)
     //glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     
+    if(world->cam.pitch > 85.f)
+        world->cam.pitch = 85.f;
+    if(world->cam.pitch < -85.f)
+        world->cam.pitch = -85.f;
 
     glm_perspective(world->cam.fov * M_PI_180f, world->gfx.screen_width/world->gfx.screen_height, 0.1f, world->gfx.fog_maxdist, world->p);
     glm_ortho(0.f, world->viewport[2], 0.f, world->viewport[3], 0.1f, 1000.f, world->ui->projection);
-
 
     world->cam.front[0] = cosf(world->cam.yaw * M_PI_180f) * cosf(world->cam.pitch * M_PI_180f);
     world->cam.front[1] = sinf(world->cam.pitch * M_PI_180f);
@@ -196,15 +186,12 @@ void world_frame(struct world* world)
 
     glm_mul(world->p, world->v, world->vp);
 
-    if(get_focus())
-    {
-        world->cam.yaw += mouse_position[0] * world->delta_time * 10.f;
-        world->cam.pitch -= mouse_position[1] * world->delta_time * 10.f;
-    }
-    if(world->cam.pitch > 85.f)
-        world->cam.pitch = 85.f;
-    if(world->cam.pitch < -85.f)
-        world->cam.pitch = -85.f;
+    //if(get_focus())
+    //{
+    //    world->cam.yaw += mouse_position[0] * world->delta_time * 10.f;
+    //    world->cam.pitch -= mouse_position[1] * world->delta_time * 10.f;
+    //}
+
     //glm_lookat(world->cam.position, (vec3){0.f,16.f,0.f}, world->cam.up, world->v);
 
     // render pass

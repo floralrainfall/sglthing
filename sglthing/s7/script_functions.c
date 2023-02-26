@@ -8,11 +8,6 @@
 
 #include "../sglthing.h"
 
-static s7_pointer __world_time(s7_scheme *sc, s7_pointer args)
-{
-    return s7_make_real(sc, glfwGetTime());
-}
-
 static s7_pointer __engine_print(s7_scheme *sc, s7_pointer args)
 {
     if(!s7_is_string(s7_car(args)))
@@ -96,6 +91,20 @@ static s7_pointer __link_program(s7_scheme* sc, s7_pointer args)
 #include "../world.h"
 #include "../primitives.h"
 
+static s7_pointer __world_time(s7_scheme *sc, s7_pointer args)
+{
+    return s7_make_real(sc, glfwGetTime());
+}
+
+static s7_pointer __world_delta_time(s7_scheme *sc, s7_pointer args)
+{
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "world-render-object", 0, s7_car(args), "world pointer"));
+    struct world* world = (struct world*)s7_c_pointer(s7_car(args));
+
+    return s7_make_real(sc, world->delta_time);
+}
+
 static s7_pointer __draw_vao(s7_scheme* sc, s7_pointer args)
 {
 
@@ -119,7 +128,13 @@ static s7_pointer __render_object(s7_scheme* sc, s7_pointer args)
         return(s7_wrong_type_arg_error(sc, "world-render-primitive", 3, s7_cadddr(args), "transform"));
     struct transform* transform = (struct transform*)s7_c_object_value(s7_cadddr(args));
 
-    world_draw_model(world, model, program, transform->transform_matrix, true);
+    mat4 model_matrix;
+    glm_mat4_identity(model_matrix);
+    glm_mul(model_matrix, transform->translation_matrix, model_matrix);
+    glm_mul(model_matrix, transform->rotation_matrix, model_matrix);
+    glm_mul(model_matrix, transform->scale_matrix, model_matrix);
+
+    world_draw_model(world, model, program, model_matrix, true);
 
     return s7_nil(sc);
 }
@@ -142,7 +157,13 @@ static s7_pointer __render_primitive(s7_scheme* sc, s7_pointer args)
         return(s7_wrong_type_arg_error(sc, "world-render-primitive", 3, s7_cadddr(args), "transform"));
     struct transform* transform = (struct transform*)s7_c_object_value(s7_cadddr(args));
 
-    world_draw_primitive(world, program, GL_FILL, type, transform->transform_matrix, (vec4){1.f,1.f,1.f,1.f});
+    mat4 model_matrix;
+    glm_mat4_identity(model_matrix);
+    glm_mul(model_matrix, transform->translation_matrix, model_matrix);
+    glm_mul(model_matrix, transform->rotation_matrix, model_matrix);
+    glm_mul(model_matrix, transform->scale_matrix, model_matrix);
+
+    world_draw_primitive(world, program, GL_FILL, type, model_matrix, (vec4){1.f,1.f,1.f,1.f});
 
     return s7_nil(sc);
 }
@@ -192,6 +213,39 @@ static s7_pointer __ui_draw_text(s7_scheme* sc, s7_pointer args)
     ui_draw_text(ui, x_position, y_position, (char*)text, 1.0f);
 }
 
+#include "../keyboard.h"
+
+static s7_pointer __input_add_axis(s7_scheme* sc, s7_pointer args)
+{
+
+}
+
+static s7_pointer __input_get_axis(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_string(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "input-get-axis", 0, s7_car(args), "axis name"));
+    const char* axis = s7_string(s7_car(args));
+    return s7_make_real(sc, get_input((char*)axis));
+}
+
+static s7_pointer __input_get_key(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_integer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "input-get-key", 0, s7_car(args), "key glfw id"));
+    int key = s7_integer(s7_car(args));
+    return s7_make_boolean(sc, keys_down[key]);
+}
+
+static s7_pointer __input_get_mouse(s7_scheme* sc, s7_pointer args)
+{
+    return s7_cons(sc, s7_make_real(sc, mouse_position[0]), s7_cons(sc, s7_make_real(sc, mouse_position[1]), s7_nil(sc)));
+}
+
+static s7_pointer __input_get_focus(s7_scheme* sc, s7_pointer args)
+{
+    return s7_make_boolean(sc, get_focus());
+}
+
 void sgls7_add_functions(s7_scheme* sc)
 {
     sgls7_transform_register(sc);
@@ -204,22 +258,28 @@ void sgls7_add_functions(s7_scheme* sc)
     s7_define_variable(sc, "nil", s7_nil(sc));
 
     s7_define_function(sc, "engine-print", __engine_print, 1, 0, false, "(engine-print string) prints string to log");
-    s7_define_function(sc, "world-time", __world_time, 0, 0, false, "(world-time) gets time of glfw window");
 
-    s7_define_function(sc, "compile-shader", __compile_shader, 2, 0, false, "(compile-shader string type) compile shader");
-    s7_define_function(sc, "link-program", __link_program, 2, 0, false, "(link-program v f) links 2 shaders together and returns a program");
     s7_define_function(sc, "world-draw-object", __render_object, 4, 0, false, "(world-render-object w p m t)");
     s7_define_function(sc, "world-draw-primitive", __render_primitive, 4, 0, false, "(world-render-object w p m t)");
     s7_define_function(sc, "world-get-ui", __world_get_ui, 1, 0, false, "(world-get-ui w) returns ui data pointer");
+    s7_define_function(sc, "world-time", __world_time, 0, 0, false, "(world-time) gets time of glfw");
+    s7_define_function(sc, "world-delta-time", __world_delta_time, 1, 0, false, "(world-delta-time w) gets delta time of glfw window");
 
     s7_define_function(sc, "gl-no-depth", __gl_no_depth, 0, 0, false, "(gl-no-depth) disables depth testing");
     s7_define_function(sc, "gl-yes-depth", __gl_yes_depth, 0, 0, false, "(gl-yes-depth) enables depth testing");
 
     s7_define_function(sc, "ui-draw-text", __ui_draw_text, 4, 0, false, "(ui-draw-text u x y t)");
 
+    s7_define_function(sc, "input-get-mouse", __input_get_mouse, 0, 0, false, "(input-get-mouse) returns list, x = 1st element, y = 2nd element");
+    s7_define_function(sc, "input-get-axis", __input_get_axis, 1, 0, false, "(input-get-axis a) returns real num");
+    s7_define_function(sc, "input-get-key", __input_get_key, 1, 0, false, "(input-get-mouse k) returns #t/#f");
+
     s7_define_function(sc, "load-texture", __load_texture, 1, 0, false, "(load-model string) loads texture string into texture cache");
     s7_define_function(sc, "get-texture", __get_texture, 1, 0, false, "(get-model string) returns texture string's id");
 
     s7_define_function(sc, "load-model", __load_model, 1, 0, false, "(load-model string) loads model string into model cache");
     s7_define_function(sc, "get-model", __get_model, 1, 0, false, "(get-model string) returns model string's pointer");
+
+    s7_define_function(sc, "compile-shader", __compile_shader, 2, 0, false, "(compile-shader string type) compile shader");
+    s7_define_function(sc, "link-program", __link_program, 2, 0, false, "(link-program v f) links 2 shaders together and returns a program");
 }

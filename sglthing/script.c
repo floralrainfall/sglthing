@@ -7,12 +7,14 @@
 #include "s7/script_functions.h"
 #include "s7/transform.h"
 #include "world.h"
+#include "ui.h"
 
 struct script_system
 {
     s7_scheme* scheme;
     struct transform* player_transform;
     int player_transform_gc;
+    char script_name[64];
 };
 
 struct script_system* script_init(char* file)
@@ -31,6 +33,7 @@ struct script_system* script_init(char* file)
         printf("sglthing: starting script system on file %s (env: %s)\n", rsc_path, rsc_dir);
         struct script_system* system = malloc(sizeof(struct script_system));
         system->scheme = s7_init();
+        strncpy(system->script_name, rsc_path, 64);
 
         s7_add_to_load_path(system->scheme, rsc_dir);
         sgls7_add_functions(system->scheme);
@@ -100,5 +103,9 @@ void script_frame_render(void* world, struct script_system* system)
 void script_frame_ui(void* world, struct script_system* system)
 {
     ASSERT(system);
+    struct world* actual_world = (struct world*)world;
+    char sfui_dbg[256];
+    snprintf(sfui_dbg,256,"s7 running script %s",system->script_name);
+    ui_draw_text(actual_world->ui, actual_world->viewport[2]/3.f, actual_world->viewport[3]/1.25f, sfui_dbg, 1.f);
     s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame-ui"), s7_cons(system->scheme, s7_make_c_pointer(system->scheme, world), s7_nil(system->scheme)));
 }

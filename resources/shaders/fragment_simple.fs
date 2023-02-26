@@ -83,7 +83,7 @@ void main()
     // affine thing
     vec2 affine_tex_coords = f_uv / f_affine;
 
-    vec4 out_color = texture(texture1, affine_tex_coords);
+    vec4 out_color = color;
 
     // lighting
 

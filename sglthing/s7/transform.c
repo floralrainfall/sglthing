@@ -32,6 +32,9 @@ static s7_pointer make_transform(s7_scheme *sc, s7_pointer args)
     o->sx = 1.0;
     o->sy = 1.0;
     o->sz = 1.0;
+    glm_mat4_identity(o->translation_matrix);
+    glm_mat4_identity(o->rotation_matrix);
+    glm_mat4_identity(o->scale_matrix);
     return(s7_make_c_object(sc, transform_type_tag, (void *)o));
 }
 
@@ -58,7 +61,7 @@ static s7_pointer update_transform(s7_scheme *sc, s7_pointer args)
     if(s7_is_c_object(s7_car(args)))
     {
         struct transform* transform = s7_c_object_value(s7_car(args));
-        transform_to_matrix(&transform->transform_matrix, *transform);
+        transform_to_matrix(transform);
     }
     return NULL;
 }
@@ -74,12 +77,40 @@ SET_TRANSFORM(sx)
 SET_TRANSFORM(sy)
 SET_TRANSFORM(sz)
 
-void transform_to_matrix(mat4* dest, struct transform transform)
+#define SET_OLD_VERSION(t,v) \
+    t->v ## _old = t->v;
+#define CHK_OLD(t,v) \
+    (t->v ## _old != t->v)
+
+void transform_to_matrix(struct transform* transform)
 {
-    glm_mat4_identity(*dest);
-    glm_translate(*dest, (vec3){transform.px,transform.py,transform.pz});
-    glm_scale(*dest, (vec3){transform.sx,transform.sy,transform.sz});
-    glm_rotate(*dest, transform.rw, (vec3){transform.rx,transform.ry,transform.rz});
+    mat4 transformation;
+    glm_mat4_identity(transformation);
+    if(CHK_OLD(transform,px) || CHK_OLD(transform,py) || CHK_OLD(transform,pz))
+    {
+        glm_translate(transformation, (vec3){transform->px,transform->py,transform->pz});
+        glm_mat4_copy(transformation, transform->translation_matrix);
+        SET_OLD_VERSION(transform,px)
+        SET_OLD_VERSION(transform,py)
+        SET_OLD_VERSION(transform,pz)
+    } 
+    if(CHK_OLD(transform, rx) || CHK_OLD(transform, ry) || CHK_OLD(transform, rz) || CHK_OLD(transform, rw))
+    {
+        glm_rotate(transformation, transform->rw, (vec3){transform->rx,transform->ry,transform->rz});
+        glm_mat4_copy(transformation, transform->rotation_matrix);
+        SET_OLD_VERSION(transform,rx)
+        SET_OLD_VERSION(transform,ry)
+        SET_OLD_VERSION(transform,rz)
+        SET_OLD_VERSION(transform,rw)
+    }
+    if(CHK_OLD(transform, sx) || CHK_OLD(transform, sy) || CHK_OLD(transform, sz))
+    {
+        glm_scale(transformation, (vec3){transform->sx,transform->sy,transform->sz});
+        glm_mat4_copy(transformation, transform->scale_matrix);
+        SET_OLD_VERSION(transform,sx)
+        SET_OLD_VERSION(transform,sy)
+        SET_OLD_VERSION(transform,sz)
+    }
 }
 
 void sgls7_transform_register(s7_scheme* sc)

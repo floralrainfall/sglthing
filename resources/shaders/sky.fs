@@ -12,7 +12,7 @@ void main()
 {   
   vec4 out_color = vec4(0.0/255.0,204.0/255.0,255.0/255.0,1);
 
-  out_color.w = f_m_pos.y;
+  out_color.w = f_m_pos.y + 0.2;
 
   // color banding effect
   vec4 out_color_raw = clamp(out_color,0,1.0);

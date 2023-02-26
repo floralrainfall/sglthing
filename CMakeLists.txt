@@ -37,6 +37,8 @@ add_executable(sglthing
     sglthing/s7/script_functions.c
     sglthing/s7/transform.h
     sglthing/s7/transform.c
+    sglthing/s7/vector.h
+    sglthing/s7/vector.c
     sglthing/s7/s7.h
     sglthing/s7/s7.c
 
