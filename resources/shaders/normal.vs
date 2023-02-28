@@ -1,5 +1,3 @@
-#version 330 core
-
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
@@ -19,16 +17,11 @@ out vec3 f_m_pos;
 out vec3 f_normal;
 out vec4 f_color;
 out vec2 f_uv;
+out vec4 f_pos_light;
 out float f_affine;
 
-vec4 snap(vec4 vertex, vec2 resolution)
-{
-    vec4 snappedPos = vertex;
-    snappedPos.xyz = vertex.xyz / vertex.w; // convert to normalised device coordinates (NDC)
-    snappedPos.xy = floor(resolution * snappedPos.xy) / resolution; // snap the vertex to the lower-resolution grid
-    snappedPos.xyz *= vertex.w; // convert back to projection-space
-    return snappedPos;
-}
+float near = 0.1; 
+float far  = 1000.0; 
 
 void main()
 {
@@ -36,6 +29,7 @@ void main()
     //f_normal = v_normal;
     f_color = v_color;
     f_pos = (model * vec4(v_pos, 1.0)).xyz;
+    f_pos_light = lsm * vec4(f_pos, 1.0);
     f_m_pos = v_pos;
     gl_Position = snap(projection * view * model * vec4(v_pos, 1.0),vec2(320,240));
 

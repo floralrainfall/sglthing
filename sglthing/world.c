@@ -43,7 +43,12 @@ struct world* world_init()
     world->cam.yaw = 0.f;
 
     world->script = script_init("scripts/game.scm");
-        
+
+    world->gfx.shadow_pass = false;
+    int ls_v = compile_shader("shaders/shadow_pass.vs",GL_VERTEX_SHADER);
+    int ls_f = compile_shader("shaders/shadow_pass.fs",GL_FRAGMENT_SHADER);
+    world->gfx.lighting_shader = link_program(ls_v,ls_f);
+
     glEnable(GL_DEPTH_TEST);  
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
@@ -90,6 +95,24 @@ struct world* world_init()
 
     world->render_area = 0;
 
+    sglc(glGenFramebuffers(1, &world->gfx.depth_map_fbo));
+    sglc(glGenTextures(1, &world->gfx.depth_map_texture));
+    sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.depth_map_texture));
+    sglc(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 
+                SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL));
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)); 
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER)); 
+    vec4 border_color = { 1.0f, 1.0f, 1.0f, 1.0f };
+    sglc(glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color));   
+
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
+    sglc(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, world->gfx.depth_map_texture, 0));
+    sglc(glDrawBuffer(GL_NONE));
+    sglc(glReadBuffer(GL_NONE));
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));  
+
     return world;
 }
 
@@ -107,23 +130,10 @@ void world_frame(struct world* world)
     world->viewport[2] = (float)world->gfx.screen_width;
     world->viewport[3] = (float)world->gfx.screen_height;
     
-    //glm_ortho(-10.f,10.f,-10.f,10.f,1.0f,7.5f,world->p);
-    //glm_lookat((vec3){-2.f,4.f,-1.f},(vec3){0.f,0.f,0.f},(vec3){0.f,1.f,0.f},world->v);
-
     glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     glClear(GL_DEPTH_BUFFER_BIT);
-
-    script_frame(world, world->script);
-    
-    // shadow pass
-    //glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT);
-    //glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo);
-    //glClear(GL_DEPTH_BUFFER_BIT);
-    //world_frame_render(world);
-    //glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
     
     if(world->cam.pitch > 85.f)
         world->cam.pitch = 85.f;
@@ -150,6 +160,8 @@ void world_frame(struct world* world)
     //glm_lookat((vec3){world->cam.position[0]-10.f,world->cam.position[1]+10.f,world->cam.position[2]-10.f},(vec3){world->cam.position[0],world->cam.position[1],world->cam.position[2]},(vec3){0.f,1.f,0.f},world->v);
 
     glm_mul(world->p, world->v, world->vp);
+    
+    script_frame(world, world->script);
 
     //if(get_focus())
     //{
@@ -164,7 +176,25 @@ void world_frame(struct world* world)
     world_draw_model(world, world->gfx.sky_ball, world->sky_shader, sky_matrix, false);
     world_draw_primitive(world, world->cloud_shader, GL_FILL, PRIMITIVE_PLANE, cloud_matrix, (vec4){1.f,1.f,1.f,1.f});
     glEnable(GL_DEPTH_TEST);*/
+
+    world->gfx.shadow_pass = false;
     world_frame_render(world);
+
+    world->gfx.shadow_pass = true;
+    mat4 light_projection;
+    mat4 light_view;
+    glm_ortho(-50.f,50.f,-50.f,50.f, 1.0f, 2000.0f,light_projection);
+    glm_lookat((vec3){world->cam.position[0]-15.f*10.f,world->cam.position[1]+15.f*10.f,world->cam.position[2]+15.f*10.f},world->cam.position,(vec3){0.f,1.f,0.f},light_view);
+    glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
+    sglc(glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT));
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
+    sglc(glClear(GL_DEPTH_BUFFER_BIT));
+    sglc(glCullFace(GL_FRONT));
+    world_frame_render(world);
+    sglc(glCullFace(GL_BACK));
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    sglc(glViewport(0,0,world->viewport[2],world->viewport[3]));
+    world->gfx.shadow_pass = false;
 
     // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
 
@@ -221,6 +251,7 @@ static void __easy_uniforms(struct world* world, int shader_program, mat4 model_
     glUniformMatrix4fv(glGetUniformLocation(shader_program,"model"), 1, GL_FALSE, model_matrix[0]);
     glUniformMatrix4fv(glGetUniformLocation(shader_program,"view"), 1, GL_FALSE, world->v[0]);
     glUniformMatrix4fv(glGetUniformLocation(shader_program,"projection"), 1, GL_FALSE, world->p[0]);
+    glUniformMatrix4fv(glGetUniformLocation(shader_program,"lsm"), 1, GL_FALSE, world->gfx.light_space_matrix[0]);
     glUniform3fv(glGetUniformLocation(shader_program,"camera_position"), 1, world->cam.position);
 
     // fog
@@ -233,6 +264,10 @@ static void __easy_uniforms(struct world* world, int shader_program, mat4 model_
     glUniform1f(glGetUniformLocation(shader_program,"time"), (float)glfwGetTime());
     glUniform1i(glGetUniformLocation(shader_program,"banding_effect"), world->gfx.banding_effect);
 
+    glActiveTexture(GL_TEXTURE7);
+    glBindTexture(GL_TEXTURE_2D, world->gfx.depth_map_texture);
+    glUniform1i(glGetUniformLocation(shader_program,"depth_map"), 7);
+
     while(glGetError()!=0);
 }
 
@@ -240,6 +275,8 @@ void world_draw(struct world* world, int count, int vertex_array, int shader_pro
 {
     ASSERT(count != 0);
     ASSERT(vertex_array != 0);
+    if(world->gfx.shadow_pass)
+        shader_program = world->gfx.lighting_shader;
     ASSERT(shader_program != 0);
     sglc(glUseProgram(shader_program));
     __easy_uniforms(world, shader_program, model_matrix);
@@ -253,6 +290,8 @@ void world_draw_model(struct world* world, struct model* model, int shader_progr
     mat4 mvp;
 
     ASSERT(model != 0);
+    if(world->gfx.shadow_pass)
+        shader_program = world->gfx.lighting_shader;
     ASSERT(shader_program != 0);
     int last_vertex_array = 0;
     char txbuf[64];
@@ -268,15 +307,20 @@ void world_draw_model(struct world* world, struct model* model, int shader_progr
         
         if(set_textures)
         {
+            char tx_name[64];
             for(int j = 0; j < mesh_sel->diffuse_textures; j++)
             {
                 glActiveTexture(GL_TEXTURE0 + j);
-                glBindTexture(GL_TEXTURE_2D, mesh_sel->diffuse_texture[i]);
+                glBindTexture(GL_TEXTURE_2D, mesh_sel->diffuse_texture[i]);                
+                snprintf(tx_name,64,"diffuse%i", j);
+                glUniform1i(glGetUniformLocation(shader_program,tx_name), j);
             }
             for(int j = 0; j < mesh_sel->specular_textures; j++)
             {
                 glActiveTexture(GL_TEXTURE0 + j + 2);
                 glBindTexture(GL_TEXTURE_2D, mesh_sel->specular_texture[i]);
+                snprintf(tx_name,64,"specular%i", j);
+                glUniform1i(glGetUniformLocation(shader_program,tx_name), j+2);
             }
         }
         if(mesh_sel->vertex_array != last_vertex_array)

@@ -31,6 +31,11 @@ struct world {
         int banding_effect;
         int screen_width;
         int screen_height;
+        int depth_map_fbo;
+        int depth_map_texture;    
+        bool shadow_pass;
+        int lighting_shader;
+        mat4 light_space_matrix;
     } gfx;
 
     mat4 v;
