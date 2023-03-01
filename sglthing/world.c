@@ -39,7 +39,7 @@ struct world* world_init()
     world->cam.up[0] = 0.f;
     world->cam.up[1] = 1.f;
     world->cam.up[2] = 0.f;
-    world->cam.fov = 60.f;
+    world->cam.fov = 120.f;
     world->cam.yaw = 0.f;
 
     world->script = script_init("scripts/game.scm");
@@ -104,7 +104,7 @@ struct world* world_init()
     sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
     sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)); 
     sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER)); 
-    vec4 border_color = { 1.0f, 1.0f, 1.0f, 1.0f };
+    vec4 border_color = { 0.0f, 0.0f, 0.0f, 0.0f };
     sglc(glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color));   
 
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
@@ -118,7 +118,7 @@ struct world* world_init()
 
 void world_frame_render(struct world* world)
 {    
-    script_frame_render(world,world->script);
+    script_frame_render(world,world->script, world->gfx.shadow_pass);
     //world_draw_model(world, world->test_object, world->normal_shader, test_model, true);
 }
 
@@ -184,7 +184,7 @@ void world_frame(struct world* world)
     mat4 light_projection;
     mat4 light_view;
     glm_ortho(-50.f,50.f,-50.f,50.f, 1.0f, 2000.0f,light_projection);
-    glm_lookat((vec3){world->cam.position[0]-15.f*10.f,world->cam.position[1]+15.f*10.f,world->cam.position[2]+15.f*10.f},world->cam.position,(vec3){0.f,1.f,0.f},light_view);
+    glm_lookat((vec3){-150.f,150.f,150.f},(vec3){0.f,0.f,0.f},(vec3){0.f,1.f,0.f},light_view);
     glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
     sglc(glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT));
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));

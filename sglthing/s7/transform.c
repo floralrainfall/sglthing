@@ -96,7 +96,12 @@ void transform_to_matrix(struct transform* transform)
     } 
     if(CHK_OLD(transform, rx) || CHK_OLD(transform, ry) || CHK_OLD(transform, rz) || CHK_OLD(transform, rw))
     {
-        glm_rotate(transformation, transform->rw, (vec3){transform->rx,transform->ry,transform->rz});
+        double a = cos(transform->rw/2.0);
+        double a_sin = sin(transform->rw/2.0);
+        double x = a_sin * transform->rx;
+        double y = a_sin * transform->ry;
+        double z = a_sin * transform->rz;
+        glm_rotate(transformation, a, (vec3){x,y,z});
         glm_mat4_copy(transformation, transform->rotation_matrix);
         SET_OLD_VERSION(transform,rx)
         SET_OLD_VERSION(transform,ry)

@@ -9,8 +9,8 @@
 #include "light.h"
 #include "script.h"
 
-#define SHADOW_WIDTH 1024
-#define SHADOW_HEIGHT 1024
+#define SHADOW_WIDTH 2048
+#define SHADOW_HEIGHT 2048
 
 struct world {
     struct {
