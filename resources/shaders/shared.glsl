@@ -18,15 +18,15 @@ float shadow_calculate(vec4 pos_light, vec3 normal, vec3 light_dir)
     proj_coords = proj_coords * 0.5 + 0.5; 
     float closest_depth = texture(depth_map, proj_coords.xy).r;   
     float current_depth = proj_coords.z;  
-    float bias = max(0.05 * (1.0 - dot(normal, light_dir)), 0.005);  
+    float bias = max(0.005 * (1.0 - dot(normal, light_dir)), 0.0005);  
     float shadow = 0.0;
-    vec2 texel_size = 0.5 / textureSize(depth_map, 0);
+    vec2 texel_size = 1.0 / textureSize(depth_map, 0);
     for(int x = -1; x <= 1; ++x)
     {
         for(int y = -1; y <= 1; ++y)
         {
             float pcf_depth = texture(depth_map, proj_coords.xy + vec2(x, y) * texel_size).r; 
-            shadow += current_depth - bias > pcf_depth ? 1.0 : 0.0;        
+            shadow += current_depth - bias > pcf_depth ? 1.0 : pcf_depth;        
         }    
     }
     shadow /= 9.0;
@@ -82,7 +82,7 @@ vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_lig
 
     // calculate diffuse lighting
     vec3 norm = normalize(normal);
-    vec3 light_dir = -normalize(vec3(1.,-0.75,-0.5)*100000.0 - frag_pos);
+    vec3 light_dir = -normalize(vec3(1,-1,-1)*100000.0 - frag_pos);
     float diff = max(dot(norm, light_dir),0.1);
     vec3 diffuse = diff * vec3(227.0/255.0,168.0/255.0,87.0/255.0);
 
@@ -93,7 +93,7 @@ vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_lig
     vec3 specular = 0.5 * spec * vec3(255.0/255.0,204.0/255.0,51.0/255.0);  
 
     // calculate shadow lighting
-    float shadow = shadow_calculate(f_pos_light, normal, camera_position + vec3(-15.0,15.0,15.0));      
+    float shadow = shadow_calculate(f_pos_light, normal, camera_position + vec3(-150.0,150.0,150.0));      
 
     vec3 combined_light_result = vec3(0,0,0);
     for(int i = 0; i < MAX_LIGHTS; i++)

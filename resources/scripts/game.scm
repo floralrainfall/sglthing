@@ -3,7 +3,7 @@
 
 (define box-model (quick-load-model "test/box.obj"))
 (define box-transform (make-transform))
-(define box-texture (quick-load-texture "unuse/tile_t0.png"))
+(define box-texture (quick-load-texture "pink_checkerboard.png"))
 (set! (transform-sx box-transform) 64.0)
 (set! (transform-sy box-transform) 1.0)
 (set! (transform-sz box-transform) 64.0)
@@ -12,7 +12,7 @@
 (update-transform box-transform)
 
 (define box2-transform (make-transform))
-(set! (transform-py box2-transform) 3.0)
+(set! (transform-py box2-transform) 2.0)
 (set! (transform-sx box2-transform) 5.0)
 (set! (transform-sy box2-transform) 5.0)
 (set! (transform-sz box2-transform) 5.0)
@@ -20,13 +20,26 @@
 (set! (transform-rw box2-transform) 0.0)
 (update-transform box2-transform)
 
-(define (script-frame world camera) (gfxutils-frame world camera) (gamelib-frame world camera)
-    (gamelib-debug-3d-controller camera))
+(define sphere-transform (make-transform))
+(set! (transform-sx sphere-transform) 5.0)
+(set! (transform-sy sphere-transform) 5.0)
+(set! (transform-sz sphere-transform) 5.0)
+(set! (transform-rz sphere-transform) 1.0)
+(set! (transform-rw sphere-transform) 0.0)
+(update-transform sphere-transform)
 
-(define (script-frame-render world)
+(define (script-frame world camera) (gfxutils-frame world camera) (gamelib-frame world camera)
+    (gamelib-debug-3d-controller camera)
+    (set! (transform-px sphere-transform) (* (sin (world-time)) 4))
+    (set! (transform-py sphere-transform) (+ 4 (* (sin (/ (world-time) 2)) 2)))
+    (set! (transform-pz sphere-transform) (* (cos (world-time)) 4))
+    (update-transform sphere-transform))
+
+(define (script-frame-render world light-pass)
     (gl-bind-texture 0 box-texture)
     (world-draw-object world normal-shader box-model box-transform)
-    (world-draw-object world normal-shader box-model box2-transform))
+    (world-draw-object world normal-shader box-model box2-transform)
+    (world-draw-object world normal-shader sky-ball sphere-transform))
 
 (define (script-frame-ui world)
     (let ((ui-data (world-get-ui world))) (ui-draw-text ui-data 0 0 "Hullo World")))
