@@ -50,4 +50,6 @@ struct model
     struct aiScene *scene;
 };
 
+void model_find_bone_info(struct mesh* mesh, char* name, struct model_bone_info* info_out);
+
 #endif

@@ -17,9 +17,8 @@ void main()
 
     moved_pos.x += sin((v_pos.x+v_pos.y+time*1.1))*waviness;
     moved_pos.y += cos((v_pos.x+v_pos.y+time*1.1))*waviness;
-
     if(depth < 0.1)
         gl_Position = vec4(0,0,0,0);
         
-    gl_Position = projection * vec4(moved_pos.xy, depth, 1.0);
+    gl_Position = (projection * vec4(moved_pos.xy, depth, 1.0));
 }

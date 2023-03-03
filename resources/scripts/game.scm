@@ -2,6 +2,7 @@
 (load "game_lib.scm")
 
 (define box-model (quick-load-model "test/box.obj"))
+(define test-guy-model (quick-load-model "test/test_guy.fbx"))
 (define box-transform (make-transform))
 (define box-texture (quick-load-texture "pink_checkerboard.png"))
 (set! (transform-sx box-transform) 64.0)
@@ -38,7 +39,7 @@
 (define (script-frame-render world light-pass)
     (gl-bind-texture 0 box-texture)
     (world-draw-object world normal-shader box-model box-transform)
-    (world-draw-object world normal-shader box-model box2-transform)
+    (world-draw-object world normal-shader test-guy-model box2-transform)
     (world-draw-object world normal-shader sky-ball sphere-transform))
 
 (define (script-frame-ui world)

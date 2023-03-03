@@ -39,7 +39,7 @@ struct world* world_init()
     world->cam.up[0] = 0.f;
     world->cam.up[1] = 1.f;
     world->cam.up[2] = 0.f;
-    world->cam.fov = 120.f;
+    world->cam.fov = 45.f;
     world->cam.yaw = 0.f;
 
     world->script = script_init("scripts/game.scm");
@@ -79,6 +79,10 @@ struct world* world_init()
     world->gfx.fog_maxdist = 128.f;
     world->gfx.fog_mindist = 128.f-32.f;
     world->gfx.banding_effect = 0xff8;
+
+    world->gfx.sun_direction[0] = -0.5f;
+    world->gfx.sun_direction[1] = 0.5f;
+    world->gfx.sun_direction[2] = 0.5f;
 
     world->primitives = create_primitives();
 
@@ -134,7 +138,7 @@ void world_frame(struct world* world)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     glClear(GL_DEPTH_BUFFER_BIT);
-    
+
     if(world->cam.pitch > 85.f)
         world->cam.pitch = 85.f;
     if(world->cam.pitch < -85.f)
@@ -177,33 +181,40 @@ void world_frame(struct world* world)
     world_draw_primitive(world, world->cloud_shader, GL_FILL, PRIMITIVE_PLANE, cloud_matrix, (vec4){1.f,1.f,1.f,1.f});
     glEnable(GL_DEPTH_TEST);*/
 
-    world->gfx.shadow_pass = false;
-    world_frame_render(world);
+    for(int i = 0; i < 5; i++)
+    {
+        world->gfx.shadow_pass = true;
+        mat4 light_projection;
+        mat4 light_view;
+        glm_ortho(-100.f, 100.f,-100.f, 100.f, 1.0f, 2000.0f,light_projection);
+        vec3 sun_direction_camera;
+        sun_direction_camera[0] = world->gfx.sun_direction[0]*100.f + world->cam.position[0];
+        sun_direction_camera[1] = world->gfx.sun_direction[1]*100.f + world->cam.position[1];
+        sun_direction_camera[2] = world->gfx.sun_direction[2]*100.f + world->cam.position[2];
+        glm_lookat(sun_direction_camera, world->cam.position,(vec3){0.f,1.f,0.f},light_view);
+        glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
+        sglc(glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT));
+        sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
+        sglc(glClear(GL_DEPTH_BUFFER_BIT));
+        sglc(glCullFace(GL_FRONT));
+        world_frame_render(world);
+        sglc(glCullFace(GL_BACK));
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        sglc(glViewport(0,0,world->viewport[2],world->viewport[3]));
+    }
 
-    world->gfx.shadow_pass = true;
-    mat4 light_projection;
-    mat4 light_view;
-    glm_ortho(-50.f,50.f,-50.f,50.f, 1.0f, 2000.0f,light_projection);
-    glm_lookat((vec3){-150.f,150.f,150.f},(vec3){0.f,0.f,0.f},(vec3){0.f,1.f,0.f},light_view);
-    glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
-    sglc(glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT));
-    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
-    sglc(glClear(GL_DEPTH_BUFFER_BIT));
-    sglc(glCullFace(GL_FRONT));
-    world_frame_render(world);
-    sglc(glCullFace(GL_BACK));
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    sglc(glViewport(0,0,world->viewport[2],world->viewport[3]));
+
     world->gfx.shadow_pass = false;
+    world_frame_render(world);
 
     // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
 
-    ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, "sglthing dev", 1.f);
+    ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, "sglthing dev", 15.f);
 
     char dbg_info[256];
     int old_elements = world->ui->ui_elements;
     world->ui->ui_elements = 0;
-    snprintf(dbg_info, 256, "DEBUG\n\ncam: V=(%.2f,%.2f,%.2f)\nY=%.2f,P=%.2f\nU=(%.2f,%.2f,%.2f)\nF=(%.2f,%.2f,%.2f)\nR=(%.f,%.f,%.f)\nF=%.f\nv=(%i,%i)\nr (scene)=%i,r (ui)=%i\nt=%f, d=%f\n\nphysics pause=%s\nphysics geoms=%i\ncollisions in frame=%i\n",
+    snprintf(dbg_info, 256, "DEBUG\n\ncam: V=(%.2f,%.2f,%.2f)\nY=%.2f,P=%.2f\nU=(%.2f,%.2f,%.2f)\nF=(%.2f,%.2f,%.2f)\nR=(%.f,%.f,%.f)\nF=%.f\nv=(%i,%i)\nr (scene)=%i,r (ui)=%i\nt=%f, F=%i, d=%f, fps=%f\n\nphysics pause=%s\nphysics geoms=%i\ncollisions in frame=%i\n",
         world->cam.position[0], world->cam.position[1], world->cam.position[2],
         world->cam.yaw, world->cam.pitch,
         world->cam.up[0], world->cam.up[1], world->cam.up[2],
@@ -213,7 +224,7 @@ void world_frame(struct world* world)
         (int)world->viewport[2], (int)world->viewport[3],
         world->render_count,
         old_elements,
-        glfwGetTime(), world->delta_time,
+        glfwGetTime(), world->frames, world->delta_time, world->fps,
         world->physics.paused?"true":"false",
         dSpaceGetNumGeoms(world->physics.space),
         world->physics.collisions_in_frame);
@@ -243,6 +254,8 @@ void world_frame(struct world* world)
         stbi_write_png("screenshot.png", world->gfx.screen_width, world->gfx.screen_height, 3, pixels, 0);
         free(pixels);
     }
+
+    world->frames++;
 }
 
 static void __easy_uniforms(struct world* world, int shader_program, mat4 model_matrix)
@@ -261,6 +274,7 @@ static void __easy_uniforms(struct world* world, int shader_program, mat4 model_
 
     // misc
     glUniform4fv(glGetUniformLocation(shader_program,"viewport"), 1, world->viewport);
+    glUniform3fv(glGetUniformLocation(shader_program,"sun_direction"), 1, world->gfx.sun_direction);
     glUniform1f(glGetUniformLocation(shader_program,"time"), (float)glfwGetTime());
     glUniform1i(glGetUniformLocation(shader_program,"banding_effect"), world->gfx.banding_effect);
 

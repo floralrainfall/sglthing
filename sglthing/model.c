@@ -78,18 +78,30 @@ static void model_reset_vertex_bone_data(struct model_vertex* vtx_array, int ver
     }
 }
 
-struct model_bone_info* model_find_bone_data(struct mesh* mesh, char* name, int* id_out)
+void model_find_bone_data(struct aiMesh* mesh, char* name, struct model_bone_info* info_out)
+{
+    for(int i = 0; i < mesh->mNumBones; i++)
+    {
+        if(strncmp(mesh->mBones[i]->mName.data, name, 64) == 0)
+        {
+            info_out->id = i;
+            strncpy(info_out->name,mesh->mBones[i]->mName.data,64);
+            info_out->offset[0][0] = mesh->mBones[i]->mOffsetMatrix.a1; info_out->offset[0][1] = mesh->mBones[i]->mOffsetMatrix.b1; info_out->offset[0][2] = mesh->mBones[i]->mOffsetMatrix.c1; info_out->offset[0][3] = mesh->mBones[i]->mOffsetMatrix.d1;
+            info_out->offset[1][0] = mesh->mBones[i]->mOffsetMatrix.a2; info_out->offset[1][1] = mesh->mBones[i]->mOffsetMatrix.b2; info_out->offset[1][2] = mesh->mBones[i]->mOffsetMatrix.c2; info_out->offset[0][3] = mesh->mBones[i]->mOffsetMatrix.d2;
+            info_out->offset[2][0] = mesh->mBones[i]->mOffsetMatrix.a3; info_out->offset[2][1] = mesh->mBones[i]->mOffsetMatrix.b3; info_out->offset[2][2] = mesh->mBones[i]->mOffsetMatrix.c3; info_out->offset[0][3] = mesh->mBones[i]->mOffsetMatrix.d3;
+            info_out->offset[3][0] = mesh->mBones[i]->mOffsetMatrix.a4; info_out->offset[3][1] = mesh->mBones[i]->mOffsetMatrix.b4; info_out->offset[3][2] = mesh->mBones[i]->mOffsetMatrix.c4; info_out->offset[0][3] = mesh->mBones[i]->mOffsetMatrix.d4;
+            return;
+        }
+    }
+    info_out->id = -1;
+}
+
+void model_find_bone_info(struct mesh* mesh, char* name, struct model_bone_info* info_out)
 {
     for(int i = 0; i < mesh->bone_infos; i++)
     {
-        if(strncmp(mesh->bone_info[i].name, name, 64) == 0)
-        {
-            if(id_out)
-                *id_out = i;
-            return &mesh->bone_info[i];
-        }
+        
     }
-    return 0;
 }
 
 static void model_set_vertex_bone_data(struct model_vertex* vtx_array, int vertex, int bone_id, float weight)
@@ -120,11 +132,11 @@ static void model_extract_bone_weights(struct mesh* i_mesh, struct model_vertex*
     for(int bone_index = 0; bone_index < mesh->mNumBones; ++bone_index)
     {
         int bone_id = -1;
-        int bone_data_id = 0;
-        struct model_bone_info* bone_data;
+        struct model_bone_info bone_data;
         char* bone_name = mesh->mBones[bone_index]->mName.data;
-        bone_data = model_find_bone_data(i_mesh, bone_name, &bone_data_id);
-        if(bone_data_id == i_mesh->bone_infos)
+        model_find_bone_data(mesh, bone_name, &bone_data);
+        ASSERT(bone_data.id != -1);
+        if(bone_data.id == i_mesh->bone_infos)
         {
             struct model_bone_info new_bone_info;
             new_bone_info.id = i_mesh->bone_counter;
@@ -135,7 +147,7 @@ static void model_extract_bone_weights(struct mesh* i_mesh, struct model_vertex*
         }
         else
         {
-            bone_id = bone_data->id;
+            bone_id = bone_data.id;
         }
 
         ASSERT(bone_id != -1);
@@ -150,6 +162,7 @@ static void model_extract_bone_weights(struct mesh* i_mesh, struct model_vertex*
             model_set_vertex_bone_data(i_mesh->vtx_data, vertex_id, bone_id, weight);
         }
     }
+    printf("sglthing: %i bones extracted\n", mesh->mNumBones);
 }
 
 static void model_parse_mesh(struct model_vertex* vtx_array, int* vtx_count, unsigned int* idx_array, int* idx_count, struct aiMesh* mesh, const struct aiScene* scene)
@@ -247,7 +260,6 @@ int create_model_vao(struct model_vertex* vtx_array, int vtx_count, int* idx_arr
 
 static void model_parse_node(struct model* model, struct aiNode* node, const struct aiScene* scene)
 {
-    printf("node %s > ", &node->mName.data[0]);
     for(int i = 0; i < node->mNumMeshes; i++)
     {
         struct aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
@@ -267,15 +279,13 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
         model->meshes[model->mesh_count].vtx_data = vtx_array;
         model->meshes[model->mesh_count].vtx_data_count = vtx_count;
         model_load_textures(&model->meshes[model->mesh_count], mesh, scene);
-        model->mesh_count++;
-
         model_extract_bone_weights(&model->meshes[model->mesh_count], vtx_array, mesh, scene);
+        model->mesh_count++;
 
         free(idx_array);
     }
     for(int i = 0; i < node->mNumChildren; i++)
     {
-        printf("new_node \nsglthing: start > ");
         model_parse_node(model, node->mChildren[i], scene);
     }
 }
@@ -295,9 +305,7 @@ void load_model(char* file)
         return;
     }
 
-    printf("sglthing: start > ");
     model_parse_node(sel_model, scene->mRootNode, scene);
-    printf("\n");
 
     strncpy(&sel_model->name[0], file, 64);
     sel_model->scene = scene;

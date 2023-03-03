@@ -7,6 +7,14 @@ Estimated Requirements
 
 ![The last screenshot in this repo](https://github.com/floralrainfall/sglthing/raw/trunk/screenshot.png)
 
+## Requirements/Libraries
+
+- ODE, Open Dynamics Engine
+- Assimp
+- OpenGL 3.2 Core
+- GLFW
+- GLib
+
 ## Windows Cross-Compilation Notes
 
 Assimp doesn't copy itself over to the build directory for some reason. Just do cp deps/assimp/bin/libassimp-5.dll . to get it in.

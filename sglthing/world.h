@@ -28,6 +28,7 @@ struct world {
         float fog_mindist;
         vec4 fog_color;
         vec4 clear_color;
+        vec3 sun_direction;
         int banding_effect;
         int screen_width;
         int screen_height;
@@ -52,6 +53,10 @@ struct world {
     int render_count;
     
     double delta_time;
+    double last_time;
+    double fps;
+    int frames_in_second;
+    int frames;
     
     struct {
         bool paused;

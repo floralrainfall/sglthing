@@ -22,6 +22,7 @@ int main(int argc, char** argv)
     glfwSetErrorCallback(glerror);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_SAMPLES, 8);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     GLFWwindow* window = glfwCreateWindow(640,480,"sglthing",NULL,NULL);
     if(!window)
@@ -34,6 +35,7 @@ int main(int argc, char** argv)
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
+    glEnable(GL_MULTISAMPLE);  
 
     dInitODE2(0);
     dAllocateODEDataForThread(dAllocateMaskAll);
@@ -46,9 +48,16 @@ int main(int argc, char** argv)
 
     // main render loop
     world->delta_time = 0.f;
+    world->last_time = glfwGetTime();
     while(!glfwWindowShouldClose(window))
     {
         double frame_start = glfwGetTime();
+        world->frames_in_second++;
+        if(frame_start - world->last_time >= 1.0) {
+            world->fps = world->frames_in_second;
+            world->frames_in_second = 0;
+            world->last_time += 1.0;
+        }        
         glfwGetFramebufferSize(window, &world->gfx.screen_width, &world->gfx.screen_height);
         glfwMakeContextCurrent(window);
         

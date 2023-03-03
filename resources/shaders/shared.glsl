@@ -1,5 +1,7 @@
 #version 330 core
 
+uniform vec3 sun_direction;
+
 vec4 snap(vec4 vertex, vec2 resolution)
 {
     vec4 snappedPos = vertex;
@@ -30,8 +32,6 @@ float shadow_calculate(vec4 pos_light, vec3 normal, vec3 light_dir)
         }    
     }
     shadow /= 9.0;
-    if(proj_coords.z > 1.0)
-        shadow = 0.0;
     return shadow;
 }
 
@@ -82,7 +82,7 @@ vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_lig
 
     // calculate diffuse lighting
     vec3 norm = normalize(normal);
-    vec3 light_dir = -normalize(vec3(1,-1,-1)*100000.0 - frag_pos);
+    vec3 light_dir = normalize((sun_direction * 100.0) - frag_pos);
     float diff = max(dot(norm, light_dir),0.1);
     vec3 diffuse = diff * vec3(227.0/255.0,168.0/255.0,87.0/255.0);
 
@@ -93,7 +93,7 @@ vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_lig
     vec3 specular = 0.5 * spec * vec3(255.0/255.0,204.0/255.0,51.0/255.0);  
 
     // calculate shadow lighting
-    float shadow = shadow_calculate(f_pos_light, normal, camera_position + vec3(-150.0,150.0,150.0));      
+    float shadow = shadow_calculate(f_pos_light, normal, camera_position + (sun_direction*100.0));      
 
     vec3 combined_light_result = vec3(0,0,0);
     for(int i = 0; i < MAX_LIGHTS; i++)

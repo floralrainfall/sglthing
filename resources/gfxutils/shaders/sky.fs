@@ -14,7 +14,9 @@ void main()
 
     out_color.w = f_m_pos.y + 0.2;
 
-    vec3 sun = vec3(-0.5,0.5,0.5);
+    out_color = mix(vec4(1,1,1,1),out_color,distance(sun_direction,f_m_pos)-0.05);
+    if(distance(sun_direction,f_m_pos)<0.3)
+        out_color = vec4(1,1,1,1);
 
     // color banding effect
     vec4 out_color_raw = clamp(out_color,0,1.0);
@@ -26,10 +28,6 @@ void main()
     out_color_raw = vec4(i_out_color_raw);
     out_color_raw /= 16.0;
     out_color = out_color_raw;
-
-    out_color = mix(vec4(1,1,1,1),out_color,distance(sun,f_m_pos)-0.15);
-    if(distance(sun,f_m_pos)<0.3)
-        out_color = vec4(1,1,1,1);
 
     FragColor = out_color;
 }

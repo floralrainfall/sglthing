@@ -18,7 +18,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     vec2 points[MAX_CHARACTERS_STRING][2] = {0};
     int point_count = 0;
 
-    float size = 8;
+    float size = 8 + ui->ui_size;
     int line = 0;
     int keys = 0;
 
@@ -148,6 +148,7 @@ void ui_init(struct ui_data* ui)
     ui->background_color[2] = 0.5f;
     ui->background_color[3] = 0.2f;
     ui->waviness = 0.f;
+    ui->ui_size = 0;
 }
 
 void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, vec3 camera_front, vec3 position, float fov, mat4 m, mat4 vp, char* text)

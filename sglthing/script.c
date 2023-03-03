@@ -97,7 +97,9 @@ void script_frame(void* world, struct script_system* system)
 void script_frame_render(void* world, struct script_system* system, bool xtra_pass)
 {
     ASSERT(system);
+    s7_gc_on(system->scheme, false);
     s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame-render"), s7_cons(system->scheme, s7_make_c_pointer(system->scheme, world), s7_cons(system->scheme, s7_make_boolean(system->scheme, xtra_pass), s7_nil(system->scheme))));
+    s7_gc_on(system->scheme, true);
 }
 
 void script_frame_ui(void* world, struct script_system* system)

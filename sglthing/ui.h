@@ -18,6 +18,7 @@ struct ui_data
     int ui_elements;
 
     int ui_cursor;
+    int ui_size;
 
     vec4 background_color;
     float waviness;

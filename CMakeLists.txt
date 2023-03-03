@@ -8,6 +8,7 @@ find_package(glfw3)
 find_package(cglm)
 find_package(assimp)
 find_package(PkgConfig REQUIRED)
+pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0)
 pkg_check_modules(ODE ode)
 set(ODE_FOUND OFF)
 
@@ -44,6 +45,8 @@ add_executable(sglthing
 
     sglthing/primitives.h
     sglthing/primitives.c 
+    sglthing/animator.h
+    sglthing/animator.c
     sglthing/sglthing.h
     sglthing/sglthing.c
     sglthing/keyboard.h
@@ -62,6 +65,8 @@ add_executable(sglthing
     sglthing/light.c 
     sglthing/model.h
     sglthing/model.c 
+    sglthing/bone.h
+    sglthing/bone.c 
     sglthing/ui.h
     sglthing/ui.c 
     sglthing/io.h
@@ -78,6 +83,7 @@ target_link_libraries(sglthing PUBLIC
     cglm
     assimp
     m
+    PkgConfig::deps
     ${ODE_LIBRARY}
 )
 

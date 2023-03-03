@@ -1,7 +1,7 @@
 #ifndef SGLTHING_H
 #define SGLTHING_H
 
-#define ASSERT(x) if(!(x)) { printf("sglthing: assert '%s' failed\n", #x); exit(-1); }
+#define ASSERT(x) if(!(x)) { printf("sglthing: assert '%s' failed (%s:%i)\n", #x, __FILE__, __LINE__); exit(-1); }
 
 #define M_PIf 3.14159265359f
 #define M_PI_180f 0.01745329251f

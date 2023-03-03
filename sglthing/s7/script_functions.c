@@ -303,6 +303,30 @@ static s7_pointer __physics_create_geom(s7_scheme* sc, s7_pointer args)
 
 }
 
+#include "../animator.h"
+
+// TODO: finish
+
+static s7_pointer __animator_set_uniforms(s7_scheme* sc, s7_pointer args)
+{
+
+}
+
+static s7_pointer __animator_set_animation(s7_scheme* sc, s7_pointer args)
+{
+
+}
+
+static s7_pointer __animator_update(s7_scheme* sc, s7_pointer args)
+{
+    
+}
+
+static s7_pointer __animator_create(s7_scheme* sc, s7_pointer args)
+{
+
+}
+
 void sgls7_add_functions(s7_scheme* sc)
 {
     sgls7_transform_register(sc);
