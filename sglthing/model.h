@@ -2,6 +2,7 @@
 #define MODEL_H
 #include <cglm/cglm.h>
 
+#define MAX_BONE_WEIGHTS 4
 void load_model(char* file);
 struct model* get_model(char* file);
 
@@ -11,8 +12,8 @@ struct model_vertex
     vec3 normal;
     vec4 color;
     vec2 tex_coords;
-    int bone_ids[4];
-    float weights[4];
+    int bone_ids[MAX_BONE_WEIGHTS];
+    float weights[MAX_BONE_WEIGHTS];
 };
 
 struct model_bone_info

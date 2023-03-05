@@ -77,7 +77,9 @@ void light_area_set_uniforms(struct light_area* area, int shader_program)
         char uniform_name[64];
         while(glGetError()!=0);
         if(area->active_lights[i])
+        {
             light_set_uniforms(i,area->active_lights[i],shader_program);
+        }
         else
         {
             snprintf(uniform_name,64,"lights[%i].present",i);

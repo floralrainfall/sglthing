@@ -32,6 +32,7 @@ struct bone {
 
     mat4 local_transform;
     int id;
+    char name[64];
 };
 
 void bone_get(struct bone* bone, char* name, int id, const struct aiNodeAnim* channel);

@@ -309,22 +309,249 @@ static s7_pointer __physics_create_geom(s7_scheme* sc, s7_pointer args)
 
 static s7_pointer __animator_set_uniforms(s7_scheme* sc, s7_pointer args)
 {
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "animator-set-uniforms", 0, s7_car(args), "animator"));
+    struct animator* animator = (struct animator*)s7_c_pointer(s7_car(args));
 
+    if(!s7_is_integer(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "animator-set-uniforms", 1, s7_car(args), "shader program"));
+    int shader_program = s7_integer(s7_cadr(args));
+
+    animator_set_bone_uniform_matrices(animator, shader_program);
+    return s7_nil(sc);
 }
 
 static s7_pointer __animator_set_animation(s7_scheme* sc, s7_pointer args)
 {
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "animator-set-animation", 0, s7_car(args), "animator"));
+    struct animator* animator = (struct animator*)s7_c_pointer(s7_car(args));
 
+    if(!s7_is_c_pointer(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "animator-set-animation", 1, s7_car(args), "animation"));
+    struct animation* animation = (struct animation*)s7_c_pointer(s7_cadr(args));
+
+    animator_set_animation(animator, animation);
+    return s7_nil(sc);
+}
+
+static s7_pointer __animator_current_time(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "animator-current-time", 0, s7_car(args), "animator"));
+    struct animator* animator = (struct animator*)s7_c_pointer(s7_car(args));
+
+    return s7_make_real(sc, animator->current_time);
 }
 
 static s7_pointer __animator_update(s7_scheme* sc, s7_pointer args)
 {
-    
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "animator-update", 0, s7_car(args), "animator"));
+    struct animator* animator = (struct animator*)s7_c_pointer(s7_car(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "animator-update", 1, s7_car(args), "delta time"));
+    float delta_time = s7_real(s7_cadr(args));
+
+    animator_update(animator, delta_time);
 }
 
 static s7_pointer __animator_create(s7_scheme* sc, s7_pointer args)
 {
+    struct animator* animator = (struct animator*)malloc(sizeof(struct animator));
+    animator_create(animator);
+    return s7_make_c_pointer(sc, animator);
+}
 
+static s7_pointer __animation_create(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_string(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "animation-create", 0, s7_car(args), "animation path"));
+    if(!s7_is_c_pointer(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "animation-create", 1, s7_cadr(args), "model"));
+    struct model* model = s7_c_pointer(s7_cadr(args));
+    struct animation* animation = (struct animation*)malloc(sizeof(struct animation));
+    animation_create((char*)s7_string(s7_car(args)), &model->meshes[0], animation);
+    return s7_make_c_pointer(sc, animation);
+}
+
+#include "../light.h"
+
+static s7_pointer __lightarea_create(s7_scheme* sc, s7_pointer args)
+{
+    return s7_make_c_pointer(sc, light_create_area());
+}
+
+static s7_pointer __lightarea_update(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "lightarea-update", 1, s7_car(args), "lightarea"));
+    struct light_area* lightarea = s7_c_pointer(s7_car(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "lightarea-update", 1, s7_cadr(args), "position X"));
+    float position_x = s7_real(s7_cadr(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "lightarea-update", 1, s7_caddr(args), "position Y"));
+    float position_y = s7_real(s7_caddr(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "lightarea-update", 1, s7_cadddr(args), "position Z"));
+    float position_z = s7_real(s7_cadddr(args));
+
+    light_update(lightarea,(vec3){position_x,position_y,position_z});
+
+    return s7_nil(sc);
+}
+
+static s7_pointer __lightarea_use(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "lightarea-update", 1, s7_car(args), "lightarea"));
+    struct light_area* lightarea = s7_c_pointer(s7_car(args));
+
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "lightarea-update", 1, s7_cadr(args), "world"));
+    struct world* world = s7_c_pointer(s7_cadr(args));
+
+    world->render_area = lightarea;
+
+    return s7_nil(sc);
+}
+
+static s7_pointer __light_create(s7_scheme* sc, s7_pointer args)
+{
+    struct light* light = malloc(sizeof(struct light));
+    light_add(light);
+    return s7_make_c_pointer(sc, light);
+}
+
+static s7_pointer __light_set_position(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-position", 1, s7_car(args), "light"));
+    struct light* light = (struct light*)s7_c_pointer(s7_car(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-position", 1, s7_cadr(args), "position X"));
+    float position_x = s7_real(s7_cadr(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-position", 1, s7_caddr(args), "position Y"));
+    float position_y = s7_real(s7_caddr(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-position", 1, s7_cadddr(args), "position Z"));
+    float position_z = s7_real(s7_cadddr(args));
+
+    light->position[0] = position_x;
+    light->position[1] = position_y;
+    light->position[2] = position_z;
+
+    return s7_nil(sc);
+}
+
+static s7_pointer __light_set_clq(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-clq", 1, s7_car(args), "light"));
+    struct light* light = (struct light*)s7_c_pointer(s7_car(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-clq", 2, s7_cadr(args), "constant"));
+    float constant = s7_real(s7_cadr(args));
+
+    if(!s7_is_real(s7_caddr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-clq", 3, s7_caddr(args), "linear"));
+    float linear = s7_real(s7_caddr(args));
+
+    if(!s7_is_real(s7_cadddr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-clq", 4, s7_cadddr(args), "quadratic"));
+    float quadratic = s7_real(s7_cadddr(args));
+
+    light->constant = constant;
+    light->linear = linear;
+    light->quadratic = quadratic;
+    light->intensity = 1.0;
+
+    return s7_nil(sc);
+}
+
+static s7_pointer __light_set_ambient(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-ambient", 1, s7_car(args), "light"));
+    struct light* light = (struct light*)s7_c_pointer(s7_car(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-ambient", 2, s7_cadr(args), "red"));
+    float r = s7_real(s7_cadr(args));
+
+    if(!s7_is_real(s7_caddr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-ambient", 3, s7_caddr(args), "green"));
+    float g = s7_real(s7_caddr(args));
+
+    if(!s7_is_real(s7_cadddr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-ambient", 4, s7_cadddr(args), "blue"));
+    float b = s7_real(s7_cadddr(args));
+
+    light->ambient[0] = r;
+    light->ambient[1] = g;
+    light->ambient[2] = b;
+
+    return s7_nil(sc);
+}
+
+static s7_pointer __light_set_diffuse(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-diffuse", 1, s7_car(args), "light"));
+    struct light* light = (struct light*)s7_c_pointer(s7_car(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-diffuse", 2, s7_cadr(args), "red"));
+    float r = s7_real(s7_cadr(args));
+
+    if(!s7_is_real(s7_caddr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-diffuse", 3, s7_caddr(args), "green"));
+    float g = s7_real(s7_caddr(args));
+
+    if(!s7_is_real(s7_cadddr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-diffuse", 4, s7_cadddr(args), "blue"));
+    float b = s7_real(s7_cadddr(args));
+
+    light->diffuse[0] = r;
+    light->diffuse[1] = g;
+    light->diffuse[2] = b;
+
+    return s7_nil(sc);
+}
+
+static s7_pointer __light_set_specular(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-specular", 1, s7_car(args), "light"));
+    struct light* light = (struct light*)s7_c_pointer(s7_car(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-specular", 2, s7_cadr(args), "red"));
+    float r = s7_real(s7_cadr(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-specular", 3, s7_caddr(args), "green"));
+    float g = s7_real(s7_caddr(args));
+
+    if(!s7_is_real(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "light-set-specular", 4, s7_cadddr(args), "blue"));
+    float b = s7_real(s7_cadddr(args));
+
+    light->specular[0] = r;
+    light->specular[1] = g;
+    light->specular[2] = b;
+
+    return s7_nil(sc);
 }
 
 void sgls7_add_functions(s7_scheme* sc)
@@ -337,6 +564,7 @@ void sgls7_add_functions(s7_scheme* sc)
     s7_define_variable(sc, "math-pi-2", s7_make_real(sc, M_PI_2f));
     s7_define_variable(sc, "math-pi-180", s7_make_real(sc, M_PI_180f));
     s7_define_variable(sc, "nil", s7_nil(sc));
+    s7_define_variable(sc, "nullptr", s7_make_c_pointer(sc, NULL));
 
     s7_define_function(sc, "engine-print", __engine_print, 1, 0, false, "(engine-print string) prints string to log");
 
@@ -367,4 +595,23 @@ void sgls7_add_functions(s7_scheme* sc)
 
     s7_define_function(sc, "compile-shader", __compile_shader, 2, 0, false, "(compile-shader string type) compile shader");
     s7_define_function(sc, "link-program", __link_program, 2, 0, false, "(link-program v f) links 2 shaders together and returns a program");
+
+    s7_define_function(sc, "animator-create", __animator_create, 0, 0, false, "(animator-create)");
+    s7_define_function(sc, "animator-set-animation", __animator_set_animation, 2, 0, false, "(animator-set-animation a A)");
+    s7_define_function(sc, "animator-set-uniforms", __animator_set_uniforms, 2, 0, false, "(animator-set-uniforms a p)");
+    s7_define_function(sc, "animator-update", __animator_update, 2, 0, false, "(animator-update a d)");
+    s7_define_function(sc, "animator-current-time", __animator_current_time, 1, 0, false, "(animator-current-time a)");
+
+    s7_define_function(sc, "animation-create", __animation_create, 2, 0, false, "(animation-create f m)");    
+    
+    s7_define_function(sc, "lightarea-create", __lightarea_create, 0, 0, false, "(lightarea-create)");
+    s7_define_function(sc, "lightarea-update", __lightarea_update, 4, 0, false, "(lightarea-update a x y z)");
+    s7_define_function(sc, "lightarea-use", __lightarea_use, 2, 0, false, "(lightarea-use a w)");
+
+    s7_define_function(sc, "light-create", __light_create, 0, 0, false, "(light-create)");
+    s7_define_function(sc, "light-set-clq", __light_set_clq, 4, 0, false, "(light-set-clq a c l q)");
+    s7_define_function(sc, "light-set-position", __light_set_position, 4, 0, false, "(light-set-position a x y z)");
+    s7_define_function(sc, "light-set-ambient", __light_set_ambient, 4, 0, false, "(light-set-position a r g b)");
+    s7_define_function(sc, "light-set-diffuse", __light_set_diffuse, 4, 0, false, "(light-set-position a r g b)");
+    s7_define_function(sc, "light-set-specular", __light_set_specular, 4, 0, false, "(light-set-position a r g b)");
 }

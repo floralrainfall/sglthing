@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <glad/glad.h>
+#include "sglthing.h"
 
 int compile_shader(const char* shader_name, int type)
 {
@@ -20,11 +21,16 @@ int compile_shader(const char* shader_name, int type)
         int common_data_read = fread(c_shader_data, 1, 65535, common_shader_file);
         fclose(common_shader_file);
 
+        printf("sglthing: compiling shader %s %04x\n", shader_name, type);
         int shader_id = glCreateShader(type);
+        int error = glGetError();
+        if(error)
+            printf("sglthing: glCreateShader error: %i\n", error);
+        ASSERT(error == 0);
+        ASSERT(shader_id);
         int success;
-        char *shader_sources[] = {c_shader_data, shader_data};
-        sglc(glShaderSource(shader_id, 2, shader_sources, NULL));        
-        printf("sglthing: compiling shader  %s\n", shader_name);
+        char *shader_sources[] = {c_shader_data, shader_data};  
+        sglc(glShaderSource(shader_id, 2, shader_sources, NULL));      
         sglc(glCompileShader(shader_id));
         sglc(glGetShaderiv(shader_id, GL_COMPILE_STATUS, &success));
         if(!success)
@@ -36,7 +42,7 @@ int compile_shader(const char* shader_name, int type)
         }
         free(shader_data); // having 64K be allocated every time we compile a shader could cause memory leaks
         free(c_shader_data);
-        printf("sglthing: compiled shader %i %s\n", shader_id, shader_name);
+        printf("sglthing: compiled shader  %s %i\n", shader_name, shader_id);
 
         return shader_id;
     }
@@ -51,7 +57,9 @@ int compile_shader(const char* shader_name, int type)
 
 int link_program(int vertex, int fragment)
 {
+    ASSERT(vertex && fragment);
     int program = glCreateProgram();
+    ASSERT(program);
     int success;
     if(vertex)
     {

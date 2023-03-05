@@ -20,9 +20,11 @@
     
 (define normal-shader (compile-shaders "shaders/normal.vs" "shaders/fragment.fs"))
 (define normal-simple-shader (compile-shaders "shaders/normal.vs" "shaders/fragment_simple.fs"))
+(define rigged-shader (compile-shaders "shaders/rigged.vs" "shaders/fragment.fs"))
 (define debug-shader  (compile-shaders "shaders/dbg.vs" "shaders/dbg.fs"))
 (define sky-shader    (compile-shaders "shaders/sky.vs" "shaders/sky.fs"))
 (define cloud-shader  (compile-shaders "shaders/cloud.vs" "shaders/cloud.fs"))
+(define camera-light-area (lightarea-create))
 
 (define sky-ball (quick-load-model "skyball.obj"))
 (define sky-transform (make-transform))
@@ -40,7 +42,8 @@
     (set! (transform-py sky-transform) (transform-py camera))
     (set! (transform-pz sky-transform) (transform-pz camera))
     (update-transform sky-transform)
-    (draw-sky world))
+    (draw-sky world)
+    (lightarea-update camera-light-area (transform-px camera) (transform-py camera) (transform-pz camera)))
 
 (define (draw-sky world)
     (gl-no-depth) 

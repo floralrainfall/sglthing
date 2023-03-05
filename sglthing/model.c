@@ -22,14 +22,14 @@ static void model_load_textures(struct mesh* mesh, struct aiMesh* mesh_2, const 
         for(unsigned int i = 0; i < MIN(3,aiGetMaterialTextureCount(material, aiTextureType_DIFFUSE)); i++)
         {
             aiGetMaterialTexture(material, aiTextureType_DIFFUSE, i, &path, NULL, NULL, NULL, NULL, NULL, NULL);
-            if(!get_texture(&path.data))
+            char fpath[256];
+            snprintf(fpath,256,"test/%s",path.data);
+            if(!get_texture(&fpath))
             {
                 if(path.data[0] == '*')
                     printf("sglthing: embedded textures not supported\n");
                 else
                 {
-                    char fpath[64];
-                    snprintf(fpath,64,"../resources/%s",&path.data);
                     load_texture(fpath);
                     mesh->diffuse_texture[mesh->diffuse_textures] = get_texture(fpath);
                     mesh->diffuse_textures++;
@@ -37,7 +37,7 @@ static void model_load_textures(struct mesh* mesh, struct aiMesh* mesh_2, const 
             }
             else
             {
-                mesh->diffuse_texture[mesh->diffuse_textures] = get_texture(path.data);
+                mesh->diffuse_texture[mesh->diffuse_textures] = get_texture(fpath);
                 mesh->diffuse_textures++;
             }
         }
@@ -68,13 +68,10 @@ static void model_load_textures(struct mesh* mesh, struct aiMesh* mesh_2, const 
 
 static void model_reset_vertex_bone_data(struct model_vertex* vtx_array, int vertex)
 {
-    for(int i = 0; i < 4; i++)
+    for(int i = 0; i < MAX_BONE_WEIGHTS; i++)
     {
-        if(vtx_array[vertex].bone_ids[i] < 0)
-        {
-            vtx_array[vertex].bone_ids[i] = -1;
-            vtx_array[vertex].bone_ids[i] = 0.f;
-        }
+        vtx_array[vertex].bone_ids[i] = -1;
+        vtx_array[vertex].weights[i] = 0.f;
     }
 }
 
@@ -86,10 +83,7 @@ void model_find_bone_data(struct aiMesh* mesh, char* name, struct model_bone_inf
         {
             info_out->id = i;
             strncpy(info_out->name,mesh->mBones[i]->mName.data,64);
-            info_out->offset[0][0] = mesh->mBones[i]->mOffsetMatrix.a1; info_out->offset[0][1] = mesh->mBones[i]->mOffsetMatrix.b1; info_out->offset[0][2] = mesh->mBones[i]->mOffsetMatrix.c1; info_out->offset[0][3] = mesh->mBones[i]->mOffsetMatrix.d1;
-            info_out->offset[1][0] = mesh->mBones[i]->mOffsetMatrix.a2; info_out->offset[1][1] = mesh->mBones[i]->mOffsetMatrix.b2; info_out->offset[1][2] = mesh->mBones[i]->mOffsetMatrix.c2; info_out->offset[0][3] = mesh->mBones[i]->mOffsetMatrix.d2;
-            info_out->offset[2][0] = mesh->mBones[i]->mOffsetMatrix.a3; info_out->offset[2][1] = mesh->mBones[i]->mOffsetMatrix.b3; info_out->offset[2][2] = mesh->mBones[i]->mOffsetMatrix.c3; info_out->offset[0][3] = mesh->mBones[i]->mOffsetMatrix.d3;
-            info_out->offset[3][0] = mesh->mBones[i]->mOffsetMatrix.a4; info_out->offset[3][1] = mesh->mBones[i]->mOffsetMatrix.b4; info_out->offset[3][2] = mesh->mBones[i]->mOffsetMatrix.c4; info_out->offset[0][3] = mesh->mBones[i]->mOffsetMatrix.d4;
+            ASSIMP_TO_GLM(mesh->mBones[i]->mOffsetMatrix, info_out->offset);
             return;
         }
     }
@@ -100,13 +94,18 @@ void model_find_bone_info(struct mesh* mesh, char* name, struct model_bone_info*
 {
     for(int i = 0; i < mesh->bone_infos; i++)
     {
-        
+        if(strncmp(mesh->bone_info[i].name,name,64)==0)
+        {
+            *info_out = mesh->bone_info[i];
+            return;
+        }
     }
+    info_out->id = -1;
 }
 
 static void model_set_vertex_bone_data(struct model_vertex* vtx_array, int vertex, int bone_id, float weight)
 {
-    for(int i = 0; i < 4; i++)
+    for(int i = 0; i < MAX_BONE_WEIGHTS; i++)
     {
         if(vtx_array[vertex].bone_ids[i] < 0)
         {
@@ -115,14 +114,6 @@ static void model_set_vertex_bone_data(struct model_vertex* vtx_array, int verte
             break;
         }
     }
-}
-
-static void assimp_convert_mat4(struct aiMatrix4x4 from, mat4 to)
-{
-    to[0][0] = from.a1; to[1][0] = from.a2; to[2][0] = from.a3; to[3][0] = from.a4;
-    to[0][1] = from.b1; to[1][1] = from.b2; to[2][1] = from.b3; to[3][1] = from.b4;
-    to[0][2] = from.c1; to[1][2] = from.c2; to[2][2] = from.c3; to[3][2] = from.c4;
-    to[0][3] = from.d1; to[1][3] = from.d2; to[2][3] = from.d3; to[3][3] = from.d4;
 }
 
 static void model_extract_bone_weights(struct mesh* i_mesh, struct model_vertex* vtx_array, struct aiMesh* mesh, const struct aiScene* scene)
@@ -134,16 +125,17 @@ static void model_extract_bone_weights(struct mesh* i_mesh, struct model_vertex*
         int bone_id = -1;
         struct model_bone_info bone_data;
         char* bone_name = mesh->mBones[bone_index]->mName.data;
+        printf("sglthing: %s bone added\n", bone_name);
         model_find_bone_data(mesh, bone_name, &bone_data);
         ASSERT(bone_data.id != -1);
-        if(bone_data.id == i_mesh->bone_infos)
+        if(strncmp(bone_name,i_mesh->bone_info[i_mesh->bone_infos].name,64)==0)
         {
             struct model_bone_info new_bone_info;
             new_bone_info.id = i_mesh->bone_counter;
-            assimp_convert_mat4(mesh->mBones[bone_index]->mOffsetMatrix,new_bone_info.offset);
+            strncpy(new_bone_info.name,bone_name,64);
+            ASSIMP_TO_GLM(mesh->mBones[bone_index]->mOffsetMatrix,new_bone_info.offset);
+            bone_id = i_mesh->bone_infos;
             i_mesh->bone_info[i_mesh->bone_infos++] = new_bone_info;
-            bone_id = i_mesh->bone_counter;
-            i_mesh->bone_counter++;
         }
         else
         {
@@ -159,6 +151,7 @@ static void model_extract_bone_weights(struct mesh* i_mesh, struct model_vertex*
         {
             int vertex_id = weights[weight_index].mVertexId;
             float weight =  weights[weight_index].mWeight;
+            ASSERT(vertex_id <= i_mesh->vtx_data_count);
             model_set_vertex_bone_data(i_mesh->vtx_data, vertex_id, bone_id, weight);
         }
     }
@@ -248,10 +241,10 @@ int create_model_vao(struct model_vertex* vtx_array, int vtx_count, int* idx_arr
     sglc(glEnableVertexAttribArray(3));
     // ivec4: bone_ids
     sglc(glVertexAttribIPointer(4, 4, GL_INT, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, bone_ids)));
-    sglc(glEnableVertexAttribArray(3));
+    sglc(glEnableVertexAttribArray(4));
     // vec4: weights
     sglc(glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, weights)));
-    sglc(glEnableVertexAttribArray(3));
+    sglc(glEnableVertexAttribArray(5));
 
     sglc(glBindVertexArray(0));
 

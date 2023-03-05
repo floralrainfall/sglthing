@@ -84,7 +84,6 @@ void script_frame(void* world, struct script_system* system)
                                                                                 s7_cons(system->scheme, transform, s7_nil(system->scheme))));
     s7_gc_unprotect_at(system->scheme,gc_i);
     
-
     actual_world->cam.position[0] = new_transform->px;
     actual_world->cam.position[1] = new_transform->py;
     actual_world->cam.position[2] = new_transform->pz;
@@ -105,9 +104,11 @@ void script_frame_render(void* world, struct script_system* system, bool xtra_pa
 void script_frame_ui(void* world, struct script_system* system)
 {
     ASSERT(system);
+    s7_gc_on(system->scheme, false);
     struct world* actual_world = (struct world*)world;
     char sfui_dbg[256];
     snprintf(sfui_dbg,256,"s7 running script %s",system->script_name);
     ui_draw_text(actual_world->ui, actual_world->viewport[2]/3.f, 0.f, sfui_dbg, 1.f);
     s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame-ui"), s7_cons(system->scheme, s7_make_c_pointer(system->scheme, world), s7_nil(system->scheme)));
+    s7_gc_on(system->scheme, true);
 }

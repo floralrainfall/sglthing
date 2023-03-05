@@ -42,16 +42,18 @@ struct world* world_init()
     world->cam.fov = 45.f;
     world->cam.yaw = 0.f;
 
+    world->frames = 0;
+    world->fps = 0.0;
+
     world->script = script_init("scripts/game.scm");
 
     world->gfx.shadow_pass = false;
     int ls_v = compile_shader("shaders/shadow_pass.vs",GL_VERTEX_SHADER);
     int ls_f = compile_shader("shaders/shadow_pass.fs",GL_FRAGMENT_SHADER);
     world->gfx.lighting_shader = link_program(ls_v,ls_f);
-
-    glEnable(GL_DEPTH_TEST);  
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
+    int q_v = compile_shader("shaders/quad.vs",GL_VERTEX_SHADER);
+    int q_f = compile_shader("shaders/quad.gs",GL_GEOMETRY_SHADER);
+    world->gfx.quad_shader = link_program(q_v,q_f);
 
     add_input((struct keyboard_mapping){.key_positive = GLFW_KEY_D, .key_negative = GLFW_KEY_A, .name = "x_axis"});
     add_input((struct keyboard_mapping){.key_positive = GLFW_KEY_Q, .key_negative = GLFW_KEY_E, .name = "y_axis"});
@@ -76,7 +78,7 @@ struct world* world_init()
     world->gfx.fog_color[2] = world->gfx.clear_color[2];
     world->gfx.fog_color[3] = world->gfx.clear_color[3];
 
-    world->gfx.fog_maxdist = 128.f;
+    world->gfx.fog_maxdist = 1000.f;
     world->gfx.fog_mindist = 128.f-32.f;
     world->gfx.banding_effect = 0xff8;
 
@@ -108,7 +110,7 @@ struct world* world_init()
     sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
     sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)); 
     sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER)); 
-    vec4 border_color = { 0.0f, 0.0f, 0.0f, 0.0f };
+    vec4 border_color = { 1.0f, 1.0f, 1.0f, 1.0f };
     sglc(glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color));   
 
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
@@ -122,8 +124,13 @@ struct world* world_init()
 
 void world_frame_render(struct world* world)
 {    
+    if(world->gfx.shadow_pass)
+        glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Light Pass");
+    else
+        glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Scene");
     script_frame_render(world,world->script, world->gfx.shadow_pass);
     //world_draw_model(world, world->test_object, world->normal_shader, test_model, true);
+    glPopDebugGroupKHR();   
 }
 
 void world_frame(struct world* world)
@@ -135,9 +142,10 @@ void world_frame(struct world* world)
     world->viewport[3] = (float)world->gfx.screen_height;
     
     glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-    glClear(GL_DEPTH_BUFFER_BIT);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
 
     if(world->cam.pitch > 85.f)
         world->cam.pitch = 85.f;
@@ -181,30 +189,28 @@ void world_frame(struct world* world)
     world_draw_primitive(world, world->cloud_shader, GL_FILL, PRIMITIVE_PLANE, cloud_matrix, (vec4){1.f,1.f,1.f,1.f});
     glEnable(GL_DEPTH_TEST);*/
 
-    for(int i = 0; i < 5; i++)
-    {
-        world->gfx.shadow_pass = true;
-        mat4 light_projection;
-        mat4 light_view;
-        glm_ortho(-100.f, 100.f,-100.f, 100.f, 1.0f, 2000.0f,light_projection);
-        vec3 sun_direction_camera;
-        sun_direction_camera[0] = world->gfx.sun_direction[0]*100.f + world->cam.position[0];
-        sun_direction_camera[1] = world->gfx.sun_direction[1]*100.f + world->cam.position[1];
-        sun_direction_camera[2] = world->gfx.sun_direction[2]*100.f + world->cam.position[2];
-        glm_lookat(sun_direction_camera, world->cam.position,(vec3){0.f,1.f,0.f},light_view);
-        glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
-        sglc(glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT));
-        sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
-        sglc(glClear(GL_DEPTH_BUFFER_BIT));
-        sglc(glCullFace(GL_FRONT));
-        world_frame_render(world);
-        sglc(glCullFace(GL_BACK));
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        sglc(glViewport(0,0,world->viewport[2],world->viewport[3]));
-    }
-
-
+    world->gfx.shadow_pass = true;
+    mat4 light_projection;
+    mat4 light_view;
+    glm_ortho(-100.f, 100.f, -100.f, 100.f, 1.0f, 2000.0f,light_projection);
+    vec3 sun_direction_camera;
+    sun_direction_camera[0] = world->gfx.sun_direction[0]*100.f + world->cam.position[0];
+    sun_direction_camera[1] = world->gfx.sun_direction[1]*100.f + world->cam.position[1];
+    sun_direction_camera[2] = world->gfx.sun_direction[2]*100.f + world->cam.position[2];
+    glm_lookat(sun_direction_camera, world->cam.position,(vec3){0.f,1.f,0.f},light_view);
+    glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
+    sglc(glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT));
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
+    sglc(glClear(GL_DEPTH_BUFFER_BIT));
+    sglc(glCullFace(GL_FRONT));
+    world_frame_render(world);
+    sglc(glCullFace(GL_BACK));
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    sglc(glViewport(0,0,world->viewport[2],world->viewport[3]));
+    
     world->gfx.shadow_pass = false;
+
+    glStencilMask(0x00);
     world_frame_render(world);
 
     // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
@@ -314,7 +320,7 @@ void world_draw_model(struct world* world, struct model* model, int shader_progr
         sglc(glUseProgram(shader_program));
 
         __easy_uniforms(world, shader_program, model_matrix);
-        if(world->render_area)
+        if(world->render_area && !world->gfx.shadow_pass)
             light_area_set_uniforms(world->render_area, shader_program);
         struct mesh* mesh_sel = &model->meshes[i];
         vec3 src_position = {0.f, 1.f, 0.f};

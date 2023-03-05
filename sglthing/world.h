@@ -9,8 +9,8 @@
 #include "light.h"
 #include "script.h"
 
-#define SHADOW_WIDTH 2048
-#define SHADOW_HEIGHT 2048
+#define SHADOW_WIDTH 512
+#define SHADOW_HEIGHT 512
 
 struct world {
     struct {
@@ -37,6 +37,7 @@ struct world {
         bool shadow_pass;
         int lighting_shader;
         mat4 light_space_matrix;
+        int quad_shader;
     } gfx;
 
     mat4 v;

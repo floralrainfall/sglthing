@@ -119,8 +119,8 @@ bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, char
 
 void ui_init(struct ui_data* ui)
 {
-    int ui_vertex = compile_shader("shaders/ui.vs", GL_VERTEX_SHADER);
-    int ui_frag = compile_shader("shaders/ui.fs", GL_FRAGMENT_SHADER);
+    int ui_vertex = compile_shader("uiassets/shaders/ui.vs", GL_VERTEX_SHADER);
+    int ui_frag = compile_shader("uiassets/shaders/ui.fs", GL_FRAGMENT_SHADER);
     ui->ui_program = link_program(ui_vertex, ui_frag);
 
     load_texture("uiassets/font.png");

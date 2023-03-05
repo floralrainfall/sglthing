@@ -42,7 +42,11 @@ static void __kbd_callback(GLFWwindow* window, int key, int scancode, int action
     }
 
     if(action == GLFW_PRESS || action == GLFW_RELEASE)
+    {
+        if(key == GLFW_KEY_TAB && action == GLFW_PRESS)
+            set_focus(window, !mouse_focus);
         keys_down[key] = action;
+    }
 }
 
 void init_kbd(GLFWwindow* window)

@@ -36,11 +36,12 @@ int main(int argc, char** argv)
     glfwSwapInterval(0);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
     glEnable(GL_MULTISAMPLE);  
+    glEnable(GL_BLEND);
 
     dInitODE2(0);
     dAllocateODEDataForThread(dAllocateMaskAll);
     init_kbd(window);
-    set_focus(window, true);
+    set_focus(window, false);
 
     world = world_init();
 
