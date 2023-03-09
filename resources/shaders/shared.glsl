@@ -12,21 +12,37 @@ vec4 snap(vec4 vertex, vec2 resolution)
 }
 
 uniform sampler2D depth_map;
+uniform sampler2D depth_map_far;
 uniform mat4 lsm;
+uniform mat4 lsm_far;
 
-float shadow_calculate(vec3 camera, vec3 pos, vec4 pos_light, vec3 normal, vec3 light_dir)
+float shadow_calculate(vec3 camera, sampler2D map, vec3 pos, vec4 pos_light, vec3 normal, vec3 light_dir)
 {    
     vec3 proj_coords = pos_light.xyz / pos_light.w;
-    proj_coords = proj_coords * 0.5 + 0.5; 
-    float closest_depth = texture(depth_map, proj_coords.xy).r;   
+    proj_coords = proj_coords * 0.5 + 0.5;
+
+    if(proj_coords.x <= 0.01 || proj_coords.x >= 0.999)
+        return -1;
+    if(proj_coords.y <= 0.01 || proj_coords.y >= 0.999)
+        return -1;
+    if(proj_coords.z <= 0.01 || proj_coords.z >= 0.999)
+        return -1;
+    //float closest_depth = texture(map, proj_coords.xy).r;
     float current_depth = proj_coords.z;  
-    float bias = max(0.005 * (1.0 - dot(normal, light_dir)), 0.0005);  
+    float bias = max(0.05 * (1.0 - dot(normal, light_dir)), 0.005);  
     float shadow = 0.0;
-    vec2 texel_size = 1.0 / textureSize(depth_map, 0);
-    shadow += current_depth - bias > closest_depth ? 1.0 : closest_depth;
+    vec2 texel_size = 1.0 / textureSize(map, 0);
+    
+    for(int x = -1; x <= 1; ++x)
+    {
+        for(int y = -1; y <= 1; ++y)
+        {
+            float pcf_depth = texture(map, proj_coords.xy + vec2(x, y) * texel_size).r; 
+            shadow += current_depth - bias > pcf_depth ? 1.0 : 0.0;        
+        }    
+    }
     shadow /= 9.0;
-    if(proj_coords.z > 1.0)
-        shadow = 0.0;
+
     return shadow;
 }
 
@@ -70,7 +86,7 @@ vec3 calc_point_light(light i, vec3 normal, vec3 frag_pos, vec3 view_dir)
 #define MAX_LIGHTS 4
 uniform light lights[MAX_LIGHTS];
 
-vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_light)
+vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_light, vec4 f_pos_light_far)
 {
         // ambient lighting
     vec3 ambient = 0.25 * vec3(30.0/255.0,26.0/255.0,117.0/255.0);
@@ -88,11 +104,17 @@ vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_lig
     vec3 specular = 0.5 * spec * vec3(255.0/255.0,204.0/255.0,51.0/255.0);  
 
     // calculate shadow lighting
-    float shadow = shadow_calculate(camera_position, frag_pos, f_pos_light, normal, camera_position + (sun_direction*100.0));      
+    float shadow = shadow_calculate(camera_position, depth_map, frag_pos, f_pos_light, normal, camera_position + (sun_direction*50.0));   
+    if(shadow == -1)   
+        shadow = shadow_calculate(camera_position, depth_map_far, frag_pos, f_pos_light_far, normal, camera_position + (sun_direction*100.0));      
+    if(shadow == -1)
+        shadow = 0.0;
+    //shadow = mix(shadow,shadow_far,distance(frag_pos, camera_position)/64.0);
 
     vec3 combined_light_result = vec3(0,0,0);
     for(int i = 0; i < MAX_LIGHTS; i++)
         combined_light_result += calc_point_light(lights[i], normal, frag_pos, view_dir);
 
+    //return vec3(1.0,0.0,1.0) * 1.0-shadow;
     return ambient + (1.0 - shadow) * (diffuse + specular) + combined_light_result;
 }

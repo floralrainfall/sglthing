@@ -1,8 +1,39 @@
-layout (location = 0) in vec3 a_pos;
+layout (location = 0) in vec3 v_pos;
+
+layout(location=4) in ivec4 v_bone_ids;
+layout(location=5) in vec4 v_weights;
 
 uniform mat4 model;
+uniform int sel_map;
+
+const int MAX_BONES = 100;
+const int MAX_BONE_INFLUENCE = 4;
+uniform mat4 bone_matrices[MAX_BONES];
 
 void main()
-{
-    gl_Position = lsm * model * vec4(a_pos, 1.0),vec2(320,240);
+{       
+    vec4 total_position = vec4(0.0);
+    int null_ids = 0;
+    for(int i = 0; i < MAX_BONE_INFLUENCE; i++)
+    {
+        if(v_bone_ids[i] == -1) 
+        {
+            null_ids++;
+            continue;
+        }
+        if(v_bone_ids[i] >= MAX_BONES) 
+        {
+            total_position = vec4(v_pos,1.0f);
+            break;
+        }
+        vec4 local_position = bone_matrices[v_bone_ids[i]] * vec4(v_pos,1.0);
+        total_position += local_position * v_weights[i];
+    }
+    if(null_ids == 4)
+        total_position = vec4(v_pos,1.0);
+        
+    if(sel_map == 0)
+        gl_Position = lsm * model * total_position;
+    else if(sel_map == 1)
+        gl_Position = lsm_far * model * total_position;
 }  

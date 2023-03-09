@@ -14,7 +14,7 @@ static s7_pointer __engine_print(s7_scheme *sc, s7_pointer args)
         return(s7_wrong_type_arg_error(sc, "engine-print", 1, s7_car(args), "a string"));
     const char* str = s7_string(s7_car(args));
 
-    printf("s7: '%s'\n", str);
+    printf("sglthing: (engine-print '%s')\n", str);
     return s7_nil(sc);
 }
 
@@ -99,10 +99,19 @@ static s7_pointer __world_time(s7_scheme *sc, s7_pointer args)
 static s7_pointer __world_delta_time(s7_scheme *sc, s7_pointer args)
 {
     if(!s7_is_c_pointer(s7_car(args)))
-        return(s7_wrong_type_arg_error(sc, "world-render-object", 0, s7_car(args), "world pointer"));
+        return(s7_wrong_type_arg_error(sc, "world-delta-time", 0, s7_car(args), "world pointer"));
     struct world* world = (struct world*)s7_c_pointer(s7_car(args));
 
     return s7_make_real(sc, world->delta_time);
+}
+
+static s7_pointer __world_lighting_shader(s7_scheme *sc, s7_pointer args)
+{
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "world-lighting-shader", 0, s7_car(args), "world pointer"));
+    struct world* world = (struct world*)s7_c_pointer(s7_car(args));
+
+    return s7_make_integer(sc, world->gfx.lighting_shader);
 }
 
 static s7_pointer __draw_vao(s7_scheme* sc, s7_pointer args)
@@ -341,7 +350,7 @@ static s7_pointer __animator_current_time(s7_scheme* sc, s7_pointer args)
         return(s7_wrong_type_arg_error(sc, "animator-current-time", 0, s7_car(args), "animator"));
     struct animator* animator = (struct animator*)s7_c_pointer(s7_car(args));
 
-    return s7_make_real(sc, animator->current_time);
+    return s7_make_real(sc, animator->current_time / animator->animation->ticks_per_second);
 }
 
 static s7_pointer __animator_update(s7_scheme* sc, s7_pointer args)
@@ -573,6 +582,7 @@ void sgls7_add_functions(s7_scheme* sc)
     s7_define_function(sc, "world-get-ui", __world_get_ui, 1, 0, false, "(world-get-ui w) returns ui data pointer");
     s7_define_function(sc, "world-time", __world_time, 0, 0, false, "(world-time) gets time of glfw");
     s7_define_function(sc, "world-delta-time", __world_delta_time, 1, 0, false, "(world-delta-time w) gets delta time of glfw window");
+    s7_define_function(sc, "world-lighting-shader", __world_lighting_shader, 1, 0, false, "(world-lighting-shader w) gets the worlds shadow pass shader");
 
     s7_define_function(sc, "io-add-directory", __io_add_directory, 1, 0, false, "(io-add-directory d)");
 
@@ -586,6 +596,7 @@ void sgls7_add_functions(s7_scheme* sc)
     s7_define_function(sc, "input-get-mouse", __input_get_mouse, 0, 0, false, "(input-get-mouse) returns list, x = 1st element, y = 2nd element");
     s7_define_function(sc, "input-get-axis", __input_get_axis, 1, 0, false, "(input-get-axis a) returns real num");
     s7_define_function(sc, "input-get-key", __input_get_key, 1, 0, false, "(input-get-mouse k) returns #t/#f");
+    s7_define_function(sc, "input-get-focus", __input_get_focus, 0, 0, false, "(input-get-focus) returns #t/#f");
 
     s7_define_function(sc, "load-texture", __load_texture, 1, 0, false, "(load-model string) loads texture string into texture cache");
     s7_define_function(sc, "get-texture", __get_texture, 1, 0, false, "(get-model string) returns texture string's id");

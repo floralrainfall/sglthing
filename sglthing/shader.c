@@ -55,24 +55,22 @@ int compile_shader(const char* shader_name, int type)
     }
 }
 
-int link_program(int vertex, int fragment)
+int create_program()
 {
-    ASSERT(vertex && fragment);
     int program = glCreateProgram();
     ASSERT(program);
+    return program;
+}
+
+int attach_program_shader(int program, int shader)
+{
+    if(shader)
+        sglc(glAttachShader(program,shader));
+}
+
+int link_programv(int program)
+{    
     int success;
-    if(vertex)
-    {
-        sglc(glAttachShader(program,vertex));
-    }
-    else
-        printf("sglthing: no vertex shader set\n");
-    if(fragment)
-    {
-        sglc(glAttachShader(program,fragment));
-    }
-    else
-        printf("sglthing: no fragment shader set\n");
     sglc(glLinkProgram(program));
 
     glGetProgramiv(program, GL_LINK_STATUS, &success);
@@ -80,8 +78,29 @@ int link_program(int vertex, int fragment)
         char info_log[512];
         glGetProgramInfoLog(program, 512, NULL, info_log);
         printf("sglthing: program compilation failed\n%s\n",info_log);
-        return 0;
     }
+    printf("sglthing: linked program %i\n", program);
+
+    return success;
+}
+
+int link_program(int vertex, int fragment)
+{
+    ASSERT(vertex && fragment);
+    int program = create_program();
+    if(vertex)
+    {
+        attach_program_shader(program, vertex);
+    }
+    else
+        printf("sglthing: no vertex shader set\n");
+    if(fragment)
+    {
+        attach_program_shader(program, fragment);
+    }
+    else
+        printf("sglthing: no fragment shader set\n");
+    link_programv(program);
     printf("sglthing: linked program %i; v: %i, f: %i\n", program, vertex, fragment);
     return program;
 }

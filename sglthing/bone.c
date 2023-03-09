@@ -29,7 +29,7 @@ void bone_get(struct bone* bone, char* name, int id, const struct aiNodeAnim* ch
         data.quat[0] = ai_quaternion.x;
         data.quat[1] = ai_quaternion.y;
         data.quat[2] = ai_quaternion.z;
-        data.quat[2] = ai_quaternion.w;
+        data.quat[3] = ai_quaternion.w;
         data.timestamp = time_stamp;
         g_array_append_vals(bone->key_rotations, &data, 1);
     }
@@ -46,6 +46,8 @@ void bone_get(struct bone* bone, char* name, int id, const struct aiNodeAnim* ch
         data.timestamp = time_stamp;
         g_array_append_vals(bone->key_scales, &data, 1);
     }
+
+    bone->id = id;
 
     strncpy(bone->name, name, 64);
 }
@@ -119,20 +121,20 @@ void bone_interp_scale(struct bone* bone, mat4 out, float animation_time)
     glm_mat4_identity(t);
     if (bone->num_key_scales == 1)
     {
-        struct key_scale t_k = g_array_index(bone->key_translations, struct key_scale, 0); 
+        struct key_scale t_k = g_array_index(bone->key_scales, struct key_scale, 0); 
         glm_translate(t,t_k.scale);
         glm_mat4_copy(t,out);
         return;
     }
-    int p0_index = bone_get_translation_idx(bone, animation_time);
+    int p0_index = bone_get_scale_idx(bone, animation_time);
     int p1_index = p0_index + 1;
-    float scale_factor = get_scale_factor(g_array_index(bone->key_translations, struct key_scale, p0_index).timestamp, 
-                                          g_array_index(bone->key_translations, struct key_scale, p1_index).timestamp, animation_time);
+    float scale_factor = get_scale_factor(g_array_index(bone->key_scales, struct key_scale, p0_index).timestamp, 
+                                          g_array_index(bone->key_scales, struct key_scale, p1_index).timestamp, animation_time);
     vec3 final_scale;
-    glm_vec3_mix(g_array_index(bone->key_translations, struct key_scale, p0_index).scale,
-                 g_array_index(bone->key_translations, struct key_scale, p1_index).scale,
+    glm_vec3_mix(g_array_index(bone->key_scales, struct key_scale, p0_index).scale,
+                 g_array_index(bone->key_scales, struct key_scale, p1_index).scale,
                  scale_factor, final_scale);
-    glm_translate(t,final_scale);
+    glm_scale(t,final_scale);
     glm_mat4_copy(t, out);
 }
 

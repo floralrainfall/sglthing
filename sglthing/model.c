@@ -128,13 +128,13 @@ static void model_extract_bone_weights(struct mesh* i_mesh, struct model_vertex*
         printf("sglthing: %s bone added\n", bone_name);
         model_find_bone_data(mesh, bone_name, &bone_data);
         ASSERT(bone_data.id != -1);
-        if(strncmp(bone_name,i_mesh->bone_info[i_mesh->bone_infos].name,64)==0)
+        if(strncmp(bone_name,i_mesh->bone_info[i_mesh->bone_infos].name,64)==0 || i_mesh->bone_infos == bone_data.id)
         {
             struct model_bone_info new_bone_info;
-            new_bone_info.id = i_mesh->bone_counter;
+            new_bone_info.id = i_mesh->bone_infos;
             strncpy(new_bone_info.name,bone_name,64);
             ASSIMP_TO_GLM(mesh->mBones[bone_index]->mOffsetMatrix,new_bone_info.offset);
-            bone_id = i_mesh->bone_infos;
+            bone_id = new_bone_info.id;
             i_mesh->bone_info[i_mesh->bone_infos++] = new_bone_info;
         }
         else
@@ -207,7 +207,7 @@ static void model_parse_mesh(struct model_vertex* vtx_array, int* vtx_count, uns
         }
     }
 
-    printf("parsed mesh with %i vertices %i faces... \n", mesh->mNumVertices, mesh->mNumFaces);
+    // printf("parsed mesh with %i vertices %i faces... \n", mesh->mNumVertices, mesh->mNumFaces);
 }
 
 // FIXME: only until recently i had figured out that vertex array switching is an expensive operation
@@ -264,8 +264,6 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
         model_parse_mesh(vtx_array, &vtx_count, idx_array, &idx_count, mesh, scene);
 
         int element_buffer, vertex_buffer;
-        int new_mesh = create_model_vao(vtx_array, vtx_count, idx_array, idx_count, &vertex_buffer, &element_buffer);
-        model->meshes[model->mesh_count].vertex_array = new_mesh;
         model->meshes[model->mesh_count].element_buffer = element_buffer;
         model->meshes[model->mesh_count].vertex_buffer = vertex_buffer;
         model->meshes[model->mesh_count].element_count = idx_count;
@@ -273,6 +271,8 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
         model->meshes[model->mesh_count].vtx_data_count = vtx_count;
         model_load_textures(&model->meshes[model->mesh_count], mesh, scene);
         model_extract_bone_weights(&model->meshes[model->mesh_count], vtx_array, mesh, scene);
+        int new_mesh = create_model_vao(vtx_array, vtx_count, idx_array, idx_count, &vertex_buffer, &element_buffer);
+        model->meshes[model->mesh_count].vertex_array = new_mesh;
         model->mesh_count++;
 
         free(idx_array);

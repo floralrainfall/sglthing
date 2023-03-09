@@ -39,6 +39,9 @@ struct world* world_init()
     world->cam.up[0] = 0.f;
     world->cam.up[1] = 1.f;
     world->cam.up[2] = 0.f;
+    world->cam.world_up[0] = 0.f;
+    world->cam.world_up[1] = 1.f;
+    world->cam.world_up[2] = 0.f;
     world->cam.fov = 45.f;
     world->cam.yaw = 0.f;
 
@@ -51,9 +54,11 @@ struct world* world_init()
     int ls_v = compile_shader("shaders/shadow_pass.vs",GL_VERTEX_SHADER);
     int ls_f = compile_shader("shaders/shadow_pass.fs",GL_FRAGMENT_SHADER);
     world->gfx.lighting_shader = link_program(ls_v,ls_f);
-    int q_v = compile_shader("shaders/quad.vs",GL_VERTEX_SHADER);
-    int q_f = compile_shader("shaders/quad.gs",GL_GEOMETRY_SHADER);
-    world->gfx.quad_shader = link_program(q_v,q_f);
+    world->gfx.quad_shader = create_program();
+    int q_v = compile_shader("shaders/quad.vs",GL_VERTEX_SHADER);   attach_program_shader(world->gfx.quad_shader, q_v);
+    int q_g = compile_shader("shaders/quad.gs",GL_GEOMETRY_SHADER); attach_program_shader(world->gfx.quad_shader, q_g);
+    int q_f = compile_shader("shaders/quad.fs",GL_FRAGMENT_SHADER); attach_program_shader(world->gfx.quad_shader, q_f);
+    link_programv(world->gfx.quad_shader);
 
     add_input((struct keyboard_mapping){.key_positive = GLFW_KEY_D, .key_negative = GLFW_KEY_A, .name = "x_axis"});
     add_input((struct keyboard_mapping){.key_positive = GLFW_KEY_Q, .key_negative = GLFW_KEY_E, .name = "y_axis"});
@@ -78,8 +83,8 @@ struct world* world_init()
     world->gfx.fog_color[2] = world->gfx.clear_color[2];
     world->gfx.fog_color[3] = world->gfx.clear_color[3];
 
-    world->gfx.fog_maxdist = 1000.f;
-    world->gfx.fog_mindist = 128.f-32.f;
+    world->gfx.fog_maxdist = 100.f;
+    world->gfx.fog_mindist = 50.f;
     world->gfx.banding_effect = 0xff8;
 
     world->gfx.sun_direction[0] = -0.5f;
@@ -100,9 +105,12 @@ struct world* world_init()
     world->physics.contactgroup = dJointGroupCreate (0);
 
     world->render_area = 0;
+    
+    vec4 border_color = { 0.0f, 0.0f, 0.0f, 1.0f };
 
     sglc(glGenFramebuffers(1, &world->gfx.depth_map_fbo));
     sglc(glGenTextures(1, &world->gfx.depth_map_texture));
+
     sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.depth_map_texture));
     sglc(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 
                 SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL));
@@ -110,11 +118,28 @@ struct world* world_init()
     sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
     sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)); 
     sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER)); 
-    vec4 border_color = { 1.0f, 1.0f, 1.0f, 1.0f };
     sglc(glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color));   
 
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
     sglc(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, world->gfx.depth_map_texture, 0));
+    sglc(glDrawBuffer(GL_NONE));
+    sglc(glReadBuffer(GL_NONE));
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));  
+
+    sglc(glGenFramebuffers(1, &world->gfx.depth_map_fbo_far));
+    sglc(glGenTextures(1, &world->gfx.depth_map_texture_far));
+
+    sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.depth_map_texture_far));
+    sglc(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 
+                SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL));
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)); 
+    sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER)); 
+    sglc(glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color));   
+
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo_far));
+    sglc(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, world->gfx.depth_map_texture_far, 0));
     sglc(glDrawBuffer(GL_NONE));
     sglc(glReadBuffer(GL_NONE));
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));  
@@ -124,12 +149,27 @@ struct world* world_init()
 
 void world_frame_render(struct world* world)
 {    
-    if(world->gfx.shadow_pass)
-        glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Light Pass");
-    else
-        glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Scene");
+    glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Scene");
     script_frame_render(world,world->script, world->gfx.shadow_pass);
     //world_draw_model(world, world->test_object, world->normal_shader, test_model, true);
+    glPopDebugGroupKHR();   
+}
+
+void world_frame_light_pass(struct world* world, float quality, int framebuffer, int framebuffer_x, int framebuffer_y)
+{
+    glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Light Pass");
+    world->gfx.shadow_pass = true;
+
+    sglc(glViewport(0,0,framebuffer_x,framebuffer_y));
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, framebuffer));
+    sglc(glClear(GL_DEPTH_BUFFER_BIT));
+    sglc(glCullFace(GL_FRONT));
+    world_frame_render(world);
+    sglc(glCullFace(GL_BACK));
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    sglc(glViewport(0,0,world->viewport[2],world->viewport[3]));
+    
+    world->gfx.shadow_pass = false;
     glPopDebugGroupKHR();   
 }
 
@@ -160,7 +200,7 @@ void world_frame(struct world* world)
     world->cam.front[2] = sinf(world->cam.yaw * M_PI_180f) * cosf(world->cam.pitch * M_PI_180f);
 
     glm_normalize(world->cam.front);
-    glm_cross(world->cam.front, (vec3){0.f, 1.f, 0.f}, world->cam.right);
+    glm_cross(world->cam.front, world->cam.world_up, world->cam.right);
     glm_normalize(world->cam.right);
     glm_cross(world->cam.right, world->cam.front, world->cam.up);
     glm_normalize(world->cam.up);
@@ -189,26 +229,30 @@ void world_frame(struct world* world)
     world_draw_primitive(world, world->cloud_shader, GL_FILL, PRIMITIVE_PLANE, cloud_matrix, (vec4){1.f,1.f,1.f,1.f});
     glEnable(GL_DEPTH_TEST);*/
 
-    world->gfx.shadow_pass = true;
-    mat4 light_projection;
-    mat4 light_view;
-    glm_ortho(-100.f, 100.f, -100.f, 100.f, 1.0f, 2000.0f,light_projection);
     vec3 sun_direction_camera;
+    mat4 light_projection, light_projection_far;
+    mat4 light_view, light_view_far;
+
+    glm_ortho(-15.f, 15.f, -15.f, 15.f, 1.0f, 100.0f,light_projection);
+    glm_ortho(-100.f, 100.f, -100.f, 100.f, 1.0f, 200.0f,light_projection_far);
+
+    sun_direction_camera[0] = world->gfx.sun_direction[0]*50.f + world->cam.position[0];
+    sun_direction_camera[1] = world->gfx.sun_direction[1]*50.f + world->cam.position[1];
+    sun_direction_camera[2] = world->gfx.sun_direction[2]*50.f + world->cam.position[2];
+    glm_lookat(sun_direction_camera, world->cam.position,(vec3){0.f,1.f,0.f},light_view);
+
     sun_direction_camera[0] = world->gfx.sun_direction[0]*100.f + world->cam.position[0];
     sun_direction_camera[1] = world->gfx.sun_direction[1]*100.f + world->cam.position[1];
     sun_direction_camera[2] = world->gfx.sun_direction[2]*100.f + world->cam.position[2];
-    glm_lookat(sun_direction_camera, world->cam.position,(vec3){0.f,1.f,0.f},light_view);
+    glm_lookat(sun_direction_camera, world->cam.position,(vec3){0.f,1.f,0.f},light_view_far);
+
     glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
-    sglc(glViewport(0,0,SHADOW_WIDTH,SHADOW_HEIGHT));
-    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.depth_map_fbo));
-    sglc(glClear(GL_DEPTH_BUFFER_BIT));
-    sglc(glCullFace(GL_FRONT));
-    world_frame_render(world);
-    sglc(glCullFace(GL_BACK));
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    sglc(glViewport(0,0,world->viewport[2],world->viewport[3]));
-    
-    world->gfx.shadow_pass = false;
+    glm_mat4_mul(light_projection_far, light_view_far, world->gfx.light_space_matrix_far);
+
+    world->gfx.current_map = 0;
+    world_frame_light_pass(world,15.f,world->gfx.depth_map_fbo,SHADOW_WIDTH,SHADOW_HEIGHT);
+    world->gfx.current_map = 1;
+    world_frame_light_pass(world,50.f,world->gfx.depth_map_fbo_far,SHADOW_WIDTH,SHADOW_HEIGHT);
 
     glStencilMask(0x00);
     world_frame_render(world);
@@ -271,6 +315,7 @@ static void __easy_uniforms(struct world* world, int shader_program, mat4 model_
     glUniformMatrix4fv(glGetUniformLocation(shader_program,"view"), 1, GL_FALSE, world->v[0]);
     glUniformMatrix4fv(glGetUniformLocation(shader_program,"projection"), 1, GL_FALSE, world->p[0]);
     glUniformMatrix4fv(glGetUniformLocation(shader_program,"lsm"), 1, GL_FALSE, world->gfx.light_space_matrix[0]);
+    glUniformMatrix4fv(glGetUniformLocation(shader_program,"lsm_far"), 1, GL_FALSE, world->gfx.light_space_matrix_far[0]);
     glUniform3fv(glGetUniformLocation(shader_program,"camera_position"), 1, world->cam.position);
 
     // fog
@@ -283,10 +328,15 @@ static void __easy_uniforms(struct world* world, int shader_program, mat4 model_
     glUniform3fv(glGetUniformLocation(shader_program,"sun_direction"), 1, world->gfx.sun_direction);
     glUniform1f(glGetUniformLocation(shader_program,"time"), (float)glfwGetTime());
     glUniform1i(glGetUniformLocation(shader_program,"banding_effect"), world->gfx.banding_effect);
+    glUniform1i(glGetUniformLocation(shader_program,"sel_map"), world->gfx.current_map);
 
     glActiveTexture(GL_TEXTURE7);
     glBindTexture(GL_TEXTURE_2D, world->gfx.depth_map_texture);
     glUniform1i(glGetUniformLocation(shader_program,"depth_map"), 7);
+
+    glActiveTexture(GL_TEXTURE8);
+    glBindTexture(GL_TEXTURE_2D, world->gfx.depth_map_texture_far);
+    glUniform1i(glGetUniformLocation(shader_program,"depth_map_far"), 8);
 
     while(glGetError()!=0);
 }

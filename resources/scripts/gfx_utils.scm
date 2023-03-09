@@ -45,6 +45,10 @@
     (draw-sky world)
     (lightarea-update camera-light-area (transform-px camera) (transform-py camera) (transform-pz camera)))
 
+(define (gfxutils-set-animator pass animator shader world)
+    (when pass (animator-set-uniforms animator (world-lighting-shader world)))
+    (when (not pass) (animator-set-uniforms animator shader)))
+
 (define (draw-sky world)
     (gl-no-depth) 
     (world-draw-object world sky-shader sky-ball sky-transform)

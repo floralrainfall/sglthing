@@ -9,8 +9,8 @@
 #include "light.h"
 #include "script.h"
 
-#define SHADOW_WIDTH 512
-#define SHADOW_HEIGHT 512
+#define SHADOW_WIDTH 2048
+#define SHADOW_HEIGHT 2048
 
 struct world {
     struct {
@@ -18,6 +18,7 @@ struct world {
         float pitch;
         float yaw;
         vec3 up;
+        vec3 world_up;
         vec3 front;
         vec3 right;
         float fov;
@@ -34,9 +35,13 @@ struct world {
         int screen_height;
         int depth_map_fbo;
         int depth_map_texture;    
+        int depth_map_fbo_far;
+        int depth_map_texture_far;   
         bool shadow_pass;
         int lighting_shader;
         mat4 light_space_matrix;
+        mat4 light_space_matrix_far;
+        int current_map;
         int quad_shader;
     } gfx;
 
@@ -73,6 +78,7 @@ struct world* world_init();
 
 void world_frame(struct world* world);
 void world_frame_render(struct world* world);
+void world_frame_light_pass(struct world* world, float quality, int framebuffer, int framebuffer_x, int framebuffer_y);
 void world_draw(struct world* world, int count, int vertex_array, int shader_program, mat4 model_matrix);
 void world_draw_model(struct world* world, struct model* model, int shader_program, mat4 model_matrix, bool set_textures);
 

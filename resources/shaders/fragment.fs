@@ -15,12 +15,13 @@ in vec4 f_color;
 in vec2 f_uv;
 in float f_affine;
 in vec4 f_pos_light;
+in vec4 f_pos_light_far;
 
 uniform sampler2D diffuse0;
 
 void main()
 {   
-    vec3 lighting = calc_light(f_normal, f_pos, camera_position, f_pos_light);
+    vec3 lighting = calc_light(f_normal, f_pos, camera_position, f_pos_light, f_pos_light_far);
 
     // affine thing
     vec2 affine_tex_coords = f_uv / f_affine;

@@ -17,11 +17,12 @@ in vec3 f_normal;
 in vec4 f_color;
 in vec2 f_uv;
 in vec4 f_pos_light;
+in vec4 f_pos_light_far;
 in float f_affine;
 
 void main()
 {   
-    vec3 lighting = calc_light(f_normal, f_pos, camera_position, f_pos_light);
+    vec3 lighting = calc_light(f_normal, f_pos, camera_position, f_pos_light, f_pos_light_far);
 
     // affine thing
     vec2 affine_tex_coords = f_uv / f_affine;

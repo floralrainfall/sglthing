@@ -21,13 +21,14 @@ out vec3 f_normal;
 out vec4 f_color;
 out vec2 f_uv;
 out vec4 f_pos_light;
+out vec4 f_pos_light_far;
 out float f_affine;
 
 float near = 0.1; 
 float far  = 1000.0; 
 
 void main()
-{
+{    
     vec4 total_position = vec4(0.0);
     int null_ids = 0;
     for(int i = 0; i < MAX_BONE_INFLUENCE; i++)
@@ -48,12 +49,13 @@ void main()
     }
     if(null_ids == 4)
         total_position = vec4(v_pos,1.0);
-
+        
     f_normal = mat3(transpose(inverse(model))) * v_normal;  
     //f_normal = v_normal;
     f_color = v_color;
-    f_pos = (model * vec4(v_pos, 1.0)).xyz;
+    f_pos = (model * total_position).xyz;
     f_pos_light = lsm * vec4(f_pos, 1.0);
+    f_pos_light_far = lsm_far * vec4(f_pos, 1.0);
     f_m_pos = v_pos;
     gl_Position = snap(projection * view * model * total_position,vec2(320,240));
 
@@ -62,5 +64,4 @@ void main()
     float affine = dist + ((gl_Position.w * 8.0) / dist) * 0.25;
     f_uv = v_uv * affine;
     f_affine = affine;
-
 }
