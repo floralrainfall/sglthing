@@ -30,6 +30,7 @@ float far  = 1000.0;
 void main()
 {    
     vec4 total_position = vec4(0.0);
+    vec3 total_normal = vec3(0.0);
     int null_ids = 0;
     for(int i = 0; i < MAX_BONE_INFLUENCE; i++)
     {
@@ -41,16 +42,18 @@ void main()
         if(v_bone_ids[i] >= MAX_BONES) 
         {
             total_position = vec4(v_pos,1.0f);
+            total_normal = v_normal;
             break;
         }
         vec4 local_position = bone_matrices[v_bone_ids[i]] * vec4(v_pos,1.0);
         total_position += local_position * v_weights[i];
         vec3 local_normal = mat3(bone_matrices[v_bone_ids[i]]) * v_normal;
+        total_normal += local_normal * v_weights[i];
     }
     if(null_ids == 4)
         total_position = vec4(v_pos,1.0);
         
-    f_normal = mat3(transpose(inverse(model))) * v_normal;  
+    f_normal = mat3(transpose(inverse(model))) * total_normal;  
     //f_normal = v_normal;
     f_color = v_color;
     f_pos = (model * total_position).xyz;
