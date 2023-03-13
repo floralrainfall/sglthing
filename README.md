@@ -15,6 +15,11 @@ Estimated Requirements
 - GLFW
 - GLib
 
+SGLThing requires a configuration file in the resources directory named `config_private.cfg`. In the file should be your sgl.endoh.ca username, and password.
+
+    user_username ExampleUsername
+    user_password ExamplePassword
+
 ## Windows Cross-Compilation Notes
 
 Assimp doesn't copy itself over to the build directory for some reason. Just do cp deps/assimp/bin/libassimp-5.dll . to get it in.
