@@ -10,3 +10,6 @@
 [submodule "deps/ODE"]
 	path = deps/ODE
 	url = https://github.com/thomasmarsh/ODE
+[submodule "deps/curl"]
+	path = deps/curl
+	url = https://github.com/curl/curl

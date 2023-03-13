@@ -8,10 +8,9 @@ find_package(glfw3)
 find_package(cglm)
 find_package(CURL)
 find_package(assimp)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0)
-pkg_check_modules(ODE ode)
-set(ODE_FOUND OFF)
+#find_package(PkgConfig REQUIRED)
+#pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0)
+#pkg_check_modules(ODE ode)
 
 set(ODE_LIBRARY ${ODE_LIBRARIES})
 if(NOT ODE_FOUND)
@@ -30,6 +29,10 @@ endif()
 if(NOT cglm_FOUND)
     message(STATUS "cglm not found, using deps/cglm")
     add_subdirectory(deps/cglm)
+endif()
+if(NOT CURL_FOUND)
+    message(STATUS "curl not found, using deps/curl")
+    add_subdirectory(deps/curl)
 endif()
 
 project(sglthing)
@@ -95,7 +98,6 @@ target_link_libraries(sglthing PUBLIC
     cglm
     assimp
     m
-    PkgConfig::deps
     ${CURL_LIBRARIES}
     ${ODE_LIBRARY}
 )
