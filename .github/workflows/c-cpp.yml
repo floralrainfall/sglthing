@@ -48,7 +48,7 @@ jobs:
         shell: bash
         run: |    
            if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt install -y libglfw3-dev libode-dev libassimp-dev libcurl4-openssl-dev libcglm-dev
+            sudo apt install -y glfw3 libglfw3-dev libode-dev libassimp-dev libcurl4-openssl-dev libcglm-dev libxinerama-dev libxk-dev libxcursor-dev 
            elif [ "$RUNNER_OS" == "Windows" ]; then
             choco install glfw3 
            elif [ "$RUNNER_OS" == "macOS" ]; then
