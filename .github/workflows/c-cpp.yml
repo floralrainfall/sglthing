@@ -44,6 +44,19 @@ jobs:
         run: mkdir build
         shell: bash
         
+      - name: Install libxrandr
+        shell: bash
+        run: |    
+           if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt install -y libxrandr-dev
+           elif [ "$RUNNER_OS" == "Windows" ]; then
+                choco install important_windows_software
+           elif [ "$RUNNER_OS" == "macOS" ]; then
+                echo "idk what to do as mac"
+           else
+                echo "$RUNNER_OS not supported"
+                exit 1
+           fi
       # Run CMake to generate Ninja project files, using the vcpkg's toolchain file to resolve and install the dependencies as specified in vcpkg.json.
       - name: Install dependencies and generate project files
         working-directory: build
