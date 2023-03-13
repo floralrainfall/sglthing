@@ -197,6 +197,9 @@ struct world* world_init(char** argv, int argc)
 #endif
 
     char* net_mode = config_string_get(&world->config,"network_mode");
+
+    world->server.status = NETWORKSTATUS_DISCONNECTED;
+    world->client.status = NETWORKSTATUS_DISCONNECTED;
     if(strcmp(net_mode,"server")==0)
     {
         network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
@@ -210,6 +213,7 @@ struct world* world_init(char** argv, int argc)
     }
     world->client.security = (config_number_get(&world->config,"network_security") == 1.0);
     world->server.security = (config_number_get(&world->config,"network_security") == 1.0);
+    world->server.shutdown_empty = (config_number_get(&world->config,"shutdown_empty") == 1.0);
     return world;
 }
 
@@ -443,6 +447,9 @@ void world_frame(struct world* world)
     if(world->server.mode == NETWORKSTATUS_CONNECTED)
         network_dbg_ui(&world->server, world->ui);
 
+    if(world->client.status == NETWORKSTATUS_DISCONNECTED && world->server.status == NETWORKSTATUS_DISCONNECTED)
+        glfwSetWindowShouldClose(world->gfx.window, true);
+
     if(keys_down[GLFW_KEY_GRAVE_ACCENT])
     {
         char* pixels = (char*)malloc(3*world->gfx.screen_width*world->gfx.screen_height);
@@ -588,6 +595,8 @@ void world_draw_primitive(struct world* world, int shader, int fill, enum primit
 // TODO: this
 void world_deinit(struct world* world)
 {
-    network_close(&world->server);
-    network_close(&world->client);
+    if(world->server.status == NETWORKSTATUS_CONNECTED)
+        network_close(&world->server);
+    if(world->client.status == NETWORKSTATUS_CONNECTED)
+        network_close(&world->client);
 }

@@ -76,6 +76,7 @@ void network_open(struct network* network, char* ip, int port)
     network->next_tick = glfwGetTime() + 0.01;
     network->mode = NETWORKMODE_SERVER;
     network->network_frames = 0;
+    network->shutdown_ready = false;
     strncpy(network->server_name, "SGLThing game server", 64);
     strncpy(network->server_motd, "Server has not set a server_motd", 128);
     strncpy(network->debugger_pass, "debugger", 64);
@@ -229,6 +230,14 @@ void network_manage_socket(struct network* network, struct network_client* clien
                 if(network->mode == NETWORKMODE_CLIENT)
                 {
                     printf("sglthing: client del player %i\n", in_packet.packet.player_remove.player_id);
+                    if(in_packet.packet.player_remove.player_id == client->player_id)
+                    {
+                        client->connected = false;
+                        network->status = NETWORKSTATUS_DISCONNECTED;
+                        printf("sglthing: we ought to be out of here!\n");
+                        network_disconnect_player(network, false, "disconnected", client);
+                        return;
+                    }
                 }
                 break;
             case PACKETTYPE_CHAT_MESSAGE:
@@ -268,6 +277,12 @@ void network_frame(struct network* network, float delta_time)
     if(network->mode == NETWORKMODE_SERVER)
     {
         network->distributed_time = glfwGetTime();
+        if(network->server_clients->len == 0 && network->shutdown_ready && network->shutdown_empty)
+        {
+            printf("sglthing: server shutting down because it is empty\n");
+            network_close(network);
+            return;
+        }
         for(int i = 0; i < network->server_clients->len; i++)
         {
             struct network_client* cli = &g_array_index(network->server_clients, struct network_client, i);
@@ -275,7 +290,7 @@ void network_frame(struct network* network, float delta_time)
 
             if(cli->connected)
             {
-                if(network->distributed_time - cli->last_ping_time > 4.0)
+                if(network->distributed_time - cli->last_ping_time > 10.0)
                 {
                     printf("sglthing: disconnecting player %i after 10 seconds of inactivity\n", cli->player_id);
                     network_disconnect_player(network, true, "Timed out (10 seconds)", cli);
@@ -313,6 +328,8 @@ void network_frame(struct network* network, float delta_time)
             new_client.last_ping_time = glfwGetTime() + 5.f;
             new_client.ping_time_interval = 5.0;
             g_array_append_val(network->server_clients, new_client);
+
+            network->shutdown_ready = true;
         }
         else
         {
@@ -369,8 +386,6 @@ void network_disconnect_player(struct network* network, bool transmit_disconnect
 void network_close(struct network* network)
 {
     if(!network)
-        return;
-    if(network->status != NETWORKSTATUS_CONNECTED)
         return;
     if(network->mode == NETWORKMODE_SERVER)
     {

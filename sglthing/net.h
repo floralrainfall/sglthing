@@ -47,6 +47,9 @@ struct network {
     double next_tick;
 
     bool security;
+
+    bool shutdown_empty;
+    bool shutdown_ready;
 };
 
 #define MAGIC_NUMBER 0x7930793179327934
