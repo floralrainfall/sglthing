@@ -60,6 +60,7 @@ void animation_get_bones(struct animation* anim, struct aiAnimation* anim_2, str
             model->bone_info[model->bone_infos].id = model->bone_infos;
             model->bone_infos++;
             _bone_info.id = model->bone_info[model->bone_infos].id;
+            bones_not_found++;
         }
 
         struct bone bone;
@@ -74,21 +75,27 @@ void animation_get_bones(struct animation* anim, struct aiAnimation* anim_2, str
         printf("sglthing: WARN: %i bones not found\n", bones_not_found);
 }
 
-int animation_create(char* animation_path, struct mesh* model, struct animation* anim)
+static void __animation_create2(struct animation* anim, struct mesh* model, int id, const struct aiScene* scene)
+{
+    struct aiAnimation* anim_2 = scene->mAnimations[id];
+    anim->duration = anim_2->mDuration;
+    anim->ticks_per_second = anim_2->mTicksPerSecond;
+    anim->node = (struct assimp_node_data*)malloc(sizeof(struct assimp_node_data));
+    anim->bones = g_array_new(false,true,sizeof(struct bone));
+    animation_read_hierarchy(anim->node, scene->mRootNode);
+    animation_get_bones(anim, anim_2, model);
+}
+
+int animation_create(char* animation_path, struct mesh* model, int id, struct animation* anim)
 {
     char path[256];
     int f = file_get_path(path, 256, animation_path);
     if(f)
     {
+        printf("sglthing: loading anim %i from %s\n", id, animation_path);
         const struct aiScene* scene = aiImportFile(path, aiProcess_Triangulate);
         ASSERT(scene && scene->mRootNode && scene->mAnimations);
-        struct aiAnimation* anim_2 = scene->mAnimations[0];
-        anim->duration = anim_2->mDuration;
-        anim->ticks_per_second = anim_2->mTicksPerSecond;
-        anim->node = (struct assimp_node_data*)malloc(sizeof(struct assimp_node_data));
-        anim->bones = g_array_new(false,true,sizeof(struct bone));
-        animation_read_hierarchy(anim->node, scene->mRootNode);
-        animation_get_bones(anim, anim_2, model);
+        __animation_create2(anim, model, id, scene);
         printf("sglthing: loaded anim %s duration %0.2f\n", animation_path, anim->duration/anim->ticks_per_second);
     }
     return -1;
@@ -170,4 +177,29 @@ void animator_set_bone_uniform_matrices(struct animator* animate, int shader_pro
                 sglc(glUniformMatrix4fv(unf, 1, GL_FALSE, animate->final_bone_matrices[i][0]));
         }
     }
+}
+
+int animation_bundle_create(char* animation_path, struct mesh* model, struct animation_bundle* anim_bundle)
+{
+    char path[256];
+    int f = file_get_path(path, 256, animation_path);
+    if(f)
+    {
+        anim_bundle->animations = g_array_new(false, true, sizeof(struct animation));
+        const struct aiScene* scene = aiImportFile(path, aiProcess_Triangulate);
+        ASSERT(scene && scene->mRootNode && scene->mAnimations);
+        for(int i = 0; i < scene->mNumAnimations; i++)
+        {
+            struct animation anim;
+            __animation_create2(&anim, model, i, scene);
+            g_array_append_vals(anim_bundle->animations, &anim, 1);
+        }
+        printf("sglthing: loaded anim %s count %i\n", animation_path, scene->mNumAnimations);
+    }
+    return -1;
+}
+
+struct animation* animation_bundle_get(struct animation_bundle* anim_bundle, int id)
+{
+    return &g_array_index(anim_bundle->animations, struct animation, id);
 }

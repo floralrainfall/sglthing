@@ -23,7 +23,10 @@ static void model_load_textures(struct mesh* mesh, struct aiMesh* mesh_2, const 
         {
             aiGetMaterialTexture(material, aiTextureType_DIFFUSE, i, &path, NULL, NULL, NULL, NULL, NULL, NULL);
             char fpath[256];
-            snprintf(fpath,256,"test/%s",path.data);
+            if(path.data[0] != '/')
+                snprintf(fpath,256,"test/%s",path.data);
+            else
+                strncpy(fpath, path.data, 256);
             if(!get_texture(&fpath))
             {
                 if(path.data[0] == '*')

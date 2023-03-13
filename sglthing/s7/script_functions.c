@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "transform.h"
+#include "netbundle.h"
 
 #include "../sglthing.h"
 
@@ -212,6 +213,11 @@ static s7_pointer __gl_bind_texture(s7_scheme* sc, s7_pointer args)
         return(s7_wrong_type_arg_error(sc, "gl-bind-texture", 1, s7_cadr(args), "texture id"));
     int texture_id = s7_integer(s7_cadr(args));
 
+    //tbd
+    //if(!s7_is_integer(s7_cadr(args)))
+    //    return(s7_wrong_type_arg_error(sc, "gl-bind-texture", 1, s7_cadr(args), "sampler name"));
+    //const char* sampler_name = s7_string(s7_cadr(args));
+
     glActiveTexture(GL_TEXTURE0 + texture_slot);
     glBindTexture(GL_TEXTURE_2D, texture_id);
     return s7_nil(sc);
@@ -381,8 +387,34 @@ static s7_pointer __animation_create(s7_scheme* sc, s7_pointer args)
         return(s7_wrong_type_arg_error(sc, "animation-create", 1, s7_cadr(args), "model"));
     struct model* model = s7_c_pointer(s7_cadr(args));
     struct animation* animation = (struct animation*)malloc(sizeof(struct animation));
-    animation_create((char*)s7_string(s7_car(args)), &model->meshes[0], animation);
+    int animation_id = 0;
+    if(s7_is_integer(s7_caddr(args)))
+        animation_id = s7_integer(s7_caddr(args));
+    animation_create((char*)s7_string(s7_car(args)), &model->meshes[0], animation_id, animation);
     return s7_make_c_pointer(sc, animation);
+}
+
+static s7_pointer __animation_bundle_create(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_string(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "animation-bundle-create", 0, s7_car(args), "animation path"));
+    if(!s7_is_c_pointer(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "animation-bundle-create", 1, s7_cadr(args), "model"));
+    struct model* model = s7_c_pointer(s7_cadr(args));
+    struct animation_bundle* animation = (struct animation_bundle*)malloc(sizeof(struct animation_bundle));
+    animation_bundle_create((char*)s7_string(s7_car(args)), &model->meshes[0], animation);
+    return s7_make_c_pointer(sc, animation);
+}
+
+static s7_pointer __animation_bundle_get(s7_scheme* sc, s7_pointer args)
+{
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "animation-bundle-get", 0, s7_car(args), "animation bundle"));
+    if(!s7_is_integer(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "animation-bundle-get", 1, s7_cadr(args), "id"));
+    struct animation_bundle* bundle = (struct animation_bundle*)s7_c_pointer(s7_car(args));
+    int animation_id = s7_integer(s7_cadr(args));
+    return s7_make_c_pointer(sc, animation_bundle_get(bundle, animation_id));
 }
 
 #include "../light.h"
@@ -566,6 +598,7 @@ static s7_pointer __light_set_specular(s7_scheme* sc, s7_pointer args)
 void sgls7_add_functions(s7_scheme* sc)
 {
     sgls7_transform_register(sc);
+    sgls7_netbundle_register(sc);
 
     s7_define_variable(sc, "GL_FRAGMENT_SHADER", s7_make_integer(sc, GL_FRAGMENT_SHADER));
     s7_define_variable(sc, "GL_VERTEX_SHADER", s7_make_integer(sc, GL_VERTEX_SHADER));
@@ -613,7 +646,10 @@ void sgls7_add_functions(s7_scheme* sc)
     s7_define_function(sc, "animator-update", __animator_update, 2, 0, false, "(animator-update a d)");
     s7_define_function(sc, "animator-current-time", __animator_current_time, 1, 0, false, "(animator-current-time a)");
 
-    s7_define_function(sc, "animation-create", __animation_create, 2, 0, false, "(animation-create f m)");    
+    s7_define_function(sc, "animation-create", __animation_create, 2, 1, false, "(animation-create f m i)");
+
+    s7_define_function(sc, "animation-bundle-create", __animation_bundle_create, 2, 0, false, "(animation-bundle-create f m)");   
+    s7_define_function(sc, "animation-bundle-get", __animation_bundle_get, 2, 0, false, "(animation-bundle-get b i)");   
     
     s7_define_function(sc, "lightarea-create", __lightarea_create, 0, 0, false, "(lightarea-create)");
     s7_define_function(sc, "lightarea-update", __lightarea_update, 4, 0, false, "(lightarea-update a x y z)");

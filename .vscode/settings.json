@@ -20,6 +20,26 @@
         "neko_vm.h": "c",
         "cstring": "c",
         "regex": "c",
-        "__node_handle": "c"
+        "__node_handle": "c",
+        "stdlib.h": "c",
+        "array": "c",
+        "hash_map": "c",
+        "hash_set": "c",
+        "bitset": "c",
+        "string_view": "c",
+        "initializer_list": "c",
+        "__hash_table": "c",
+        "__split_buffer": "c",
+        "__tree": "c",
+        "deque": "c",
+        "list": "c",
+        "map": "c",
+        "queue": "c",
+        "set": "c",
+        "stack": "c",
+        "unordered_map": "c",
+        "unordered_set": "c",
+        "valarray": "c",
+        "vector": "c"
     }
 }

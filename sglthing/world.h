@@ -8,6 +8,10 @@
 #include "primitives.h"
 #include "light.h"
 #include "script.h"
+#include "config.h"
+#include "net.h"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 
 #define SHADOW_WIDTH 2048
 #define SHADOW_HEIGHT 2048
@@ -33,6 +37,7 @@ struct world {
         int banding_effect;
         int screen_width;
         int screen_height;
+
         int depth_map_fbo;
         int depth_map_texture;    
         int depth_map_fbo_far;
@@ -42,7 +47,18 @@ struct world {
         mat4 light_space_matrix;
         mat4 light_space_matrix_far;
         int current_map;
+
+#ifdef FBO_ENABLED
+        int hdr_fbo;
+        int hdr_color_buffers[2];
+        int hdr_pingpong_fbos[2];
+        int hdr_pingpong_buffers[2];
+        int hdr_blur_shader;
+#endif
+
         int quad_shader;
+
+        GLFWwindow *window;
     } gfx;
 
     mat4 v;
@@ -72,9 +88,16 @@ struct world {
 
         int collisions_in_frame;
     } physics;
+
+    struct network server;
+    struct network client;
+
+    struct config_file config;
+    struct config_file config_private;
 };
 
-struct world* world_init();
+struct world* world_init(char** argv, int argc);
+void world_deinit(struct world* world);
 
 void world_frame(struct world* world);
 void world_frame_render(struct world* world);

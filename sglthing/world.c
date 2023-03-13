@@ -29,7 +29,7 @@ static void world_physics_callback(void* data, dGeomID o1, dGeomID o2)
     }
 }
 
-struct world* world_init()
+struct world* world_init(char** argv, int argc)
 {
     struct world* world = malloc(sizeof(struct world));
 
@@ -48,12 +48,22 @@ struct world* world_init()
     world->frames = 0;
     world->fps = 0.0;
 
+    config_load(&world->config, "config.cfg");
+    config_add(&world->config, argv, argc);
+
     world->script = script_init("scripts/game.scm");
 
     world->gfx.shadow_pass = false;
     int ls_v = compile_shader("shaders/shadow_pass.vs",GL_VERTEX_SHADER);
     int ls_f = compile_shader("shaders/shadow_pass.fs",GL_FRAGMENT_SHADER);
     world->gfx.lighting_shader = link_program(ls_v,ls_f);
+#ifdef FBO_ENABLED
+    world->gfx.hdr_blur_shader = create_program();
+    int b_v = compile_shader("shaders/quad.vs",GL_VERTEX_SHADER);   attach_program_shader(world->gfx.hdr_blur_shader, b_v);
+    int b_g = compile_shader("shaders/quad.gs",GL_GEOMETRY_SHADER); attach_program_shader(world->gfx.hdr_blur_shader, b_g);
+    int b_f = compile_shader("shaders/_game_screen.fs",GL_FRAGMENT_SHADER); attach_program_shader(world->gfx.hdr_blur_shader, b_f);
+    link_programv(world->gfx.hdr_blur_shader);
+#endif
     world->gfx.quad_shader = create_program();
     int q_v = compile_shader("shaders/quad.vs",GL_VERTEX_SHADER);   attach_program_shader(world->gfx.quad_shader, q_v);
     int q_g = compile_shader("shaders/quad.gs",GL_GEOMETRY_SHADER); attach_program_shader(world->gfx.quad_shader, q_g);
@@ -76,7 +86,7 @@ struct world* world_init()
     world->gfx.clear_color[0] = 250.f/255.f;
     world->gfx.clear_color[1] = 214.f/255.f;
     world->gfx.clear_color[2] = 165.f/255.f; 
-    world->gfx.clear_color[3] = 1.f;
+    world->gfx.clear_color[3] = 0.f;
 
     world->gfx.fog_color[0] = world->gfx.clear_color[0];
     world->gfx.fog_color[1] = world->gfx.clear_color[1];
@@ -144,6 +154,62 @@ struct world* world_init()
     sglc(glReadBuffer(GL_NONE));
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));  
 
+#ifdef FBO_ENABLED
+    sglc(glGenFramebuffers(1, &world->gfx.hdr_fbo));
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
+    sglc(glGenTextures(2, world->gfx.hdr_color_buffers));
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_color_buffers[i]));
+        sglc(glTexImage2D(
+            GL_TEXTURE_2D, 0, GL_RGBA16F, world->viewport[2], world->viewport[3], 0, GL_RGBA, GL_FLOAT, NULL
+        ));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+        sglc(glFramebufferTexture2D(
+            GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, world->gfx.hdr_color_buffers[i], 0
+        ));
+    }  
+    unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    sglc(glDrawBuffers(2, attachments));  
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+    
+    sglc(glGenFramebuffers(2, world->gfx.hdr_pingpong_fbos));
+    sglc(glGenTextures(2, world->gfx.hdr_pingpong_buffers));
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_pingpong_fbos[i]));
+        sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_pingpong_buffers[i]));
+        glTexImage2D(
+            GL_TEXTURE_2D, 0, GL_RGBA16F, world->viewport[2], world->viewport[3], 0, GL_RGBA, GL_FLOAT, NULL
+        );
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+        sglc(glFramebufferTexture2D(
+            GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, world->gfx.hdr_pingpong_buffers[i], 0
+        ));
+    }
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+#endif
+
+    char* net_mode = config_string_get(&world->config,"network_mode");
+    if(strcmp(net_mode,"server")==0)
+    {
+        network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
+    } else if(strcmp(net_mode,"client")==0)
+    {
+        network_connect(&world->client, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
+    } else if(strcmp(net_mode,"host")==0)
+    {
+        network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
+        network_connect(&world->client, "127.0.0.1", config_number_get(&world->config,"network_port"));
+    }
+    world->client.security = (config_number_get(&world->config,"network_security") == 1.0);
+    world->server.security = (config_number_get(&world->config,"network_security") == 1.0);
     return world;
 }
 
@@ -181,9 +247,20 @@ void world_frame(struct world* world)
     world->viewport[2] = (float)world->gfx.screen_width;
     world->viewport[3] = (float)world->gfx.screen_height;
     
-    glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+#ifdef FBO_ENABLED
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
+#else
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+#endif
+    if(world->client.status == NETWORKSTATUS_CONNECTED)
+    {
+        glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]);
+    }
+    else
+    {
+        glClearColor(0.2f,0.2f,0.2f,1.0f);
+    }
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
 
@@ -213,8 +290,18 @@ void world_frame(struct world* world)
 
     glm_mul(world->p, world->v, world->vp);
     
-    script_frame(world, world->script);
+    network_frame(&world->server, world->delta_time);
+    network_frame(&world->client, world->delta_time);
 
+    if(world->client.status != NETWORKSTATUS_CONNECTED)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER,2);
+    }
+    script_frame(world, world->script);
+    if(world->client.status != NETWORKSTATUS_CONNECTED)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
+    }
     //if(get_focus())
     //{
     //    world->cam.yaw += mouse_position[0] * world->delta_time * 10.f;
@@ -249,52 +336,112 @@ void world_frame(struct world* world)
     glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
     glm_mat4_mul(light_projection_far, light_view_far, world->gfx.light_space_matrix_far);
 
-    world->gfx.current_map = 0;
-    world_frame_light_pass(world,15.f,world->gfx.depth_map_fbo,SHADOW_WIDTH,SHADOW_HEIGHT);
-    world->gfx.current_map = 1;
-    world_frame_light_pass(world,50.f,world->gfx.depth_map_fbo_far,SHADOW_WIDTH,SHADOW_HEIGHT);
-
-    glStencilMask(0x00);
-    world_frame_render(world);
-
-    // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
-
-    ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, "sglthing dev", 15.f);
-
-    char dbg_info[256];
-    int old_elements = world->ui->ui_elements;
-    world->ui->ui_elements = 0;
-    snprintf(dbg_info, 256, "DEBUG\n\ncam: V=(%.2f,%.2f,%.2f)\nY=%.2f,P=%.2f\nU=(%.2f,%.2f,%.2f)\nF=(%.2f,%.2f,%.2f)\nR=(%.f,%.f,%.f)\nF=%.f\nv=(%i,%i)\nr (scene)=%i,r (ui)=%i\nt=%f, F=%i, d=%f, fps=%f\n\nphysics pause=%s\nphysics geoms=%i\ncollisions in frame=%i\n",
-        world->cam.position[0], world->cam.position[1], world->cam.position[2],
-        world->cam.yaw, world->cam.pitch,
-        world->cam.up[0], world->cam.up[1], world->cam.up[2],
-        world->cam.front[0], world->cam.front[1], world->cam.front[2],
-        world->cam.right[0], world->cam.right[1], world->cam.right[2],
-        world->cam.fov,
-        (int)world->viewport[2], (int)world->viewport[3],
-        world->render_count,
-        old_elements,
-        glfwGetTime(), world->frames, world->delta_time, world->fps,
-        world->physics.paused?"true":"false",
-        dSpaceGetNumGeoms(world->physics.space),
-        world->physics.collisions_in_frame);
-    ui_draw_text(world->ui, 0.f, world->gfx.screen_height-(16.f*3), dbg_info, 1.f);
-
-    script_frame_ui(world, world->script);
-
-    for(int i = 0; i < archives_loaded; i++)
+    if(world->client.status == NETWORKSTATUS_CONNECTED)
     {
-        snprintf(dbg_info, 256, "FS Archive %i: %s", i, archives[i].directory);
-        ui_draw_text(world->ui, world->gfx.screen_width/2, world->gfx.screen_height-(16.f*3)-(i*16.f), dbg_info, 1.f);
+        world->gfx.current_map = 0;
+        world_frame_light_pass(world,15.f,world->gfx.depth_map_fbo,SHADOW_WIDTH,SHADOW_HEIGHT);
+        world->gfx.current_map = 1;
+        world_frame_light_pass(world,50.f,world->gfx.depth_map_fbo_far,SHADOW_WIDTH,SHADOW_HEIGHT);
+
+    #ifdef FBO_ENABLED
+        sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
+    #else
+        sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+    #endif
+
+        world_frame_render(world);
+
+    #ifdef FBO_ENABLED
+        sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+        sglc(glUseProgram(world->gfx.quad_shader));        
+        sglc(glActiveTexture(GL_TEXTURE0));
+        sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_color_buffers[0]));
+        sglc(glUniform1i(glGetUniformLocation(world->gfx.quad_shader,"image"), 0));
+        sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
+        sglc(glDrawArrays(GL_POINTS, 0, 1));
+
+        bool bloom_blur_horiz = true, first_bloom_iter = true;
+        int amount = 10;
+        for(int i = 0; i < amount; i++)
+        {
+            sglc(glUseProgram(world->gfx.hdr_blur_shader));
+            sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_pingpong_fbos[bloom_blur_horiz]));
+            sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur_shader,"horizontal"), bloom_blur_horiz)); 
+            //sglc(glUniform2f(glGetUniformLocation(world->gfx.hdr_blur_shader,"size"), 1.0f, 1.0f)); 
+            //sglc(glUniform2f(glGetUniformLocation(world->gfx.hdr_blur_shader,"offset"), 0.0f, 0.0f)); 
+            sglc(glActiveTexture(GL_TEXTURE0));
+            sglc(glBindTexture(GL_TEXTURE_2D, first_bloom_iter ? world->gfx.hdr_color_buffers[1] : world->gfx.hdr_pingpong_buffers[!bloom_blur_horiz]));
+            sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur_shader,"image"), 0));
+            sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
+            sglc(glDrawArrays(GL_POINTS, 0, 1));
+            bloom_blur_horiz = !bloom_blur_horiz;
+            if(first_bloom_iter)
+                first_bloom_iter = false;
+        }
+    #endif
+        // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
+
+        ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, "sglthing dev", 15.f);
+
+        if(config_number_get(&world->config,"debug_mode") == 1.0)
+        {
+            char dbg_info[256];
+            int old_elements = world->ui->ui_elements;
+            world->ui->ui_elements = 0;
+            snprintf(dbg_info, 256, "DEBUG\n\ncam: V=(%.2f,%.2f,%.2f)\nY=%.2f,P=%.2f\nU=(%.2f,%.2f,%.2f)\nF=(%.2f,%.2f,%.2f)\nR=(%.f,%.f,%.f)\nF=%.f\nv=(%i,%i)\nr (scene)=%i,r (ui)=%i\nt=%f, F=%i, d=%f, fps=%f\n\nphysics pause=%s\nphysics geoms=%i\ncollisions in frame=%i\n",
+                world->cam.position[0], world->cam.position[1], world->cam.position[2],
+                world->cam.yaw, world->cam.pitch,
+                world->cam.up[0], world->cam.up[1], world->cam.up[2],
+                world->cam.front[0], world->cam.front[1], world->cam.front[2],
+                world->cam.right[0], world->cam.right[1], world->cam.right[2],
+                world->cam.fov,
+                (int)world->viewport[2], (int)world->viewport[3],
+                world->render_count,
+                old_elements,
+                glfwGetTime(), world->frames, world->delta_time, world->fps,
+                world->physics.paused?"true":"false",
+                dSpaceGetNumGeoms(world->physics.space),
+                world->physics.collisions_in_frame);
+            ui_draw_text(world->ui, 0.f, world->gfx.screen_height-(16.f*3), dbg_info, 1.f);
+
+            for(int i = 0; i < world->config.config_values; i++)
+            {
+                struct config_value* e = &world->config.config[i];
+                snprintf(dbg_info, 256, "cfg:%s=%s",e->name,e->string_value);
+                ui_draw_text(world->ui, 100.f, world->gfx.screen_height-(16.f*(1+i)), dbg_info, 1.f);
+            }
+            network_dbg_ui(&world->server, world->ui);
+            for(int i = 0; i < archives_loaded; i++)
+            {
+                snprintf(dbg_info, 256, "FS Archive %i: %s", i, archives[i].directory);
+                ui_draw_text(world->ui, world->gfx.screen_width/2, world->gfx.screen_height-(16.f*3)-(i*16.f), dbg_info, 1.f);
+            }
+        }
+
+        script_frame_ui(world, world->script);
+    }
+    else
+    {
+        sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+        world->gfx.current_map = 0;
+        world->gfx.shadow_pass = false;
+        if(world->client.mode == NETWORKSTATUS_DISCONNECTED)
+        {        
+            ui_draw_text(world->ui, 0.f, 16.f, world->client.disconnect_reason, 1.f);
+            ui_draw_text(world->ui, 0.f, 0.f, "Disconnected (world->client.mode == NETWORKSTATUS_DISCONNECTED)", 1.f);
+        }
+        char dbg_info[256];
+        for(int i = 0; i < world->config.config_values; i++)
+        {
+            struct config_value* e = &world->config.config[i];
+            snprintf(dbg_info, 256, "cfg:%s=%s",e->name,e->string_value);
+            ui_draw_text(world->ui, 0.f, world->gfx.screen_height-(16.f*(1+i)), dbg_info, 1.f);
+        }
+        set_focus(world->gfx.window, false);
     }
 
-    world->physics.collisions_in_frame = 0;
-    if(!world->physics.paused && world->delta_time != 0.0 && !keys_down[GLFW_KEY_GRAVE_ACCENT])
-    {
-        dSpaceCollide(world->physics.space,(void*)world,&world_physics_callback);
-        dWorldQuickStep(world->physics.world, MIN(0.03f,world->delta_time));
-        dJointGroupEmpty(world->physics.contactgroup);
-    }
+    if(world->server.mode == NETWORKSTATUS_CONNECTED)
+        network_dbg_ui(&world->server, world->ui);
 
     if(keys_down[GLFW_KEY_GRAVE_ACCENT])
     {
@@ -305,6 +452,8 @@ void world_frame(struct world* world)
         free(pixels);
     }
 
+    if(!world->frames)
+        printf("sglthing: frame 1 done\n");
     world->frames++;
 }
 
@@ -434,4 +583,11 @@ void world_draw_primitive(struct world* world, int shader, int fill, enum primit
             sglc(glPolygonMode(GL_FRONT_AND_BACK,GL_FILL));
             break;
     }
+}
+
+// TODO: this
+void world_deinit(struct world* world)
+{
+    network_close(&world->server);
+    network_close(&world->client);
 }

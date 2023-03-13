@@ -6,6 +6,7 @@ add_subdirectory(glad)
 
 find_package(glfw3)
 find_package(cglm)
+find_package(CURL)
 find_package(assimp)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0)
@@ -38,6 +39,8 @@ add_executable(sglthing
     sglthing/s7/script_functions.c
     sglthing/s7/transform.h
     sglthing/s7/transform.c
+    sglthing/s7/netbundle.h
+    sglthing/s7/netbundle.c
     sglthing/s7/vector.h
     sglthing/s7/vector.c
     sglthing/s7/s7.h
@@ -59,6 +62,8 @@ add_executable(sglthing
     sglthing/shader.c 
     sglthing/script.h
     sglthing/script.c 
+    sglthing/config.h
+    sglthing/config.c 
     sglthing/world.h
     sglthing/world.c 
     sglthing/light.h
@@ -67,14 +72,21 @@ add_executable(sglthing
     sglthing/model.c 
     sglthing/bone.h
     sglthing/bone.c 
+    sglthing/http.h
+    sglthing/http.c 
+    sglthing/net.h
+    sglthing/net.c 
     sglthing/ui.h
     sglthing/ui.c 
     sglthing/io.h
     sglthing/io.c 
 )
 
+target_compile_definitions(sglthing PUBLIC SGLTHING_COMPILE)
+
 target_include_directories(sglthing PUBLIC
     ${ODE_INCLUDE_DIR}
+    ${CURL_INCLUDE_DIRS}
 )
 
 target_link_libraries(sglthing PUBLIC
@@ -84,6 +96,7 @@ target_link_libraries(sglthing PUBLIC
     assimp
     m
     PkgConfig::deps
+    ${CURL_LIBRARIES}
     ${ODE_LIBRARY}
 )
 

@@ -112,3 +112,8 @@ void script_frame_ui(void* world, struct script_system* system)
     s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame-ui"), s7_cons(system->scheme, s7_make_c_pointer(system->scheme, world), s7_nil(system->scheme)));
     s7_gc_on(system->scheme, true);
 }
+
+void script_net_event(struct script_system* system, int event, char* data)
+{
+    
+}
