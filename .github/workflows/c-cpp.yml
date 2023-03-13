@@ -43,8 +43,8 @@ jobs:
       # Run CMake to generate Ninja project files, using the vcpkg's toolchain file to resolve and install the dependencies as specified in vcpkg.json.
       - name: Install dependencies and generate project files
         run: |
-          cmake 
+          cmake sglthing
       # Build (Release configuration only) the whole project with Ninja (which is spawn by CMake).
       - name: Build (Release configuration)
         run: |
-          cmake --build --config Release
+          cmake --build --config Release sglthing
