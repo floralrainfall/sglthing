@@ -29,9 +29,11 @@ static void world_physics_callback(void* data, dGeomID o1, dGeomID o2)
     }
 }
 
-struct world* world_init(char** argv, int argc)
+struct world* world_init(char** argv, int argc, GLFWwindow* window)
 {
     struct world* world = malloc(sizeof(struct world));
+
+    world->gfx.window = window;
 
     world->cam.position[0] = 0.f;
     world->cam.position[1] = 0.f;
@@ -48,10 +50,25 @@ struct world* world_init(char** argv, int argc)
     world->frames = 0;
     world->fps = 0.0;
 
+    
     config_load(&world->config, "config.cfg");
     config_add(&world->config, argv, argc);
 
-    world->script = script_init("scripts/game.scm");
+    char* net_mode = config_string_get(&world->config,"network_mode");
+
+    world->downloader.socket = 0;
+    bool network_download;
+    world->assets_downloading = false;
+    world->downloader.socket = -1;
+    if(strcmp(net_mode,"client")==0)
+    {
+        network_start_download(&world->downloader,config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"), "game/data.tar", config_string_get(&world->config,"server_pass"));
+        network_download = true;
+        world->assets_downloading = true;
+    }
+
+    if(!network_download)
+        world->script = script_init("scripts/game.scm");
 
     world->gfx.shadow_pass = false;
     int ls_v = compile_shader("shaders/shadow_pass.vs",GL_VERTEX_SHADER);
@@ -196,31 +213,47 @@ struct world* world_init(char** argv, int argc)
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 #endif
 
-    char* net_mode = config_string_get(&world->config,"network_mode");
-
     world->server.status = NETWORKSTATUS_DISCONNECTED;
     world->client.status = NETWORKSTATUS_DISCONNECTED;
+    network_init(&world->server, world->script);
+    if(!network_download)
+        network_init(&world->client, world->script);
+    world->client.security = (config_number_get(&world->config,"network_security") == 1.0);
+    world->server.security = (config_number_get(&world->config,"network_security") == 1.0);
+    world->server.shutdown_empty = (config_number_get(&world->config,"shutdown_empty") == 1.0);
+    world->server.client_default_tick = config_number_get(&world->config,"server_default_tick");
+
+    strncpy(world->server.debugger_pass,config_string_get(&world->config,"debugger_pass"),64);
+    strncpy(world->server.server_pass,config_string_get(&world->config,"server_pass"),64);
+    strncpy(world->client.debugger_pass,config_string_get(&world->config,"debugger_pass"),64);
+    strncpy(world->client.server_pass,config_string_get(&world->config,"server_pass"),64);
+
+    strncpy(world->server.server_motd,config_string_get(&world->config,"server_motd"),128);
+    strncpy(world->server.server_name,config_string_get(&world->config,"server_name"),64);
+
     if(strcmp(net_mode,"server")==0)
     {
+        char v_name[32];
+        snprintf(v_name,32,"sglthing r%i DEDICATED SERVER",GIT_COMMIT_COUNT);
+        glfwSetWindowTitle(world->gfx.window, v_name);
         network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
     } else if(strcmp(net_mode,"client")==0)
     {
-        network_connect(&world->client, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
+        if(!network_download)
+            network_connect(&world->client, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
     } else if(strcmp(net_mode,"host")==0)
     {
         network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
         network_connect(&world->client, "127.0.0.1", config_number_get(&world->config,"network_port"));
     }
-    world->client.security = (config_number_get(&world->config,"network_security") == 1.0);
-    world->server.security = (config_number_get(&world->config,"network_security") == 1.0);
-    world->server.shutdown_empty = (config_number_get(&world->config,"shutdown_empty") == 1.0);
     return world;
 }
 
 void world_frame_render(struct world* world)
 {    
     glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Scene");
-    script_frame_render(world,world->script, world->gfx.shadow_pass);
+    if(!world->assets_downloading)
+        script_frame_render(world,world->script, world->gfx.shadow_pass);
     //world_draw_model(world, world->test_object, world->normal_shader, test_model, true);
     glPopDebugGroupKHR();   
 }
@@ -295,13 +328,15 @@ void world_frame(struct world* world)
     glm_mul(world->p, world->v, world->vp);
     
     network_frame(&world->server, world->delta_time);
-    network_frame(&world->client, world->delta_time);
+    if(!world->assets_downloading)
+        network_frame(&world->client, world->delta_time);
 
     if(world->client.status != NETWORKSTATUS_CONNECTED)
     {
         glBindFramebuffer(GL_FRAMEBUFFER,2);
     }
-    script_frame(world, world->script);
+    if(!world->assets_downloading)
+        script_frame(world, world->script);
     if(world->client.status != NETWORKSTATUS_CONNECTED)
     {
         glBindFramebuffer(GL_FRAMEBUFFER,0);
@@ -340,7 +375,7 @@ void world_frame(struct world* world)
     glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
     glm_mat4_mul(light_projection_far, light_view_far, world->gfx.light_space_matrix_far);
 
-    if(world->client.status == NETWORKSTATUS_CONNECTED)
+    if(world->client.status == NETWORKSTATUS_CONNECTED && !world->assets_downloading)
     {
         world->gfx.current_map = 0;
         world_frame_light_pass(world,15.f,world->gfx.depth_map_fbo,SHADOW_WIDTH,SHADOW_HEIGHT);
@@ -385,8 +420,6 @@ void world_frame(struct world* world)
     #endif
         // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
 
-        ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, "sglthing dev", 15.f);
-
         if(config_number_get(&world->config,"debug_mode") == 1.0)
         {
             char dbg_info[256];
@@ -414,7 +447,7 @@ void world_frame(struct world* world)
                 snprintf(dbg_info, 256, "cfg:%s=%s",e->name,e->string_value);
                 ui_draw_text(world->ui, 100.f, world->gfx.screen_height-(16.f*(1+i)), dbg_info, 1.f);
             }
-            network_dbg_ui(&world->server, world->ui);
+
             for(int i = 0; i < archives_loaded; i++)
             {
                 snprintf(dbg_info, 256, "FS Archive %i: %s", i, archives[i].directory);
@@ -422,33 +455,74 @@ void world_frame(struct world* world)
             }
         }
 
-        script_frame_ui(world, world->script);
+        network_dbg_ui(&world->client, world->ui);
+        network_dbg_ui(&world->server, world->ui);
+        if(!world->assets_downloading)
+            script_frame_ui(world, world->script);
     }
     else
     {
         sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
         world->gfx.current_map = 0;
+        world->ui->ui_elements = 0;
         world->gfx.shadow_pass = false;
-        if(world->client.mode == NETWORKSTATUS_DISCONNECTED)
-        {        
-            ui_draw_text(world->ui, 0.f, 16.f, world->client.disconnect_reason, 1.f);
-            ui_draw_text(world->ui, 0.f, 0.f, "Disconnected (world->client.mode == NETWORKSTATUS_DISCONNECTED)", 1.f);
-        }
-        char dbg_info[256];
-        for(int i = 0; i < world->config.config_values; i++)
+        if(world->assets_downloading)
         {
-            struct config_value* e = &world->config.config[i];
-            snprintf(dbg_info, 256, "cfg:%s=%s",e->name,e->string_value);
-            ui_draw_text(world->ui, 0.f, world->gfx.screen_height-(16.f*(1+i)), dbg_info, 1.f);
+            world->ui->silliness = 2.f;
+            char tx[64];
+            if(world->downloader.data_size)
+            {
+                snprintf(tx,64,"%i bytes received, %f%% done", world->downloader.data_downloaded, ((float)world->downloader.data_downloaded / world->downloader.data_size) * 100.0);
+                ui_draw_text(world->ui, 0.f, 16.f, tx, 1.f);
+            }
+            snprintf(tx,64,"Downloading server content from %s:%i", config_string_get(&world->config, "network_ip"), config_number_get(&world->config, "network_port"));
+            ui_draw_text(world->ui, 0.f, 0.f, tx, 1.f);
+            network_tick_download(&world->downloader);
+
+            world->assets_downloading = !world->downloader.data_done;            
+            world->ui->silliness = 0.f;
+
+            if(world->downloader.data_done)
+            {
+                world->script = script_init("scripts/game.scm");
+                network_init(&world->client, world->script);
+                network_connect(&world->client, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
+            }
         }
+        else
+        {
+            if(world->client.status == NETWORKSTATUS_DISCONNECTED)
+            {        
+                ui_draw_text(world->ui, 0.f, 16.f, world->client.disconnect_reason, 1.f);
+                ui_draw_text(world->ui, 0.f, 0.f, "Disconnected (world->client.mode == NETWORKSTATUS_DISCONNECTED)", 1.f);
+            }
+            if(world->server.status == NETWORKSTATUS_DISCONNECTED)
+            {        
+                ui_draw_text(world->ui, 0.f, 48.f, world->server.disconnect_reason, 1.f);
+                ui_draw_text(world->ui, 0.f, 32.f, "Disconnected (world->server.mode == NETWORKSTATUS_DISCONNECTED)", 1.f);
+            }
+            char dbg_info[256];
+            for(int i = 0; i < world->config.config_values; i++)
+            {
+                struct config_value* e = &world->config.config[i];
+                snprintf(dbg_info, 256, "cfg:%s=%s",e->name,e->string_value);
+                ui_draw_text(world->ui, 0.f, world->gfx.screen_height-(16.f*(3+i)), dbg_info, 1.f);
+            }
+        }
+        if(world->server.status == NETWORKSTATUS_CONNECTED)
+            network_dbg_ui(&world->server, world->ui);
         set_focus(world->gfx.window, false);
     }
 
-    if(world->server.mode == NETWORKSTATUS_CONNECTED)
-        network_dbg_ui(&world->server, world->ui);
+    char sglthing_v_name[32];
+    snprintf(sglthing_v_name,32,"sglthing r%i", GIT_COMMIT_COUNT);
+    ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, sglthing_v_name, 15.f);
 
-    if(world->client.status == NETWORKSTATUS_DISCONNECTED && world->server.status == NETWORKSTATUS_DISCONNECTED)
+    if(world->client.status == NETWORKSTATUS_DISCONNECTED && world->server.status == NETWORKSTATUS_DISCONNECTED && (config_number_get(&world->config, "shutdown_empty") == 1.0))
+    {
+        printf("sglthing: server empty/offline or client disconnected\n");
         glfwSetWindowShouldClose(world->gfx.window, true);
+    }
 
     if(keys_down[GLFW_KEY_GRAVE_ACCENT])
     {
@@ -599,4 +673,5 @@ void world_deinit(struct world* world)
         network_close(&world->server);
     if(world->client.status == NETWORKSTATUS_CONNECTED)
         network_close(&world->client);
+    network_stop_download(&world->downloader);
 }

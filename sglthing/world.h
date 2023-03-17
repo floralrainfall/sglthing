@@ -61,6 +61,8 @@ struct world {
         GLFWwindow *window;
     } gfx;
 
+    bool assets_downloading;
+
     mat4 v;
     mat4 p;
     mat4 vp;
@@ -91,12 +93,13 @@ struct world {
 
     struct network server;
     struct network client;
+    struct network_downloader downloader;
 
     struct config_file config;
     struct config_file config_private;
 };
 
-struct world* world_init(char** argv, int argc);
+struct world* world_init(char** argv, int argc, GLFWwindow* window);
 void world_deinit(struct world* world);
 
 void world_frame(struct world* world);

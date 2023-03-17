@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #include "config.h"
 
+#ifndef SGLAPI_BASE
+#define SGLAPI_BASE "https://sgl.endoh.ca/game"
+#endif SGLAPI_BASE
+
 struct http_client
 {
     CURL* easy;

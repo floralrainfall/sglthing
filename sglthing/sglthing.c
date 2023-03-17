@@ -8,6 +8,11 @@
 #include "world.h"
 #include "io.h"
 #include "config.h"
+#include "sglthing.h"
+
+#ifndef SGLTHING_COMPILE
+#error "sglthing/sglthing.c should be compiled with SGLTHING_COMPILE"
+#endif
 
 static struct world* world;
 
@@ -34,6 +39,9 @@ static void sighandler(int sig)
 
 int main(int argc, char** argv)
 {
+    char v_name[32];
+    snprintf(v_name, 32, "sglthing r%i", GIT_COMMIT_COUNT);
+    printf("%s\n",v_name);
     // init GLFW & GLAD
     if(!glfwInit())
         return -1;
@@ -42,7 +50,7 @@ int main(int argc, char** argv)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
     glfwWindowHint(GLFW_SAMPLES, 0);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    GLFWwindow* window = glfwCreateWindow(640,480,"sglthing",NULL,NULL);
+    GLFWwindow* window = glfwCreateWindow(640,480,v_name,NULL,NULL);
     if(!window)
         return -2;    
 
@@ -65,8 +73,7 @@ int main(int argc, char** argv)
     init_kbd(window);
     set_focus(window, false);
     
-    world = world_init(argv, argc);
-    world->gfx.window = window;
+    world = world_init(argv, argc, window);
 
     printf("sglthing: ok\n");
 
@@ -99,4 +106,9 @@ int main(int argc, char** argv)
     glfwDestroyWindow(window);
     glfwTerminate();
     printf("sglthing: bye\n");
+}
+
+void __sglthing_assert_failed()
+{
+
 }

@@ -1,6 +1,9 @@
 (load "gfx_utils.scm")
 (load "game_lib.scm")
 
+(load "server/server.scm")
+(load "client/client.scm")
+
 (define box-model (quick-load-model "test/box.obj"))
 (define test-guy-model (quick-load-model "test/test_guy.fbx"))
 (define test-guy-animator (animator-create))

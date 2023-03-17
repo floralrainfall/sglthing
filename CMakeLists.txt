@@ -2,14 +2,17 @@ cmake_minimum_required(VERSION 3.4)
 
 add_subdirectory(glad)
 
-# im temporarily disabling this because when u cross compiole it doesn't like it
+execute_process(COMMAND git rev-list --count HEAD
+    OUTPUT_VARIABLE GIT_COMMIT_COUNT)
+
+set(ASSIMP_HUNTER_ENABLED FALSE)
 
 find_package(glfw3)
 find_package(cglm)
 find_package(CURL)
 find_package(assimp)
-#find_package(PkgConfig REQUIRED)
-#pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0)
 #pkg_check_modules(ODE ode)
 
 set(ODE_LIBRARY ${ODE_LIBRARIES})
@@ -38,6 +41,8 @@ endif()
 project(sglthing)
 
 add_executable(sglthing
+    sglthing/s7/script_networking.h
+    sglthing/s7/script_networking.c
     sglthing/s7/script_functions.h
     sglthing/s7/script_functions.c
     sglthing/s7/transform.h
@@ -85,11 +90,13 @@ add_executable(sglthing
     sglthing/io.c 
 )
 
-target_compile_definitions(sglthing PUBLIC SGLTHING_COMPILE)
+target_compile_definitions(sglthing PRIVATE SGLTHING_COMPILE)
+configure_file(sglthing/_sglthing.h.in _sglthing.h @ONLY)
 
 target_include_directories(sglthing PUBLIC
     ${ODE_INCLUDE_DIR}
     ${CURL_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 target_link_libraries(sglthing PUBLIC
@@ -98,6 +105,8 @@ target_link_libraries(sglthing PUBLIC
     cglm
     assimp
     m
+    ${ZLIB_LIBRARIES} # from assimp
+    PkgConfig::deps
     ${CURL_LIBRARIES}
     ${ODE_LIBRARY}
 )

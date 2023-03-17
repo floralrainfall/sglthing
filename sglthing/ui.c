@@ -30,10 +30,13 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
             line++;
             continue;
         }
-        vec2 v_up_left    = {position_x+keys*size,position_y+size*2-line*(size*2)};
-        vec2 v_up_right   = {position_x+keys*size+size,position_y+size*2-line*(size*2)};
-        vec2 v_down_left  = {position_x+keys*size,position_y-line*(size*2)};
-        vec2 v_down_right = {position_x+keys*size+size,position_y-line*(size*2)};
+
+        float x_add = sinf(keys+(ui->silliness_speed*glfwGetTime())+position_x)*ui->silliness;
+        float y_add = cosf(keys+(ui->silliness_speed*glfwGetTime())+position_y+(line*(size*2)))*ui->silliness;
+        vec2 v_up_left    = {position_x+keys*size+x_add,position_y+size*2-line*(size*2)+y_add};
+        vec2 v_up_right   = {position_x+keys*size+size+x_add,position_y+size*2-line*(size*2)+y_add};
+        vec2 v_down_left  = {position_x+keys*size+x_add,position_y-line*(size*2)+y_add};
+        vec2 v_down_right = {position_x+keys*size+size+x_add,position_y-line*(size*2)+y_add};
         keys++;
 
         // tri 1
@@ -97,8 +100,12 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     sglc(glBufferSubData(GL_ARRAY_BUFFER, 0, point_count*2*2*sizeof(float), points));
     sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
+    float old_background = ui->background_color[3];
+    if(ui->silliness != 0.0)
+        ui->background_color[3] = 0.0f;
     sglc(glUseProgram(ui->ui_program));
     sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
+    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"time"), (float)glfwGetTime()));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"waviness"), ui->waviness));
@@ -107,6 +114,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     sglc(glBindTexture(GL_TEXTURE_2D, ui->ui_font));
     sglc(glDrawArrays(GL_TRIANGLES, 0, point_count));
     ui->ui_elements++;
+    ui->background_color[3] = old_background;
 }
 
 bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
@@ -147,7 +155,14 @@ void ui_init(struct ui_data* ui)
     ui->background_color[1] = 0.5f;
     ui->background_color[2] = 0.5f;
     ui->background_color[3] = 0.2f;
+
+    ui->foreground_color[0] = 1.0f;
+    ui->foreground_color[1] = 1.0f;
+    ui->foreground_color[2] = 1.0f;
+    ui->foreground_color[3] = 1.0f;
     ui->waviness = 0.f;
+    ui->silliness = 0.f;
+    ui->silliness_speed = 5.f;
     ui->ui_size = 0;
 }
 

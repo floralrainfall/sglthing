@@ -21,7 +21,10 @@ struct ui_data
     int ui_size;
 
     vec4 background_color;
+    vec4 foreground_color;
     float waviness;
+    float silliness;
+    float silliness_speed;
 };
 
 // depth should be 1.f
