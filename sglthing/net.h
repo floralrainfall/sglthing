@@ -13,6 +13,7 @@
 #include "http.h"
 
 #define CR_PACKET_VERSION 102
+#define NO_DATAPACKETS_TICK 167
 
 struct network_client {
     int socket;
@@ -33,12 +34,17 @@ struct network_client {
     float player_color_g;
     float player_color_b;
     struct sockaddr_in sockaddr;
+    char* dl_data;
+    int dl_packet_id;
+    int dl_final_packet_id;
+    int dl_packet_size;
 };
 
 struct network_downloader {
     int socket;
     int data_size;
     int data_downloaded;
+    int data_packet_id;
 
     char* data_offset;
 

@@ -50,6 +50,7 @@
         "new": "c",
         "functional": "c",
         "atomic": "c",
-        "s7.h": "c"
+        "s7.h": "c",
+        "script_networking.h": "c"
     }
 }

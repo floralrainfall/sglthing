@@ -77,6 +77,7 @@ void network_tick_download(struct network_downloader* network)
     struct network_packet in_packet;
     while(recv(network->socket, &in_packet, sizeof(struct network_packet), MSG_DONTWAIT) != -1)
     {
+        bool cancel_tick = false;
         switch(in_packet.meta.packet_type)
         {
             case PACKETTYPE_PING:
@@ -118,6 +119,7 @@ void network_tick_download(struct network_downloader* network)
                     }
                     network->data_offset[addr] = byte;
                     network->data_downloaded ++;
+                    network->data_packet_id = in_packet.packet.data.data_packet_id;
 
                     if(in_packet.packet.data.data_packet_id == in_packet.packet.data.data_final_packet_id)
                     {
@@ -127,6 +129,7 @@ void network_tick_download(struct network_downloader* network)
                         return;
                     }
                 }
+                cancel_tick = true;
                 break;
             case PACKETTYPE_DATA_REQUEST:
                 network->data_size = in_packet.packet.data_request.data_size;
@@ -134,9 +137,11 @@ void network_tick_download(struct network_downloader* network)
                 printf("sglthing: dl: packet request, size: %i bytes\n", network->data_size);
                 break;
             default:
-                printf("sglthing: dl: unknown packet id %i\n", in_packet.meta.packet_type);
+                //printf("sglthing: dl: unknown packet id %i\n", in_packet.meta.packet_type);
                 break;
         }
+        if(cancel_tick)
+            break;
     }
 
     if(network->data_size && network->data_downloaded == network->data_size)
@@ -248,25 +253,10 @@ void network_transmit_data(struct network* network, struct network_client* clien
     int data_packet_size = DATA_PACKET_SIZE;
     int data_packets = data_length / data_packet_size;
     printf("sglthing: transmitting %i datapackets (packet size: %i)\n", data_packets, data_packet_size);
-    struct network_packet data_packet;
-    int l_pctg = 0;
-    for(int i = 0; i <= data_packets; i++)
-    {
-        char* data2 = data + (i*data_packet_size);
-        memcpy(data_packet.packet.data.data, data2, data_packet_size);
-        data_packet.meta.packet_type = PACKETTYPE_DATA;
-        data_packet.packet.data.data_size = data_packet_size;
-        data_packet.packet.data.data_final_packet_id = data_packets;
-        data_packet.packet.data.data_packet_id = i;        
-        float pctg = ((float)i/data_packets)*100.f;
-        if((int)pctg%5==0 && (int)pctg!=l_pctg)
-        {
-            l_pctg = pctg;
-            printf("sglthing: tx: %i%% done\n", l_pctg);
-        }
-        printf("sglthing: %i\n", data_packet.meta.packet_type);
-        network_transmit_packet(network, client, data_packet);
-    }    
+    client->dl_data = data;
+    client->dl_final_packet_id = data_packets; 
+    client->dl_packet_id = 0;
+    client->dl_packet_size = DATA_PACKET_SIZE;
 }
 
 void network_transmit_packet(struct network* network, struct network_client* client, struct network_packet packet)
@@ -463,8 +453,8 @@ void network_manage_socket(struct network* network, struct network_client* clien
 
                     if(strncmp(in_packet.packet.data_request.data_name,"game/data.tar",64)==0)
                     {
-                        #define TMP_DATA_SIZE 131000
-                        char* mdata = malloc(131000);
+                        #define TMP_DATA_SIZE 26666666
+                        char* mdata = malloc(TMP_DATA_SIZE);
                         z_stream strm;
                         strm.zalloc = Z_NULL;
                         strm.zfree = Z_NULL;
@@ -548,11 +538,37 @@ void network_frame(struct network* network, float delta_time)
                     cli->next_ping_time = glfwGetTime() + cli->ping_time_interval;
                     break;
                 }
+                if(cli->dl_data)
+                {
+                    struct network_packet data_packet;
+                    int l_pctg = 0;
+                    
+                    for(int i = 0; i < NO_DATAPACKETS_TICK; i++)
+                    {
+                        if(cli->dl_packet_id <= cli->dl_final_packet_id)
+                        {
+                            char* data2 = cli->dl_data + (i*cli->dl_packet_size);
+                            memcpy(data_packet.packet.data.data, data2, cli->dl_packet_size);
+                            data_packet.meta.packet_type = PACKETTYPE_DATA;
+                            data_packet.packet.data.data_size = cli->dl_packet_size;
+                            data_packet.packet.data.data_final_packet_id = cli->dl_final_packet_id;
+                            data_packet.packet.data.data_packet_id = cli->dl_packet_id;        
+                            network_transmit_packet(network, cli, data_packet);
+                            cli->dl_packet_id++;
+                        }
+                        else
+                        {
+                            printf("sglthing: final datapacket sent\n");
+                            free(cli->dl_data);
+                            cli->dl_data = NULL;
+                            break;
+                        }
+                    }
+                }
             }
             else
                 break;
         }
-
         struct sockaddr_in connecting_client;
         socklen_t socksize = sizeof(struct sockaddr_in);
         int new_socket = accept(network->client.socket, (struct sockaddr*)&connecting_client, &socksize);
@@ -568,6 +584,7 @@ void network_frame(struct network* network, float delta_time)
             new_client.connected = true;
             new_client.last_ping_time = glfwGetTime();
             new_client.ping_time_interval = 5.0;
+            new_client.dl_data = NULL;
             g_array_append_val(network->server_clients, new_client);
 
             network->shutdown_ready = true;

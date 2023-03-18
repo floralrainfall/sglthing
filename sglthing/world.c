@@ -57,10 +57,10 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     char* net_mode = config_string_get(&world->config,"network_mode");
 
     world->downloader.socket = 0;
-    bool network_download;
+    bool network_download = false;
     world->assets_downloading = false;
     world->downloader.socket = -1;
-    if(strcmp(net_mode,"client")==0)
+    if(strcmp(net_mode,"client")==0 && config_number_get(&world->config,"network_download")==1.0)
     {
         network_start_download(&world->downloader,config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"), "game/data.tar", config_string_get(&world->config,"server_pass"));
         network_download = true;
@@ -472,7 +472,7 @@ void world_frame(struct world* world)
             char tx[64];
             if(world->downloader.data_size)
             {
-                snprintf(tx,64,"%i bytes received, %f%% done", world->downloader.data_downloaded, ((float)world->downloader.data_downloaded / world->downloader.data_size) * 100.0);
+                snprintf(tx,64,"%i bytes received, %f%% done, packet %i", world->downloader.data_downloaded, ((float)world->downloader.data_downloaded / world->downloader.data_size) * 100.0, world->downloader.data_packet_id);
                 ui_draw_text(world->ui, 0.f, 16.f, tx, 1.f);
             }
             snprintf(tx,64,"Downloading server content from %s:%i", config_string_get(&world->config, "network_ip"), config_number_get(&world->config, "network_port"));
