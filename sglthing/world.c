@@ -468,19 +468,22 @@ void world_frame(struct world* world)
         world->gfx.shadow_pass = false;
         if(world->assets_downloading)
         {
-            world->ui->silliness = 2.f;
-            char tx[64];
+            char tx[256];
             if(world->downloader.data_size)
             {
-                snprintf(tx,64,"%i bytes received, %f%% done, packet %i", world->downloader.data_downloaded, ((float)world->downloader.data_downloaded / world->downloader.data_size) * 100.0, world->downloader.data_packet_id);
+                snprintf(tx,256,"%0.2f Mbytes received, %f%% done, packet %i", world->downloader.data_downloaded/1000.f/1000.f, ((float)world->downloader.data_downloaded / world->downloader.data_size) * 100.0, world->downloader.data_packet_id);
                 ui_draw_text(world->ui, 0.f, 16.f, tx, 1.f);
             }
-            snprintf(tx,64,"Downloading server content from %s:%i", config_string_get(&world->config, "network_ip"), config_number_get(&world->config, "network_port"));
+            snprintf(tx,256,"Downloading server content from '%s' on %s:%i.", world->downloader.server_name, config_string_get(&world->config, "network_ip"), (int)config_number_get(&world->config, "network_port"));
             ui_draw_text(world->ui, 0.f, 0.f, tx, 1.f);
+            snprintf(tx,256,"Server MOTD: '%s'", world->downloader.server_motd);
+            ui_draw_text(world->ui, 0.f, 32.f, tx, 1.f);            
+            snprintf(tx,256,"SGLAPI MOTD: '%s'", world->downloader.http_client.motd);
+            ui_draw_text(world->ui, 0.f, 48.f, tx, 1.f);
+
             network_tick_download(&world->downloader);
 
-            world->assets_downloading = !world->downloader.data_done;            
-            world->ui->silliness = 0.f;
+            world->assets_downloading = !world->downloader.data_done;   
 
             if(world->downloader.data_done)
             {

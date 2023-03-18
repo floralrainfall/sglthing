@@ -13,7 +13,10 @@
 #include "http.h"
 
 #define CR_PACKET_VERSION 102
-#define NO_DATAPACKETS_TICK 167
+#define NO_DATAPACKETS_TICK 1
+
+#define MAGIC_NUMBER 0x7930793179327934
+#define DATA_PACKET_SIZE 1024
 
 struct network_client {
     int socket;
@@ -37,7 +40,7 @@ struct network_client {
     char* dl_data;
     int dl_packet_id;
     int dl_final_packet_id;
-    int dl_packet_size;
+    int dl_packet_size;    
 };
 
 struct network_downloader {
@@ -84,9 +87,6 @@ struct network {
     bool shutdown_empty;
     bool shutdown_ready;
 };
-
-#define MAGIC_NUMBER 0x7930793179327934
-#define DATA_PACKET_SIZE 512
 
 struct network_packet {
     struct {
