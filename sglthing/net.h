@@ -13,10 +13,10 @@
 #include "http.h"
 
 #define CR_PACKET_VERSION 102
-#define NO_DATAPACKETS_TICK 1
+#define NO_DATAPACKETS_TICK 512
 
 #define MAGIC_NUMBER 0x7930793179327934
-#define DATA_PACKET_SIZE 1024
+#define DATA_PACKET_SIZE 256
 
 struct network_client {
     int socket;
@@ -41,6 +41,8 @@ struct network_client {
     int dl_packet_id;
     int dl_final_packet_id;
     int dl_packet_size;    
+    int dl_retries;
+    int dl_successes;
 };
 
 struct network_downloader {
@@ -191,7 +193,7 @@ void network_init(struct network* network, struct script_system* script);
 void network_connect(struct network* network, char* ip, int port);
 void network_open(struct network* network, char* ip, int port);
 void network_manage_socket(struct network* network, struct network_client* client);
-void network_transmit_packet(struct network* network, struct network_client* client, struct network_packet packet);
+int network_transmit_packet(struct network* network, struct network_client* client, struct network_packet packet);
 void network_transmit_packet_all(struct network* network, struct network_packet packet);
 void network_transmit_data(struct network* network, struct network_client* client, char* data, int data_length);
 void network_disconnect_player(struct network* network, bool transmit_disconnect, char* reason, struct network_client* client);

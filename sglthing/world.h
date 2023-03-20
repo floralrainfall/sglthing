@@ -10,6 +10,7 @@
 #include "script.h"
 #include "config.h"
 #include "net.h"
+#include "snd.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -97,6 +98,8 @@ struct world {
 
     struct config_file config;
     struct config_file config_private;
+
+    struct sndmgr mgr;
 };
 
 struct world* world_init(char** argv, int argc, GLFWwindow* window);

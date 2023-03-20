@@ -12,7 +12,7 @@ find_package(cglm)
 find_package(CURL)
 find_package(assimp)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0)
+pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0 libavutil libavcodec libavformat openal)
 #pkg_check_modules(ODE ode)
 
 set(ODE_LIBRARY ${ODE_LIBRARIES})
@@ -84,6 +84,8 @@ add_executable(sglthing
     sglthing/http.c 
     sglthing/net.h
     sglthing/net.c 
+    sglthing/snd.h
+    sglthing/snd.c 
     sglthing/ui.h
     sglthing/ui.c 
     sglthing/io.h

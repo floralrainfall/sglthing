@@ -246,6 +246,9 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
         network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
         network_connect(&world->client, "127.0.0.1", config_number_get(&world->config,"network_port"));
     }
+
+    snd_init(&world->mgr);
+
     return world;
 }
 

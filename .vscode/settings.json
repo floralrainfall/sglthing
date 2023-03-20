@@ -51,6 +51,9 @@
         "functional": "c",
         "atomic": "c",
         "s7.h": "c",
-        "script_networking.h": "c"
+        "script_networking.h": "c",
+        "avcodec.h": "c",
+        "ao.h": "c",
+        "avformat.h": "c"
     }
 }
