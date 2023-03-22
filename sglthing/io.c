@@ -24,7 +24,7 @@ int file_get_path(char* dest, int n, char* resource_path)
         {
             fclose(test);
             strncpy(dest, path, n);
-            return 1;
+            return i;
         }
     }
     strncpy(dest, resource_path, n);

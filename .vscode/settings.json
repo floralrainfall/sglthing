@@ -40,6 +40,20 @@
         "unordered_map": "c",
         "unordered_set": "c",
         "valarray": "c",
-        "vector": "c"
+        "vector": "c",
+        "compare": "c",
+        "cstddef": "c",
+        "forward_list": "c",
+        "string": "c",
+        "limits": "c",
+        "memory": "c",
+        "new": "c",
+        "functional": "c",
+        "atomic": "c",
+        "s7.h": "c",
+        "script_networking.h": "c",
+        "avcodec.h": "c",
+        "ao.h": "c",
+        "avformat.h": "c"
     }
 }

@@ -6,6 +6,7 @@
 #include <string.h>
 #include "transform.h"
 #include "netbundle.h"
+#include "script_networking.h"
 
 #include "../sglthing.h"
 
@@ -598,7 +599,8 @@ static s7_pointer __light_set_specular(s7_scheme* sc, s7_pointer args)
 void sgls7_add_functions(s7_scheme* sc)
 {
     sgls7_transform_register(sc);
-    sgls7_netbundle_register(sc);
+    sgls7_registernetworking(sc);
+
 
     s7_define_variable(sc, "GL_FRAGMENT_SHADER", s7_make_integer(sc, GL_FRAGMENT_SHADER));
     s7_define_variable(sc, "GL_VERTEX_SHADER", s7_make_integer(sc, GL_VERTEX_SHADER));
@@ -645,6 +647,11 @@ void sgls7_add_functions(s7_scheme* sc)
     s7_define_function(sc, "animator-set-uniforms", __animator_set_uniforms, 2, 0, false, "(animator-set-uniforms a p)");
     s7_define_function(sc, "animator-update", __animator_update, 2, 0, false, "(animator-update a d)");
     s7_define_function(sc, "animator-current-time", __animator_current_time, 1, 0, false, "(animator-current-time a)");
+    
+    // TODO: these
+    // s7_define_function(sc, "animator-set-speed", __animator_set_speed, 2, 0, false, "(animator-set-speed a s)");
+    // s7_define_function(sc, "animator-set-tick", __animator_set_tick, 2, 0, false, "(animator-get-tick a t)");
+    // s7_define_function(sc, "animator-get-tick", __animator_get_tick, 1, 0, false, "(animator-get-tick a)");
 
     s7_define_function(sc, "animation-create", __animation_create, 2, 1, false, "(animation-create f m i)");
 

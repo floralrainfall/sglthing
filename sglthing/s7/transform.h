@@ -27,8 +27,6 @@ struct transform
     OLD_VERSION(sz);
 
     mat4 scale_matrix;
-
-    s7_int network_id;
 };
 
 void transform_to_matrix(struct transform* transform);

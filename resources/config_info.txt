@@ -1,0 +1,12 @@
+swap_interval       sets the value of glfwSwapInterval to its number
+network_mode        server, client and host (host = server & client)
+network_port        1-65535
+network_security    use SGLAPI authentication
+network_download    download datapackets from server, client only
+debug_mode          debug mode
+shutdown_empty      shutdown if server empty/off or client disconnected
+server_default_tick server rate to tick clients (0.0167)
+server_motd         server MOTD, spaces are \'s
+server_name         server name, spaces are \'s
+server_pass         server password
+debugger_pass       server debugger password

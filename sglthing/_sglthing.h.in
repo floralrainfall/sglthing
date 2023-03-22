@@ -1,0 +1,1 @@
+#cmakedefine GIT_COMMIT_COUNT @GIT_COMMIT_COUNT@

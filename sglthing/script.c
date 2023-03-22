@@ -15,6 +15,7 @@ struct script_system
     struct transform* player_transform;
     int player_transform_gc;
     char script_name[64];
+    struct filesystem_archive* archive;
 };
 
 struct script_system* script_init(char* file)
@@ -113,7 +114,7 @@ void script_frame_ui(void* world, struct script_system* system)
     s7_gc_on(system->scheme, true);
 }
 
-void script_net_event(struct script_system* system, int event, char* data)
+void* script_s7(struct script_system* system)
 {
-    
+    return (void*)system->scheme;
 }

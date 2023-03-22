@@ -10,6 +10,7 @@
 #include "script.h"
 #include "config.h"
 #include "net.h"
+#include "snd.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -61,6 +62,8 @@ struct world {
         GLFWwindow *window;
     } gfx;
 
+    bool assets_downloading;
+
     mat4 v;
     mat4 p;
     mat4 vp;
@@ -91,12 +94,15 @@ struct world {
 
     struct network server;
     struct network client;
+    struct network_downloader downloader;
 
     struct config_file config;
     struct config_file config_private;
+
+    struct sndmgr mgr;
 };
 
-struct world* world_init(char** argv, int argc);
+struct world* world_init(char** argv, int argc, GLFWwindow* window);
 void world_deinit(struct world* world);
 
 void world_frame(struct world* world);

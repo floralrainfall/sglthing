@@ -69,6 +69,9 @@ void config_add_entry(struct config_file* config, char* a, char* b)
             config_entry = &config->config[config->config_values];
         strncpy(config_entry->name, a, 32);
         strncpy(config_entry->string_value, b, 64);
+        for(int i = 0; i < 64; i++)
+            if(config_entry->string_value[i] == '\\')
+                config_entry->string_value[i] = ' ';
         int token_len = strlen(b);
         config_entry->string_length = token_len;
         
@@ -79,7 +82,9 @@ void config_add_entry(struct config_file* config, char* a, char* b)
             config_entry->type = VT_NUMBER;
 
         config->config_values++;
-        printf("sglthing: arg \t%s\t\t=%s\n",config_entry->name,config_entry->string_value);
+
+        if(strcmp(config_entry->name,"user_password")!=0)
+            printf("sglthing: arg \t%s\t\t=%s\n",config_entry->name,config_entry->string_value);
     }
 }
 
