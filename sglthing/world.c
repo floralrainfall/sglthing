@@ -50,8 +50,9 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     world->frames = 0;
     world->fps = 0.0;
 
-    
     config_load(&world->config, "config.ini");
+    for(int i = 2; i < argc; i += 2)
+        g_key_file_set_value(world->config.key_file, "sglthing", argv[i-1], argv[i]);
     char* net_mode = config_string_get(&world->config,"network_mode");
 
     world->downloader.socket = 0;

@@ -10,7 +10,6 @@ struct config_file
     struct GKeyFile* key_file;    
 };
 
-[[deprecated("Use GKeyFile rather then config_load")]]
 void config_load(struct config_file* config, char* file);
 
 [[deprecated("Use GKeyFile rather then config_string_get")]]
