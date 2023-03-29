@@ -15,10 +15,11 @@ Estimated Requirements
 - GLFW
 - GLib
 
-SGLThing requires a configuration file in the resources directory named `config_private.cfg`. In the file should be your sgl.endoh.ca username, and password.
+SGLThing requires a configuration file in the resources directory named `config_private.ini`. In the file should be your sgl.endoh.ca username, and password.
 
-    user_username ExampleUsername
-    user_password ExamplePassword
+    [sglthing]
+    user_username=ExampleUsername
+    user_password=ExamplePassword
 
 ## Windows Cross-Compilation Notes
 
