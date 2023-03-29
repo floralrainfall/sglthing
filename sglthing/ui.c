@@ -9,16 +9,16 @@
 #include "keyboard.h"
 
 #define MAX_CHARACTERS_STRING 32767
+#define MAX_UI_ELEMENTS 512
 
 void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
 {
-    if(ui->ui_elements > 128 || keys_down[GLFW_KEY_GRAVE_ACCENT])
+    if(ui->ui_elements > MAX_UI_ELEMENTS || keys_down[GLFW_KEY_GRAVE_ACCENT])
         return;
 
     vec2 points[MAX_CHARACTERS_STRING][2] = {0};
     int point_count = 0;
 
-    float size = 8 + ui->ui_size;
     int line = 0;
     int keys = 0;
 
@@ -32,11 +32,11 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
         }
 
         float x_add = sinf(keys+(ui->silliness_speed*glfwGetTime())+position_x)*ui->silliness;
-        float y_add = cosf(keys+(ui->silliness_speed*glfwGetTime())+position_y+(line*(size*2)))*ui->silliness;
-        vec2 v_up_left    = {position_x+keys*size+x_add,position_y+size*2-line*(size*2)+y_add};
-        vec2 v_up_right   = {position_x+keys*size+size+x_add,position_y+size*2-line*(size*2)+y_add};
-        vec2 v_down_left  = {position_x+keys*size+x_add,position_y-line*(size*2)+y_add};
-        vec2 v_down_right = {position_x+keys*size+size+x_add,position_y-line*(size*2)+y_add};
+        float y_add = cosf(keys+(ui->silliness_speed*glfwGetTime())+position_y+(line*(ui->ui_font->cy)))*ui->silliness;
+        vec2 v_up_left    = {position_x+keys*ui->ui_font->cx+x_add,position_y+ui->ui_font->cy-line*(ui->ui_font->cy)+y_add};
+        vec2 v_up_right   = {position_x+keys*ui->ui_font->cx+ui->ui_font->cx+x_add,position_y+ui->ui_font->cy-line*(ui->ui_font->cy)+y_add};
+        vec2 v_down_left  = {position_x+keys*ui->ui_font->cx+x_add,position_y-line*(ui->ui_font->cy)+y_add};
+        vec2 v_down_right = {position_x+keys*ui->ui_font->cx+ui->ui_font->cx+x_add,position_y-line*(ui->ui_font->cy)+y_add};
         keys++;
 
         // tri 1
@@ -61,14 +61,28 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
         points[point_count+5][0][0] = v_down_left[0];
         points[point_count+5][0][1] = v_down_left[1];
 
-        char character = text[i];
-        float uv_x = 0.f;
-        float uv_y = (character*16.f)/4096.f;
+        float character = (float)text[i];
 
-        vec2 uv_up_left    = {0.f, uv_y};
-        vec2 uv_up_right   = {1.f, uv_y};
-        vec2 uv_down_left  = {0.f, uv_y+(16.f/4096.f)};
-        vec2 uv_down_right = {1.f, uv_y+(16.f/4096.f)};
+        float uv_x = fmodf(character - 1, ui->ui_font->cw);
+        float uv_y = ((character - 1) / ui->ui_font->ch);
+        
+        float uv_w = ui->ui_font->cx;
+        float uv_h = ui->ui_font->cy;
+
+        vec2 uv_up_left    = {uv_x,      uv_y};
+        vec2 uv_up_right   = {uv_x+uv_w, uv_y};
+        vec2 uv_down_left  = {uv_x,      uv_y+uv_h};
+        vec2 uv_down_right = {uv_x+uv_w, uv_y+uv_h};
+
+        uv_up_left[0] /= ui->ui_font->tx;
+        uv_up_right[0] /= ui->ui_font->tx;
+        uv_down_left[0] /= ui->ui_font->tx;
+        uv_down_right[0] /= ui->ui_font->tx;
+
+        uv_up_left[1] /= ui->ui_font->ty;
+        uv_up_right[1] /= ui->ui_font->ty;
+        uv_down_left[1] /= ui->ui_font->ty;
+        uv_down_right[1] /= ui->ui_font->ty;
 
         // tri 1
 
@@ -111,7 +125,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"waviness"), ui->waviness));
     sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_program,"projection"), 1, GL_FALSE, ui->projection[0]));    
     sglc(glActiveTexture(GL_TEXTURE0));
-    sglc(glBindTexture(GL_TEXTURE_2D, ui->ui_font));
+    sglc(glBindTexture(GL_TEXTURE_2D, ui->ui_font->font_texture));
     sglc(glDrawArrays(GL_TRIANGLES, 0, point_count));
     ui->ui_elements++;
     ui->background_color[3] = old_background;
@@ -119,7 +133,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 
 bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
 {
-    if(ui->ui_elements > 128 || keys_down[GLFW_KEY_GRAVE_ACCENT])
+    if(ui->ui_elements > MAX_UI_ELEMENTS || keys_down[GLFW_KEY_GRAVE_ACCENT])
         return;
 
     ui_draw_text(ui, position_x, position_y, text, depth);
@@ -131,8 +145,9 @@ void ui_init(struct ui_data* ui)
     int ui_frag = compile_shader("uiassets/shaders/ui.fs", GL_FRAGMENT_SHADER);
     ui->ui_program = link_program(ui_vertex, ui_frag);
 
-    load_texture("uiassets/font.png");
-    ui->ui_font = get_texture("uiassets/font.png");
+    ui->default_font = ui_load_font("uiassets/font.png", 8, 16, 1, 256);
+
+    ui->ui_font = ui->default_font;
 
     glGenVertexArrays(1,&ui->ui_vao);    
     glGenBuffers(1,&ui->ui_vbo);
@@ -168,7 +183,7 @@ void ui_init(struct ui_data* ui)
 
 void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, vec3 camera_front, vec3 position, float fov, mat4 m, mat4 vp, char* text)
 {
-    if(ui->ui_elements > 128 || keys_down[GLFW_KEY_GRAVE_ACCENT])
+    if(ui->ui_elements > MAX_UI_ELEMENTS || keys_down[GLFW_KEY_GRAVE_ACCENT])
         return;
         
     vec3 dest_position;
@@ -183,4 +198,25 @@ void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, ve
         glm_project(mm_position, vp, viewport, dest_position);
         ui_draw_text(ui, dest_position[0], dest_position[1], text, dist);
     }
+}
+
+struct ui_font* ui_load_font(char* file, float cx, float cy, float cw, float ch)
+{
+    struct texture_load_info tex_info = load_texture(file);
+    int font_texture = get_texture(file);
+    if(font_texture)
+    {
+        struct ui_font* new_font = malloc(sizeof(struct ui_font));
+
+        new_font->font_texture = font_texture;
+        new_font->cx = cx;
+        new_font->cy = cy;
+        new_font->cw = cw;
+        new_font->ch = ch;
+        new_font->tx = tex_info.texture_width;
+        new_font->ty = tex_info.texture_height;
+
+        return new_font;
+    }
+    return NULL;
 }

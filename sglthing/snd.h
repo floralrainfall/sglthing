@@ -29,6 +29,7 @@ void snd_init(struct sndmgr* mgr);
 void snd_stop(struct sndmgr* mgr);
 void snd_meta_view(struct sndmgr* mgr, vec3 p, vec3 v, vec3 u, vec3 l);
 void load_snd(char* file_name);
+struct snd* get_snd(char* file_name);
 void play_snd(struct sndmgr* mgr, int source, char* file_name, float delta_time);
 
 #endif

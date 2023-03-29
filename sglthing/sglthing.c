@@ -91,7 +91,6 @@ int main(int argc, char** argv)
             world->last_time += 1.0;
         }        
         glfwGetFramebufferSize(window, &world->gfx.screen_width, &world->gfx.screen_height);
-        glfwMakeContextCurrent(window);
         
         world_frame(world);
 
@@ -109,6 +108,6 @@ int main(int argc, char** argv)
 }
 
 void __sglthing_assert_failed()
-{
-
+{    
+    
 }

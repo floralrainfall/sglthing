@@ -1,31 +1,21 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-struct config_value {
-    char name[32];
+#include <glib.h>
 
-    enum {
-        VT_STRING,
-        VT_NUMBER
-    } type;
-
-    float number_value;
-    char string_value[64];
-    int string_length;
-};
+// BUTCHERED to use glib's GKeyFile
 
 struct config_file
 {
-    struct config_value config[128];
-    int config_values;
+    struct GKeyFile* key_file;    
 };
 
+[[deprecated("Use GKeyFile rather then config_load")]]
 void config_load(struct config_file* config, char* file);
-void config_add(struct config_file* config, char** argv, int argc);
-void config_add_entry(struct config_file* config, char* a, char* b);
 
-struct config_value* config_value_get(struct config_file* config, char* name);
+[[deprecated("Use GKeyFile rather then config_string_get")]]
 char* config_string_get(struct config_file* config, char* name);
+[[deprecated("Use GKeyFile rather then config_number_get")]]
 float config_number_get(struct config_file* config, char* name);
 
 #endif

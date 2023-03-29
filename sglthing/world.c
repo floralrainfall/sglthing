@@ -51,9 +51,7 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     world->fps = 0.0;
 
     
-    config_load(&world->config, "config.cfg");
-    config_add(&world->config, argv, argc);
-
+    config_load(&world->config, "config.ini");
     char* net_mode = config_string_get(&world->config,"network_mode");
 
     world->downloader.socket = 0;
@@ -247,7 +245,9 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
         network_connect(&world->client, "127.0.0.1", config_number_get(&world->config,"network_port"));
     }
 
-    snd_init(&world->mgr);
+    snd_init(&world->s_mgr);
+    mus_init(&world->m_mgr, &world->s_mgr);
+    world->m_mgr.world_ptr = (void*)world;
 
     return world;
 }
@@ -287,6 +287,7 @@ void world_frame(struct world* world)
     world->viewport[2] = (float)world->gfx.screen_width;
     world->viewport[3] = (float)world->gfx.screen_height;
     
+
 #ifdef FBO_ENABLED
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
 #else
@@ -444,13 +445,6 @@ void world_frame(struct world* world)
                 world->physics.collisions_in_frame);
             ui_draw_text(world->ui, 0.f, world->gfx.screen_height-(16.f*3), dbg_info, 1.f);
 
-            for(int i = 0; i < world->config.config_values; i++)
-            {
-                struct config_value* e = &world->config.config[i];
-                snprintf(dbg_info, 256, "cfg:%s=%s",e->name,e->string_value);
-                ui_draw_text(world->ui, 100.f, world->gfx.screen_height-(16.f*(1+i)), dbg_info, 1.f);
-            }
-
             for(int i = 0; i < archives_loaded; i++)
             {
                 snprintf(dbg_info, 256, "FS Archive %i: %s", i, archives[i].directory);
@@ -507,18 +501,13 @@ void world_frame(struct world* world)
                 ui_draw_text(world->ui, 0.f, 48.f, world->server.disconnect_reason, 1.f);
                 ui_draw_text(world->ui, 0.f, 32.f, "Disconnected (world->server.mode == NETWORKSTATUS_DISCONNECTED)", 1.f);
             }
-            char dbg_info[256];
-            for(int i = 0; i < world->config.config_values; i++)
-            {
-                struct config_value* e = &world->config.config[i];
-                snprintf(dbg_info, 256, "cfg:%s=%s",e->name,e->string_value);
-                ui_draw_text(world->ui, 0.f, world->gfx.screen_height-(16.f*(3+i)), dbg_info, 1.f);
-            }
         }
         if(world->server.status == NETWORKSTATUS_CONNECTED)
             network_dbg_ui(&world->server, world->ui);
         set_focus(world->gfx.window, false);
     }
+
+    mus_tick(&world->m_mgr);
 
     char sglthing_v_name[32];
     snprintf(sglthing_v_name,32,"sglthing r%i", GIT_COMMIT_COUNT);

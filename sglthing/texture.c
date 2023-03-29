@@ -17,7 +17,7 @@ struct texture
 struct texture textures[MAX_TEXTURES];
 int loaded_textures = 0;
 
-void load_texture(char* file)
+struct texture_load_info load_texture(char* file)
 {   
     char path[256];
     file_get_path(path, 256, file);
@@ -28,10 +28,14 @@ void load_texture(char* file)
     int image_height;
     int image_channels;
     char* data = (char*)stbi_load(path, &image_width, &image_height, &image_channels, 4);
+    struct texture_load_info tex_load_info;
     if(data)
     {
         struct texture* texture = &textures[loaded_textures];
         loaded_textures++;
+
+        tex_load_info.texture_width = image_width;
+        tex_load_info.texture_height = image_height;
 
         sglc(glGenTextures(1, &texture->texture_handle));
         sglc(glBindTexture(GL_TEXTURE_2D, texture->texture_handle));
@@ -50,6 +54,7 @@ void load_texture(char* file)
     {
         printf("sglthing: could not load texture %s\n", file);
     }
+    return tex_load_info;
 }
 
 int get_texture(char* file)

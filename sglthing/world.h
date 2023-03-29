@@ -11,6 +11,7 @@
 #include "config.h"
 #include "net.h"
 #include "snd.h"
+#include "mus.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -99,7 +100,8 @@ struct world {
     struct config_file config;
     struct config_file config_private;
 
-    struct sndmgr mgr;
+    struct sndmgr s_mgr;
+    struct musmgr m_mgr;
 };
 
 struct world* world_init(char** argv, int argc, GLFWwindow* window);

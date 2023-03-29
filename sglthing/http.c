@@ -63,7 +63,7 @@ void http_create(struct http_client* client, char* http_base)
     if(!curl_initialized)
         curl_global_init(CURL_GLOBAL_ALL);
 
-    config_load(&client->web_config, "config_private.cfg");
+    config_load(&client->web_config, "config_private.ini");
 
     client->easy = curl_easy_init();
     strncpy(client->httpbase, http_base, 64);

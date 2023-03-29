@@ -86,6 +86,8 @@ add_executable(sglthing
     sglthing/net.c 
     sglthing/snd.h
     sglthing/snd.c 
+    sglthing/mus.h
+    sglthing/mus.c 
     sglthing/ui.h
     sglthing/ui.c 
     sglthing/io.h

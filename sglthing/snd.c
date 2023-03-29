@@ -30,50 +30,26 @@ void snd_meta_view(struct sndmgr* mgr, vec3 p, vec3 v, vec3 u, vec3 l)
     alListenerfv(AL_ORIENTATION, orient);
 }
 
-static int snd_decode_buf(AVPacket *packet, AVCodecContext *codec_context, AVFrame *frame, char** buf, int* length)
+struct snd* get_snd(char* file_name)
 {
-    int response = avcodec_send_packet(codec_context, packet);
-    if (response < 0) {
-        printf("sglthing: error sending packet to encoder: '%s'\n", av_err2str(response));
-        return response;
-    }
-    while(response >= 0)
+    struct snd* snd = NULL;
+    for(int i = 0; i < snd_count; i++)
     {
-        response = avcodec_receive_frame(codec_context, frame);
-        if(response == AVERROR(EAGAIN) || response == AVERROR_EOF)
-            break;
-        else if(response < 0)
+        if(strncmp(file_name,snd_cache[i].name,64)==0)
         {
-            printf("sglthing: error receiving frame from encoder: '%s'\n", av_err2str(response));
-            return response;
-        }
-        if (response >= 0) {
-            int bytes;
-            switch(codec_context->sample_fmt)
-            {
-                case AV_SAMPLE_FMT_U8:
-                    bytes = 1;
-                    break;
-                case AV_SAMPLE_FMT_S16:
-                    bytes = 2;
-                    break;
-                case AV_SAMPLE_FMT_S32:
-                    bytes = 4;
-                    break;
-                default:
-                    bytes = 0;
-                    break;
-            }
-            *length = bytes;
-            *buf = (char*)malloc(length);
-            memcpy(*buf, frame->data, *length);
+            snd = &snd_cache[i];
+            break;
         }
     }
-    return 0;
+    return snd;
 }
 
 void load_snd(char* file_name)
 {
+    struct snd* o_snd = get_snd(file_name);
+    if(o_snd)
+        return;
+        
     char dest_path[255];
     if(file_get_path(dest_path, 255, file_name) == -1)
     {
@@ -126,53 +102,48 @@ void load_snd(char* file_name)
     ASSERT(n_snd->codec_context);
     ASSERT(avcodec_parameters_to_context(n_snd->codec_context, n_snd->codec_params) >= 0);  
     ASSERT(avcodec_open2(n_snd->codec_context, n_snd->codec, NULL) >= 0);
-    alGenBuffers(MAX_BUFFER_COUNT, n_snd->al_buffers);
+    alGenBuffers(MAX_BUFFER_COUNT, n_snd->al_buffers);  
+    
+    AVPacket* packet = av_packet_alloc();
+    AVFrame* frame = av_frame_alloc();
+
+    int rfret = 0;
+    while((rfret = av_read_frame(n_snd->format_context, packet)) >= 0){
+        if(packet->stream_index == n_snd->audio_stream_index)
+        {
+            int ret = avcodec_send_packet(n_snd->codec_context, packet);
+            if (ret < 0 || ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+                printf("sglthing: audio error %i\n", ret);
+                break;
+            }
+            while(ret >= 0)
+            {
+                ret = avcodec_receive_frame(n_snd->codec_context, frame);
+                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+                    av_frame_unref(frame);
+                    break;
+                }
+                printf("sglthing: [AUDIO DECODE] frame %i\n", n_snd->codec_context->frame_number);
+                av_frame_unref(frame);
+            }
+        }
+        av_packet_unref(packet);
+    }
+
+    av_packet_free(&packet);
+    av_packet_free(&frame);
 }
 
 void play_snd(struct sndmgr* mgr, int source, char* file_name, float delta_time)
 {
-    struct snd* snd = NULL;
-    for(int i = 0; i < snd_count; i++)
-    {
-        if(strncmp(file_name,snd_cache[i].name,64)==0)
-        {
-            snd = &snd_cache[i];
-        }
-    }
+    struct snd* snd = get_snd(file_name);
     ASSERT(snd);
     ALint buf_processed;
     alGetSourcei(source,  AL_BUFFERS_PROCESSED,  &buf_processed);
 
     if(buf_processed)
     {
-        AVFrame* frame = av_frame_alloc();
-        AVPacket* packet = av_packet_alloc();
 
-        int buf_to_load = MAX_BUFFER_COUNT;
-        ALuint buffer;
-        for(int i = 0; i < buf_to_load; i++)
-        {
-            if(av_read_frame(snd->format_context, packet))
-            {
-                if(packet->stream_index == snd->audio_stream_index)
-                {
-                    char* data = 0;
-                    int data_sz;
-
-                    int response = snd_decode_buf(packet, snd->codec_context, frame, &data, &data_sz);
-                    if(response < 0)
-                        break;
-                    alSourceUnqueueBuffers(source,  1,  &buffer);
-                    alBufferData(buffer,  AL_FORMAT_STEREO16,  data,  data_sz,  snd->codec_context->sample_rate);
-                    alSourceQueueBuffers(source,  1,  &buffer);
-                    if(data)
-                        free(data);
-                }
-            }
-            av_packet_unref(packet);
-        }
-        av_packet_free(&packet);
-        av_frame_free(&frame);
     }
 
     ALint play_status;
@@ -180,6 +151,5 @@ void play_snd(struct sndmgr* mgr, int source, char* file_name, float delta_time)
     if(play_status != AL_PLAYING)
     {
         alSourcePlay(source);
-        alSourceQueueBuffers(source, MAX_BUFFER_COUNT, snd->al_buffers);
     }
 }
