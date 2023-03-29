@@ -8,6 +8,7 @@
 #include "netbundle.h"
 #include "script_networking.h"
 
+#include "../world.h"
 #include "../sglthing.h"
 
 static s7_pointer __engine_print(s7_scheme *sc, s7_pointer args)
@@ -17,6 +18,22 @@ static s7_pointer __engine_print(s7_scheme *sc, s7_pointer args)
     const char* str = s7_string(s7_car(args));
 
     printf("sglthing: (engine-print '%s')\n", str);
+    return s7_nil(sc);
+}
+
+static s7_pointer __engine_set_title(s7_scheme *sc, s7_pointer args)
+{
+    if(!s7_is_string(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "engine-set-title", 1, s7_car(args), "a string"));
+    const char* str = s7_string(s7_car(args));
+    if(!s7_is_c_pointer(s7_cadr(args)))
+        return(s7_wrong_type_arg_error(sc, "engine-set-title", 2, s7_cadr(args), "world"));
+    struct world* world = (struct world*)s7_c_pointer(s7_cadr(args));
+
+    char v_name[32];
+    snprintf(v_name,32,"%s (sglthing r%i)",str,GIT_COMMIT_COUNT);
+    glfwSetWindowTitle(world->gfx.window, v_name);
+
     return s7_nil(sc);
 }
 
@@ -612,6 +629,7 @@ void sgls7_add_functions(s7_scheme* sc)
     s7_define_variable(sc, "nullptr", s7_make_c_pointer(sc, NULL));
 
     s7_define_function(sc, "engine-print", __engine_print, 1, 0, false, "(engine-print string) prints string to log");
+    s7_define_function(sc, "engine-set-title", __engine_set_title, 2, 0, false, "(engine-print string world) set game title");
 
     s7_define_function(sc, "world-draw-object", __render_object, 4, 0, false, "(world-render-object w p m t)");
     s7_define_function(sc, "world-draw-primitive", __render_primitive, 4, 0, false, "(world-render-object w p m t)");

@@ -8,11 +8,17 @@ static int transform_type_tag = 0;
 
 #define SET_TRANSFORM(v)                                                            \
     static s7_pointer transform_##v(s7_scheme* sc, s7_pointer args) {               \
+        if(!s7_is_c_object(s7_car(args)))                                               \
+            return(s7_wrong_type_arg_error(sc, "transform-" #v, 1, s7_cadr(args), "transform")); \
         struct transform *o = (struct transform*)s7_c_object_value(s7_car(args));   \
         return (s7_make_real(sc, o->v));                                            \
     }                                                                               \
     static s7_pointer set_transform_##v(s7_scheme* sc, s7_pointer args) {           \
+        if(!s7_is_c_object(s7_car(args)))                                               \
+            return(s7_wrong_type_arg_error(sc, "set-transform-" #v, 1, s7_cadr(args), "transform")); \
         struct transform *o = (struct transform*)s7_c_object_value(s7_car(args));   \
+        if(!s7_is_real(s7_cadr(args)))                                               \
+            return(s7_wrong_type_arg_error(sc, "set-transform-" #v, 2, s7_cadr(args), "value")); \
         o->v = s7_real(s7_cadr(args));                                              \
         return s7_cadr(args);                                                       \
     };

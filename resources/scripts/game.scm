@@ -1,8 +1,6 @@
 (load "gfx_utils.scm")
 (load "game_lib.scm")
 
-(define world-ptr ())
-
 (load "shared/shared.scm")
 (load "server/server.scm")
 (load "client/client.scm")
@@ -39,18 +37,16 @@
 
 (animator-set-animation test-guy-animator (animation-bundle-get test-guy-animation-bundle 0))
 
-(define (script-frame world camera) (gfxutils-frame world camera) (gamelib-frame world camera) (set! world-ptr world)
-    (if (input-get-focus) (gamelib-debug-3d-controller camera))
-    (animator-update test-guy-animator (world-delta-time world)))
+(define (script-frame) (gfxutils-frame game-world game-camera) (gamelib-frame game-world game-camera) (engine-set-title "SGLThing Test" game-world)
+    (if (input-get-focus) (gamelib-debug-3d-controller game-camera))
+    (animator-update test-guy-animator (world-delta-time game-world)))
 
-(define (script-frame-render world light-pass)
-    (lightarea-use camera-light-area world)
+(define (script-frame-render light-pass)
+    (lightarea-use camera-light-area game-world)
     (gl-bind-texture 0 box-texture)
-    (world-draw-object world normal-shader box-model box-transform)
-    (gfxutils-set-animator light-pass test-guy-animator rigged-shader world)
+    (world-draw-object game-world normal-shader box-model box-transform)
+    (gfxutils-set-animator light-pass test-guy-animator rigged-shader game-world)
     (gl-bind-texture 0 test-guy-texture)
-    (world-draw-object world rigged-shader test-guy-model test-guy-transform))
+    (world-draw-object game-world rigged-shader test-guy-model test-guy-transform))
 
-(define (script-frame-ui world)
-    (let ((ui-data (world-get-ui world))) (ui-draw-text ui-data 0 0 "Hullo World"))
-    (let ((ui-data (world-get-ui world))) (ui-draw-text ui-data 0 16 (format #f "animator-current-time: ~A" (animator-current-time test-guy-animator)))))
+(define (script-frame-ui) ())

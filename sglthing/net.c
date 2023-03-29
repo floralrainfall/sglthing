@@ -451,7 +451,7 @@ void network_manage_socket(struct network* network, struct network_client* clien
                 }
                 break;
             case PACKETTYPE_SCM_EVENT:
-                printf("sglthing: %s received event %i, data: '%s'\n", (network->mode == NETWORKMODE_SERVER) ? "server" : "client", in_packet.packet.scm_event.event_id, in_packet.packet.scm_event.event_data);
+                // printf("sglthing: %s received event %i, data: '%s'\n", (network->mode == NETWORKMODE_SERVER) ? "server" : "client", in_packet.packet.scm_event.event_id, in_packet.packet.scm_event.event_data);
                 if(network->script)
                     nets7_receive_event(network_get_s7_pointer(network), network, client, &in_packet);
                 break;

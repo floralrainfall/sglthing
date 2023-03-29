@@ -23,7 +23,6 @@ static void __net_send_event(s7_scheme* sc, s7_pointer args)
     packet.packet.scm_event.event_id = eventid;
     strncpy(packet.packet.scm_event.event_data, data, 512);
 
-    printf("sglthing: sending event %i, data '%s'\n", packet.packet.scm_event.event_id, packet.packet.scm_event.event_data);
     network_transmit_packet(network, client, packet);
 }
 
