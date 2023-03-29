@@ -1,2 +1,2 @@
-(define (server-init) ())
-(define (server-tick) ())
+(define (server-init network) ())
+(define (server-tick network client) ())

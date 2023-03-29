@@ -63,8 +63,8 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 
         float character = (float)text[i];
 
-        float uv_x = fmodf(character - 1, ui->ui_font->cw);
-        float uv_y = ((character - 1) / ui->ui_font->ch);
+        float uv_x = fmodf(character - 1, ui->ui_font->cw) * ui->ui_font->cx;
+        float uv_y = ((character - 1) / ui->ui_font->ch) * ui->ui_font->cy;
         
         float uv_w = ui->ui_font->cx;
         float uv_h = ui->ui_font->cy;

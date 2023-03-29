@@ -211,7 +211,8 @@ void network_connect(struct network* network, char* ip, int port)
         strncpy(client_info.packet.clientinfo.debugger_pass, network->debugger_pass, 64);
         network_transmit_packet(network, &network->client, client_info);
 
-        nets7_init_network(network_get_s7_pointer(network), network);
+        if(network->script)
+            nets7_init_network(network_get_s7_pointer(network), network);
 
         network->next_tick = glfwGetTime() + 0.01;
     }
@@ -253,7 +254,9 @@ void network_open(struct network* network, char* ip, int port)
     strncpy(network->server_name, "SGLThing game server", 64);
     strncpy(network->server_motd, "Server has not set a server_motd", 128);
     strncpy(network->debugger_pass, "debugger", 64);
-    nets7_init_network(network_get_s7_pointer(network), network);
+
+    if(network->script)
+        nets7_init_network(network_get_s7_pointer(network), network);
 
     printf("sglthing: server open on ip %s and port %i\n", ip, port);
 }
@@ -280,7 +283,7 @@ int network_transmit_packet(struct network* network, struct network_client* clie
         return -1;
     if(g_random_double_range(-1.0, 1.0) > 0.9)
         return -1;
-    return send(client->socket, &packet, sizeof(struct network_packet), MSG_DONTWAIT);
+    return send(client->socket, &packet, sizeof(struct network_packet), MSG_DONTWAIT | MSG_NOSIGNAL);
 }
 
 void network_transmit_packet_all(struct network* network, struct network_packet packet)
@@ -297,6 +300,8 @@ int last_given_player_id = 0;
 void network_manage_socket(struct network* network, struct network_client* client)
 {
     struct network_packet in_packet;
+    if(network->script)
+        nets7_tick_network(network_get_s7_pointer(network), network, client);
     while(recv(client->socket, &in_packet, sizeof(struct network_packet), MSG_DONTWAIT) != -1)
     {
         if(in_packet.meta.magic_number != MAGIC_NUMBER)
@@ -444,6 +449,11 @@ void network_manage_socket(struct network* network, struct network_client* clien
                         return;
                     }
                 }
+                break;
+            case PACKETTYPE_SCM_EVENT:
+                printf("sglthing: %s received event %i, data: '%s'\n", (network->mode == NETWORKMODE_SERVER) ? "server" : "client", in_packet.packet.scm_event.event_id, in_packet.packet.scm_event.event_data);
+                if(network->script)
+                    nets7_receive_event(network_get_s7_pointer(network), network, client, &in_packet);
                 break;
             case PACKETTYPE_CHAT_MESSAGE:
                 if(network->mode == NETWORKMODE_SERVER)

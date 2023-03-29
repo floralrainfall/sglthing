@@ -90,13 +90,14 @@ int animation_create(char* animation_path, struct mesh* model, int id, struct an
 {
     char path[256];
     int f = file_get_path(path, 256, animation_path);
-    if(f)
+    if(f != -1)
     {
         printf("sglthing: loading anim %i from %s\n", id, animation_path);
         const struct aiScene* scene = aiImportFile(path, aiProcess_Triangulate);
         ASSERT(scene && scene->mRootNode && scene->mAnimations);
         __animation_create2(anim, model, id, scene);
         printf("sglthing: loaded anim %s duration %0.2f\n", animation_path, anim->duration/anim->ticks_per_second);
+        return 0;
     }
     return -1;
 }
@@ -183,7 +184,7 @@ int animation_bundle_create(char* animation_path, struct mesh* model, struct ani
 {
     char path[256];
     int f = file_get_path(path, 256, animation_path);
-    if(f)
+    if(f != -1)
     {
         anim_bundle->animations = g_array_new(false, true, sizeof(struct animation));
         const struct aiScene* scene = aiImportFile(path, aiProcess_Triangulate);
@@ -195,6 +196,7 @@ int animation_bundle_create(char* animation_path, struct mesh* model, struct ani
             g_array_append_vals(anim_bundle->animations, &anim, 1);
         }
         printf("sglthing: loaded anim %s count %i\n", animation_path, scene->mNumAnimations);
+        return 0;
     }
     return -1;
 }

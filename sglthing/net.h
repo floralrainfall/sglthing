@@ -157,9 +157,7 @@ struct network_packet {
         } player_remove;
         struct {
             int event_id;
-#ifdef SGLTHING_COMPILE
-            struct net_bundle bundle;
-#endif
+            char event_data[512];
         } scm_event;
         struct {
             int player_id;

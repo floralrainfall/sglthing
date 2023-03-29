@@ -1,6 +1,9 @@
 (load "gfx_utils.scm")
 (load "game_lib.scm")
 
+(define world-ptr ())
+
+(load "shared/shared.scm")
 (load "server/server.scm")
 (load "client/client.scm")
 
@@ -36,7 +39,7 @@
 
 (animator-set-animation test-guy-animator (animation-bundle-get test-guy-animation-bundle 0))
 
-(define (script-frame world camera) (gfxutils-frame world camera) (gamelib-frame world camera)
+(define (script-frame world camera) (gfxutils-frame world camera) (gamelib-frame world camera) (set! world-ptr world)
     (if (input-get-focus) (gamelib-debug-3d-controller camera))
     (animator-update test-guy-animator (world-delta-time world)))
 

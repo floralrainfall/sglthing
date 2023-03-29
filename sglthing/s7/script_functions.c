@@ -403,7 +403,8 @@ static s7_pointer __animation_bundle_create(s7_scheme* sc, s7_pointer args)
         return(s7_wrong_type_arg_error(sc, "animation-bundle-create", 1, s7_cadr(args), "model"));
     struct model* model = s7_c_pointer(s7_cadr(args));
     struct animation_bundle* animation = (struct animation_bundle*)malloc(sizeof(struct animation_bundle));
-    animation_bundle_create((char*)s7_string(s7_car(args)), &model->meshes[0], animation);
+    if(animation_bundle_create((char*)s7_string(s7_car(args)), &model->meshes[0], animation) != 0)
+        return s7_nil(sc);
     return s7_make_c_pointer(sc, animation);
 }
 

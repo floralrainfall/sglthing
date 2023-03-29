@@ -55,7 +55,6 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
         g_key_file_set_value(world->config.key_file, "sglthing", argv[i-1], argv[i]);
     char* net_mode = config_string_get(&world->config,"network_mode");
 
-    world->downloader.socket = 0;
     bool network_download = false;
     world->assets_downloading = false;
     world->downloader.socket = -1;
@@ -67,7 +66,7 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     }
 
     if(!network_download)
-        world->script = script_init("scripts/game.scm");
+        world->script = script_init("scripts/game.scm", world);
 
     world->gfx.shadow_pass = false;
     int ls_v = compile_shader("shaders/shadow_pass.vs",GL_VERTEX_SHADER);
@@ -257,7 +256,7 @@ void world_frame_render(struct world* world)
 {    
     glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Scene");
     if(!world->assets_downloading)
-        script_frame_render(world,world->script, world->gfx.shadow_pass);
+        script_frame_render(world->script, world->gfx.shadow_pass);
     //world_draw_model(world, world->test_object, world->normal_shader, test_model, true);
     glPopDebugGroupKHR();   
 }
@@ -341,7 +340,7 @@ void world_frame(struct world* world)
         glBindFramebuffer(GL_FRAMEBUFFER,2);
     }
     if(!world->assets_downloading)
-        script_frame(world, world->script);
+        script_frame(world->script);
     if(world->client.status != NETWORKSTATUS_CONNECTED)
     {
         glBindFramebuffer(GL_FRAMEBUFFER,0);
@@ -456,7 +455,7 @@ void world_frame(struct world* world)
         network_dbg_ui(&world->client, world->ui);
         network_dbg_ui(&world->server, world->ui);
         if(!world->assets_downloading)
-            script_frame_ui(world, world->script);
+            script_frame_ui(world->script);
     }
     else
     {
@@ -485,7 +484,7 @@ void world_frame(struct world* world)
 
             if(world->downloader.data_done)
             {
-                world->script = script_init("scripts/game.scm");
+                world->script = script_init("scripts/game.scm", world);
                 network_init(&world->client, world->script);
                 network_connect(&world->client, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
             }
