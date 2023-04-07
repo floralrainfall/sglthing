@@ -7627,6 +7627,7 @@ static void try_to_call_gc(s7_scheme *sc)
       if ((sc->gc_resize_heap_fraction > 0.5) && (sc->heap_size >= 4194304))
 	  sc->gc_resize_heap_fraction = 0.5;
 #if S7_DEBUGGING
+      printf("s7: GARBAGE freeing memory %s %i\n", func, line);
       gc(sc, func, line); /* not call_gc! */
 #else
       gc(sc);

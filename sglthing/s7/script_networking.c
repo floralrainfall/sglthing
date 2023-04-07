@@ -32,22 +32,29 @@ void sgls7_registernetworking(s7_scheme* sc)
 }
 
 void nets7_init_network(s7_scheme* sc, struct network* net)
-{
+{    
+    if(!script_enabled(net))
+        return;
     char function_name[64];
     snprintf(function_name, 64, "%s-init", ((net->mode == NETWORKMODE_SERVER) ? "server" : "client"));
-    s7_call(sc, s7_name_to_value(sc, function_name), s7_cons(sc, s7_make_c_pointer(sc, net), s7_nil(sc)));
+    s7_pointer net_ptr = s7_make_c_pointer(sc, net);
+    s7_call(sc, s7_name_to_value(sc, function_name), s7_list(sc, 1, s7_make_c_pointer(sc, net)));
 }
 
 void nets7_tick_network(s7_scheme* sc, struct network* net, struct network_client* client)
-{
+{    
+    if(!script_enabled(net))
+        return;
     char function_name[64];
     snprintf(function_name, 64, "%s-tick", ((net->mode == NETWORKMODE_SERVER) ? "server" : "client"));
-    s7_call(sc, s7_name_to_value(sc, function_name), s7_cons(sc, s7_make_c_pointer(sc, net), s7_cons(sc, s7_make_c_pointer(sc, client), s7_nil(sc))));
+    s7_call(sc, s7_name_to_value(sc, function_name), s7_list(sc, 2, s7_make_c_pointer(sc, net), s7_make_c_pointer(sc, net)));
 }
 
 void nets7_receive_event(s7_scheme* sc, struct network* net, struct network_client* client, struct network_packet* packet)
 {
+    if(!script_enabled(net))
+        return;
     char function_name[64];
     snprintf(function_name, 64, "%s-event-%i", ((net->mode == NETWORKMODE_SERVER) ? "server" : "client"), packet->packet.scm_event.event_id);
-    s7_call(sc, s7_name_to_value(sc, function_name), s7_cons(sc, s7_make_c_pointer(sc, net), s7_cons(sc, s7_make_c_pointer(sc, client), s7_cons(sc, s7_make_string_with_length(sc, packet->packet.scm_event.event_data, 512), s7_nil(sc)))));
+    s7_call(sc, s7_name_to_value(sc, function_name), s7_list(sc, 3, s7_make_c_pointer(sc, net), s7_make_c_pointer(sc, net), s7_make_string_with_length(sc, packet->packet.scm_event.event_data, sizeof(packet->packet.scm_event.event_data))));
 }

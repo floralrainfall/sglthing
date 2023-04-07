@@ -28,7 +28,7 @@ int file_get_path(char* dest, int n, char* resource_path)
         }
     }
     strncpy(dest, resource_path, n);
-    return 0;
+    return -1;
 }
 
 FILE* file_open(char* resource_path, char* modes)

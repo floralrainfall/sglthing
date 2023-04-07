@@ -28,10 +28,15 @@ void network_init(struct network* network, struct script_system* script)
     network->client.socket = -1;
     network->client.connected = false;
     network->script = script;
+    network->receive_packet_callback = NULL;
+    network->shutdown_ready = false;
+    network->shutdown_empty = false;
+    network->players = g_hash_table_new(g_int_hash, g_int_equal);
 }
 
 void network_start_download(struct network_downloader* network, char* ip, int port, char* rqname, char* pass)
 {
+    network->http_client.server = false;
     http_create(&network->http_client, SGLAPI_BASE);
     struct sockaddr_in dest;
     network->socket = socket(AF_INET, SOCK_STREAM, 0);  
@@ -175,6 +180,7 @@ void network_stop_download(struct network_downloader* network)
 
 void network_connect(struct network* network, char* ip, int port)
 {
+    network->http_client.server = false;
     http_create(&network->http_client, SGLAPI_BASE);
 
     network->mode = NETWORKMODE_CLIENT; 
@@ -209,6 +215,9 @@ void network_connect(struct network* network, char* ip, int port)
         strncpy(client_info.packet.clientinfo.session_key, network->http_client.sessionkey, 256);
         strncpy(client_info.packet.clientinfo.server_pass, network->server_pass, 64);
         strncpy(client_info.packet.clientinfo.debugger_pass, network->debugger_pass, 64);
+        client_info.packet.clientinfo.color_r = network->client.player_color_r;
+        client_info.packet.clientinfo.color_g = network->client.player_color_g;
+        client_info.packet.clientinfo.color_b = network->client.player_color_b;
         network_transmit_packet(network, &network->client, client_info);
 
         if(network->script)
@@ -220,6 +229,7 @@ void network_connect(struct network* network, char* ip, int port)
 
 void network_open(struct network* network, char* ip, int port)
 {
+    network->http_client.server = true;
     http_create(&network->http_client, SGLAPI_BASE);
 
     struct sockaddr_in serv;
@@ -308,6 +318,11 @@ void network_manage_socket(struct network* network, struct network_client* clien
             return;
         else if(in_packet.meta.packet_version != CR_PACKET_VERSION)
             return;
+        bool passthru = true;
+        if(network->receive_packet_callback)
+            passthru = network->receive_packet_callback(network, client, &in_packet);
+        if(!passthru)
+            continue;
         switch(in_packet.meta.packet_type)
         {
             case PACKETTYPE_DISCONNECT:
@@ -350,21 +365,25 @@ void network_manage_socket(struct network* network, struct network_client* clien
                             if(network->security)
                                 network_disconnect_player(network, true, "Bad key", client);
                             client->verified = false;
-                            break;
+
+                            client->player_color_r = 0.0;
+                            client->player_color_g = 1.0;
+                            client->player_color_b = 1.0;
                         }
                         else
                         {
                             char url[256];
-                            snprintf(url,256,"auth/key_owner.sgl?sessionkey=%s",in_packet.packet.clientinfo.session_key);
+                            snprintf(url,256,"auth/key_owner?sessionkey=%s",in_packet.packet.clientinfo.session_key);
                             char* username = http_get(&network->http_client,url);
                             if(username)
                             {
                                 strncpy(in_packet.packet.clientinfo.client_name, username, 64);
                                 free(username);
                             }
-                            client->player_color_r = g_random_double_range(0.0, 1.0);
-                            client->player_color_g = g_random_double_range(0.0, 1.0);
-                            client->player_color_b = g_random_double_range(0.0, 1.0);
+
+                            client->player_color_r = in_packet.packet.clientinfo.color_r;
+                            client->player_color_g = in_packet.packet.clientinfo.color_g;
+                            client->player_color_b = in_packet.packet.clientinfo.color_b;
                         }
 
                         if(!in_packet.packet.clientinfo.observer && strlen(network->debugger_pass) && strncmp(in_packet.packet.clientinfo.debugger_pass, network->debugger_pass, 64) == 0)
@@ -377,6 +396,7 @@ void network_manage_socket(struct network* network, struct network_client* clien
                         client->authenticated = true;
                         client->player_id = last_given_player_id++;
                         client->client_version = in_packet.packet.clientinfo.sglthing_revision;
+                        client->owner = network;
                         if(client->client_version != GIT_COMMIT_COUNT)
                             printf("sglthing: WARN: new client '%s' is on sglthing r%i, while server is on sglthing r%i\n", in_packet.packet.clientinfo.client_name, client->client_version, GIT_COMMIT_COUNT);
 
@@ -387,6 +407,8 @@ void network_manage_socket(struct network* network, struct network_client* clien
 
                         if(!in_packet.packet.clientinfo.observer)
                         {
+                            g_hash_table_insert(network->players, &client->player_id, client);
+
                             response.meta.packet_type = PACKETTYPE_PLAYER_ADD;
                             response.packet.player_add.player_id = client->player_id;
                             response.packet.player_add.admin = client->debugger;
@@ -394,6 +416,7 @@ void network_manage_socket(struct network* network, struct network_client* clien
                             response.packet.player_add.player_color_g = client->player_color_g;
                             response.packet.player_add.player_color_b = client->player_color_b;
                             strncpy(response.packet.player_add.client_name, in_packet.packet.clientinfo.client_name, 64);
+
                             network_transmit_packet_all(network, response);
                             ZERO(response);
                         }
@@ -411,6 +434,9 @@ void network_manage_socket(struct network* network, struct network_client* clien
 
                         client->observer = in_packet.packet.clientinfo.observer;            
                         client->ping_time_interval = network->client_default_tick;
+
+                        if(network->new_player_callback)
+                            network->new_player_callback(network, client);
                     }
                     else
                     {
@@ -433,13 +459,34 @@ void network_manage_socket(struct network* network, struct network_client* clien
             case PACKETTYPE_PLAYER_ADD:
                 if(network->mode == NETWORKMODE_CLIENT)
                 {
+                    struct network_client* new_client = (struct network_client*)malloc(sizeof(struct network_client));
                     printf("sglthing: client new player %s %i\n", in_packet.packet.player_add.client_name, in_packet.packet.player_add.player_id);
+                    // copy
+
+                    new_client->authenticated = true;
+                    new_client->connected = true;
+                    new_client->player_color_r = in_packet.packet.player_add.player_color_r;
+                    new_client->player_color_g = in_packet.packet.player_add.player_color_g;
+                    new_client->player_color_b = in_packet.packet.player_add.player_color_b;
+                    new_client->player_id = in_packet.packet.player_add.player_id;
+                    new_client->owner = network;
+                    strncpy(new_client->client_name, in_packet.packet.player_add.client_name, 64);
+
+                    g_hash_table_insert(network->players, &in_packet.packet.player_add.player_id, new_client);        
+
+                    if(network->new_player_callback)
+                        network->new_player_callback(network, new_client);        
                 }
                 break;
             case PACKETTYPE_PLAYER_REMOVE:
                 if(network->mode == NETWORKMODE_CLIENT)
                 {
                     printf("sglthing: client del player %i\n", in_packet.packet.player_remove.player_id);
+                    struct network_client* old_client = g_hash_table_lookup(network->players, &in_packet.packet.player_remove.player_id);
+                    if(network->del_player_callback)
+                        network->del_player_callback(network, client);
+                    g_hash_table_remove(network->players, &in_packet.packet.player_remove.player_id);
+                    free(old_client);
                     if(in_packet.packet.player_remove.player_id == client->player_id)
                     {
                         client->connected = false;
@@ -619,6 +666,7 @@ void network_frame(struct network* network, float delta_time)
             new_client.last_ping_time = glfwGetTime();
             new_client.ping_time_interval = 5.0;
             new_client.dl_data = NULL;
+            new_client.owner = network;
             g_array_append_val(network->server_clients, new_client);
 
             network->shutdown_ready = true;
@@ -648,6 +696,9 @@ void network_disconnect_player(struct network* network, bool transmit_disconnect
                 break;
             }
         }
+        if(network->del_player_callback)
+            network->del_player_callback(network, client);
+        g_hash_table_remove(network->players, &client->player_id);
         if(client->authenticated && transmit_disconnect)
         {
             struct network_packet response;
@@ -715,7 +766,7 @@ void network_dbg_ui(struct network* network, struct ui_data* ui)
         vec4 oldfg, oldbg;
         glm_vec4_copy(ui->foreground_color, oldfg);
         glm_vec4_copy(ui->background_color, oldbg);
-        ui->background_color[3] = 1.f;
+        ui->background_color[3] = 0.f;
         for(int i = 0; i < network->server_clients->len; i++)
         {
             struct network_client* cli = &g_array_index(network->server_clients, struct network_client, i);

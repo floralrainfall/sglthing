@@ -1,7 +1,9 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stdio.h>
+#ifdef ODE_ENABLED
 #include <ode/ode.h>
+#endif
 #include <signal.h>
 
 #include "keyboard.h"
@@ -15,6 +17,7 @@
 #endif
 
 static struct world* world;
+extern void sglthing_init_api(struct world* world);
 
 static void glerror(int error, const char* description)
 {
@@ -62,14 +65,20 @@ int main(int argc, char** argv)
 
     fs_add_directory("resources");
     fs_add_directory("../resources");
+    fs_add_directory("~/.sglthing");
+    #ifdef __unix__
+    fs_add_directory("/opt/sglthing");
+    #endif
 
     glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
     //glEnable(GL_MULTISAMPLE);  
     glEnable(GL_BLEND);
 
+#ifdef ODE_ENABLED
     dInitODE2(0);
     dAllocateODEDataForThread(dAllocateMaskAll);
+#endif
     init_kbd(window);
     set_focus(window, false);
     
@@ -81,6 +90,10 @@ int main(int argc, char** argv)
     world->delta_time = 0.f;
     world->last_time = glfwGetTime();
     glfwSwapInterval(config_number_get(&world->config, "swap_interval"));
+
+    printf("sglthing: %p\n", &world->world_frame_user);
+    sglthing_init_api(world);
+
     while(!glfwWindowShouldClose(window))
     {
         double frame_start = glfwGetTime();

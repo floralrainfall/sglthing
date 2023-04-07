@@ -8,9 +8,10 @@
 struct ui_font
 {
     int font_texture;
-    float cx, cy;
-    float cw, ch;
-    float tx, ty;
+    int cx, cy;
+    int cw, ch;
+    int tx, ty;
+    int chr_off;
 };
 
 struct ui_data
@@ -35,6 +36,11 @@ struct ui_data
     float silliness_speed;
 
     struct ui_font* default_font;
+
+    float time;
+
+    bool shadow;
+    bool persist;
 };
 
 // depth should be 1.f

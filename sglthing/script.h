@@ -9,5 +9,6 @@ void script_frame(struct script_system* system);
 void script_frame_render(struct script_system* system, bool xtra_pass);
 void script_frame_ui(struct script_system* system);
 void* script_s7(struct script_system* system);
+bool script_enabled(struct script_system* system);
 
 #endif

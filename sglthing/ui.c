@@ -13,7 +13,7 @@
 
 void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
 {
-    if(ui->ui_elements > MAX_UI_ELEMENTS || keys_down[GLFW_KEY_GRAVE_ACCENT])
+    if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return;
 
     vec2 points[MAX_CHARACTERS_STRING][2] = {0};
@@ -61,18 +61,18 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
         points[point_count+5][0][0] = v_down_left[0];
         points[point_count+5][0][1] = v_down_left[1];
 
-        float character = (float)text[i];
+        int character = text[i] - ui->ui_font->chr_off;
 
-        float uv_x = fmodf(character - 1, ui->ui_font->cw) * ui->ui_font->cx;
-        float uv_y = ((character - 1) / ui->ui_font->ch) * ui->ui_font->cy;
+        int uv_x = fmodf(character, ui->ui_font->cw);
+        int uv_y = fmodf(ceilf(character / ui->ui_font->cw), ui->ui_font->ch);
         
         float uv_w = ui->ui_font->cx;
         float uv_h = ui->ui_font->cy;
 
-        vec2 uv_up_left    = {uv_x,      uv_y};
-        vec2 uv_up_right   = {uv_x+uv_w, uv_y};
-        vec2 uv_down_left  = {uv_x,      uv_y+uv_h};
-        vec2 uv_down_right = {uv_x+uv_w, uv_y+uv_h};
+        vec2 uv_up_left    = {(uv_x*uv_w),      (uv_y*uv_h)};
+        vec2 uv_up_right   = {(uv_x*uv_w)+uv_w, (uv_y*uv_h)};
+        vec2 uv_down_left  = {(uv_x*uv_w),      (uv_y*uv_h)+uv_h};
+        vec2 uv_down_right = {(uv_x*uv_w)+uv_w, (uv_y*uv_h)+uv_h};
 
         uv_up_left[0] /= ui->ui_font->tx;
         uv_up_right[0] /= ui->ui_font->tx;
@@ -118,25 +118,70 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     if(ui->silliness != 0.0)
         ui->background_color[3] = 0.0f;
     sglc(glUseProgram(ui->ui_program));
-    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
-    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
+    sglc(glActiveTexture(GL_TEXTURE0));
+    sglc(glBindTexture(GL_TEXTURE_2D, ui->ui_font->font_texture));
+    vec3 offset;
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"time"), (float)glfwGetTime()));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"waviness"), ui->waviness));
-    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_program,"projection"), 1, GL_FALSE, ui->projection[0]));    
-    sglc(glActiveTexture(GL_TEXTURE0));
-    sglc(glBindTexture(GL_TEXTURE_2D, ui->ui_font->font_texture));
-    sglc(glDrawArrays(GL_TRIANGLES, 0, point_count));
+    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_program,"projection"), 1, GL_FALSE, ui->projection[0]));      
+
+    offset[0] = 0.0f;
+    offset[1] = 0.0f;
+    offset[2] = 0.0f;
+    if(ui->shadow)
+    {   
+        vec4 background_color = { 0.0f, 0.0f, 0.0f, 0.0f };
+        vec4 foreground_color;
+
+        offset[0] = 0.0f;
+        offset[1] = 0.0f;
+        offset[2] = -2.0f;
+
+        sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
+        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
+        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
+        sglc(glDrawArrays(GL_TRIANGLES, 0, point_count));
+
+        offset[0] = -2.0f;
+        offset[1] = -2.0f;
+        offset[2] = -1.0f;
+        
+        glm_vec4_divs(ui->foreground_color, 2.f, foreground_color);
+        sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
+        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, foreground_color));
+        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, background_color));
+        sglc(glDrawArrays(GL_TRIANGLES, 0, point_count));
+
+        offset[0] = 0.0f;
+        offset[1] = 0.0f;
+        offset[2] = 0.0f;
+
+        sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
+        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->background_color));
+        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
+        sglc(glDrawArrays(GL_TRIANGLES, 0, point_count));
+    }
+    else
+    {    
+        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
+        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
+        sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
+        sglc(glDrawArrays(GL_TRIANGLES, 0, point_count));    
+    }
+
     ui->ui_elements++;
     ui->background_color[3] = old_background;
 }
 
 bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
 {
-    if(ui->ui_elements > MAX_UI_ELEMENTS || keys_down[GLFW_KEY_GRAVE_ACCENT])
-        return;
+    if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
+        return false;
 
     ui_draw_text(ui, position_x, position_y, text, depth);
+
+    return false;
 }
 
 void ui_init(struct ui_data* ui)
@@ -166,9 +211,9 @@ void ui_init(struct ui_data* ui)
 
     glBindVertexArray(0);
 
-    ui->background_color[0] = 0.5f;
-    ui->background_color[1] = 0.5f;
-    ui->background_color[2] = 0.5f;
+    ui->background_color[0] = 0.4f;
+    ui->background_color[1] = 0.4f;
+    ui->background_color[2] = 0.4f;
     ui->background_color[3] = 0.2f;
 
     ui->foreground_color[0] = 1.0f;
@@ -179,11 +224,13 @@ void ui_init(struct ui_data* ui)
     ui->silliness = 0.f;
     ui->silliness_speed = 5.f;
     ui->ui_size = 0;
+
+    ui->shadow = true;
 }
 
 void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, vec3 camera_front, vec3 position, float fov, mat4 m, mat4 vp, char* text)
 {
-    if(ui->ui_elements > MAX_UI_ELEMENTS || keys_down[GLFW_KEY_GRAVE_ACCENT])
+    if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return;
         
     vec3 dest_position;
@@ -215,6 +262,7 @@ struct ui_font* ui_load_font(char* file, float cx, float cy, float cw, float ch)
         new_font->ch = ch;
         new_font->tx = tex_info.texture_width;
         new_font->ty = tex_info.texture_height;
+        new_font->chr_off = 0;
 
         return new_font;
     }

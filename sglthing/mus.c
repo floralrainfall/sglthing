@@ -21,7 +21,7 @@ void mus_init(struct musmgr* mgr, struct sndmgr* s_mgr)
     mgr->current_pattern = 0;
     mgr->pattern_offset = 0;
     mgr->sndmgr = s_mgr;
-    mgr->dbgmgr = true;
+    mgr->dbgmgr = false;
     mgr->playing = false;
 
     alGenSources(MUS_TRACK_COUNT, mgr->sources);

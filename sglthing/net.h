@@ -43,6 +43,8 @@ struct network_client {
     int dl_packet_size;    
     int dl_retries;
     int dl_successes;
+    struct network* owner;
+    void* user_data;
 };
 
 struct network_downloader {
@@ -64,32 +66,6 @@ struct network_downloader {
     struct http_client http_client;
 };
 
-struct network {
-    enum { NETWORKMODE_SERVER, NETWORKMODE_CLIENT, NETWORKMODE_UNKNOWN } mode;
-    enum { NETWORKSTATUS_DISCONNECTED, NETWORKSTATUS_CONNECTED } status;
-    char disconnect_reason[32];
-    char server_motd[128];
-    char server_name[64];
-    char server_pass[64];
-    char debugger_pass[64];
-    struct network_client client;
-    struct http_client http_client;
-#ifdef SGLTHING_COMPILE
-    struct script_system* script;
-#endif
-    double distributed_time;
-    int network_frames;
-
-    GArray* server_clients;
-    double next_tick;
-    double client_default_tick;
-
-    bool security;
-
-    bool shutdown_empty;
-    bool shutdown_ready;
-};
-
 struct network_packet {
     struct {
         enum { 
@@ -109,6 +85,8 @@ struct network_packet {
 
             PACKETTYPE_DEBUGGER_QUIT,    // C-->S
             PACKETTYPE_DEBUGGER_KICK,    // C-->S
+
+            PACKETTYPE_LAST_ID,
         } packet_type;
         int packet_version;
         float distributed_time;
@@ -122,6 +100,10 @@ struct network_packet {
             char server_pass[64];
             char debugger_pass[64];
             int sglthing_revision;
+
+            float color_r;
+            float color_g;
+            float color_b;
 
             bool observer;
         } clientinfo;
@@ -185,6 +167,38 @@ struct network_packet {
             char reason[32];
         } dbg_kick;
     } packet;
+};
+
+struct network {
+    enum { NETWORKMODE_SERVER, NETWORKMODE_CLIENT, NETWORKMODE_UNKNOWN } mode;
+    enum { NETWORKSTATUS_DISCONNECTED, NETWORKSTATUS_CONNECTED } status;
+    char disconnect_reason[32];
+    char server_motd[128];
+    char server_name[64];
+    char server_pass[64];
+    char debugger_pass[64];
+    struct network_client client;
+    struct http_client http_client;
+#ifdef SGLTHING_COMPILE
+    struct script_system* script;
+#endif
+    double distributed_time;
+    int network_frames;
+
+    GArray* server_clients;
+    double next_tick;
+    double client_default_tick;
+
+    bool security;
+
+    bool shutdown_empty;
+    bool shutdown_ready;
+
+    bool (*receive_packet_callback)(struct network* network, struct network_client* client, struct network_packet* packet);
+    void (*new_player_callback)(struct network* network, struct network_client* client);
+    void (*del_player_callback)(struct network* network, struct network_client* client);
+
+    GHashTable* players;
 };
 
 void network_init(struct network* network, struct script_system* script);

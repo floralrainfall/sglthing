@@ -38,7 +38,7 @@
 (animator-set-animation test-guy-animator (animation-bundle-get test-guy-animation-bundle 0))
 
 (define (script-frame) (gfxutils-frame game-world game-camera) (gamelib-frame game-world game-camera) (engine-set-title "SGLThing Test" game-world)
-    (if (input-get-focus) (gamelib-debug-3d-controller game-camera))
+    (if (input-get-focus) ())
     (animator-update test-guy-animator (world-delta-time game-world)))
 
 (define (script-frame-render light-pass)

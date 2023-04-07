@@ -10,6 +10,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#ifdef ODE_ENABLED
 static void world_physics_callback(void* data, dGeomID o1, dGeomID o2)
 {
     dBodyID b1 = dGeomGetBody(o1);
@@ -28,6 +29,7 @@ static void world_physics_callback(void* data, dGeomID o1, dGeomID o2)
         world->physics.collisions_in_frame++;
     }
 }
+#endif
 
 struct world* world_init(char** argv, int argc, GLFWwindow* window)
 {
@@ -64,6 +66,8 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
         network_download = true;
         world->assets_downloading = true;
     }
+
+    world->enable_script = (config_number_get(&world->config, "script_enabled") == 1.0);
 
     if(!network_download)
         world->script = script_init("scripts/game.scm", world);
@@ -118,6 +122,7 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
 
     world->primitives = create_primitives();
 
+#ifdef ODE_ENABLED
     world->physics.world = dWorldCreate();
     dWorldSetContactSurfaceLayer(world->physics.world, 0.001);
     dWorldSetAutoDisableFlag(world->physics.world, 1);
@@ -128,6 +133,7 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
 
     world->physics.space = dHashSpaceCreate(0);
     world->physics.contactgroup = dJointGroupCreate (0);
+#endif
 
     world->render_area = 0;
     
@@ -229,6 +235,10 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     strncpy(world->server.server_motd,config_string_get(&world->config,"server_motd"),128);
     strncpy(world->server.server_name,config_string_get(&world->config,"server_name"),64);
 
+    world->client.client.player_color_r = config_number_get(&world->config, "user_color_r");
+    world->client.client.player_color_g = config_number_get(&world->config, "user_color_g");
+    world->client.client.player_color_b = config_number_get(&world->config, "user_color_b");
+
     if(strcmp(net_mode,"server")==0)
     {
         char v_name[32];
@@ -249,6 +259,11 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     mus_init(&world->m_mgr, &world->s_mgr);
     world->m_mgr.world_ptr = (void*)world;
 
+    world->world_frame_user = NULL;
+    world->world_frame_ui_user = NULL;
+    world->world_frame_render_user = NULL;
+    world->world_uniforms_set = NULL;
+
     return world;
 }
 
@@ -257,6 +272,8 @@ void world_frame_render(struct world* world)
     glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Scene");
     if(!world->assets_downloading)
         script_frame_render(world->script, world->gfx.shadow_pass);
+    if(world->world_frame_render_user)
+        world->world_frame_render_user(world);
     //world_draw_model(world, world->test_object, world->normal_shader, test_model, true);
     glPopDebugGroupKHR();   
 }
@@ -339,6 +356,8 @@ void world_frame(struct world* world)
     {
         glBindFramebuffer(GL_FRAMEBUFFER,2);
     }
+    if(world->world_frame_user)
+        world->world_frame_user(world);
     if(!world->assets_downloading)
         script_frame(world->script);
     if(world->client.status != NETWORKSTATUS_CONNECTED)
@@ -429,7 +448,11 @@ void world_frame(struct world* world)
             char dbg_info[256];
             int old_elements = world->ui->ui_elements;
             world->ui->ui_elements = 0;
-            snprintf(dbg_info, 256, "DEBUG\n\ncam: V=(%.2f,%.2f,%.2f)\nY=%.2f,P=%.2f\nU=(%.2f,%.2f,%.2f)\nF=(%.2f,%.2f,%.2f)\nR=(%.f,%.f,%.f)\nF=%.f\nv=(%i,%i)\nr (scene)=%i,r (ui)=%i\nt=%f, F=%i, d=%f, fps=%f\n\nphysics pause=%s\nphysics geoms=%i\ncollisions in frame=%i\n",
+            snprintf(dbg_info, 256, "DEBUG\n\ncam: V=(%.2f,%.2f,%.2f)\nY=%.2f,P=%.2f\nU=(%.2f,%.2f,%.2f)\nF=(%.2f,%.2f,%.2f)\nR=(%.f,%.f,%.f)\nF=%.f\nv=(%i,%i)\nr (scene)=%i,r (ui)=%i\nt=%f, F=%i, d=%f, fps=%f\n\n"
+#ifdef ODE_ENABLED
+                "physics pause=%s\nphysics geoms=%i\ncollisions in frame=%i\n"
+#endif
+                ,
                 world->cam.position[0], world->cam.position[1], world->cam.position[2],
                 world->cam.yaw, world->cam.pitch,
                 world->cam.up[0], world->cam.up[1], world->cam.up[2],
@@ -439,10 +462,13 @@ void world_frame(struct world* world)
                 (int)world->viewport[2], (int)world->viewport[3],
                 world->render_count,
                 old_elements,
-                glfwGetTime(), world->frames, world->delta_time, world->fps,
-                world->physics.paused?"true":"false",
+                world->time, world->frames, world->delta_time, world->fps
+#ifdef ODE_ENABLED
+                , world->physics.paused?"true":"false",
                 dSpaceGetNumGeoms(world->physics.space),
-                world->physics.collisions_in_frame);
+                world->physics.collisions_in_frame
+#endif
+            );
             ui_draw_text(world->ui, 0.f, world->gfx.screen_height-(16.f*3), dbg_info, 1.f);
 
             for(int i = 0; i < archives_loaded; i++)
@@ -456,6 +482,8 @@ void world_frame(struct world* world)
         network_dbg_ui(&world->server, world->ui);
         if(!world->assets_downloading)
             script_frame_ui(world->script);
+        if(world->world_frame_ui_user)
+            world->world_frame_ui_user(world);
     }
     else
     {
@@ -507,11 +535,11 @@ void world_frame(struct world* world)
         set_focus(world->gfx.window, false);
     }
 
-    mus_tick(&world->m_mgr);
-
     char sglthing_v_name[32];
     snprintf(sglthing_v_name,32,"sglthing r%i", GIT_COMMIT_COUNT);
     ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, sglthing_v_name, 15.f);
+    
+    mus_tick(&world->m_mgr);
 
     if(world->client.status == NETWORKSTATUS_DISCONNECTED && world->server.status == NETWORKSTATUS_DISCONNECTED && (config_number_get(&world->config, "shutdown_empty") == 1.0))
     {
@@ -551,7 +579,7 @@ static void __easy_uniforms(struct world* world, int shader_program, mat4 model_
     // misc
     glUniform4fv(glGetUniformLocation(shader_program,"viewport"), 1, world->viewport);
     glUniform3fv(glGetUniformLocation(shader_program,"sun_direction"), 1, world->gfx.sun_direction);
-    glUniform1f(glGetUniformLocation(shader_program,"time"), (float)glfwGetTime());
+    glUniform1f(glGetUniformLocation(shader_program,"time"), (float)world->time);
     glUniform1i(glGetUniformLocation(shader_program,"banding_effect"), world->gfx.banding_effect);
     glUniform1i(glGetUniformLocation(shader_program,"sel_map"), world->gfx.current_map);
 
@@ -562,6 +590,9 @@ static void __easy_uniforms(struct world* world, int shader_program, mat4 model_
     glActiveTexture(GL_TEXTURE8);
     glBindTexture(GL_TEXTURE_2D, world->gfx.depth_map_texture_far);
     glUniform1i(glGetUniformLocation(shader_program,"depth_map_far"), 8);
+
+    if(world->world_uniforms_set)
+        world->world_uniforms_set(world);
 
     while(glGetError()!=0);
 }
@@ -664,9 +695,20 @@ void world_draw_primitive(struct world* world, int shader, int fill, enum primit
 // TODO: this
 void world_deinit(struct world* world)
 {
+    char url[256];
     if(world->server.status == NETWORKSTATUS_CONNECTED)
+    {
         network_close(&world->server);
+        snprintf(url,256,"auth/cancel?sessionkey=%s", world->server.http_client.sessionkey);
+        if(world->client.http_client.login)
+            http_get(&world->server.http_client,url);
+    }
     if(world->client.status == NETWORKSTATUS_CONNECTED)
+    {
         network_close(&world->client);
+        snprintf(url,256,"auth/cancel?sessionkey=%s", world->client.http_client.sessionkey);
+        if(world->client.http_client.login)
+            http_get(&world->client.http_client,url);
+    }
     network_stop_download(&world->downloader);
 }

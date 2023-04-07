@@ -1,7 +1,9 @@
 #ifndef WORLD_H
 #define WORLD_H
 #include <cglm/cglm.h>
+#ifdef ODE_ENABLED
 #include <ode/ode.h>
+#endif
 #include "graphic.h"
 #include "model.h"
 #include "ui.h"
@@ -73,7 +75,10 @@ struct world {
     struct ui_data* ui;
 
     struct light_area* render_area;
+
     struct script_system* script;
+    bool enable_script;
+
     struct primitives primitives;
 
     int render_count;
@@ -81,9 +86,11 @@ struct world {
     double delta_time;
     double last_time;
     double fps;
+    double time;
     int frames_in_second;
     int frames;
     
+#ifdef ODE_ENABLED
     struct {
         bool paused;
         dWorldID world;
@@ -92,6 +99,7 @@ struct world {
 
         int collisions_in_frame;
     } physics;
+#endif
 
     struct network server;
     struct network client;
@@ -102,6 +110,11 @@ struct world {
 
     struct sndmgr s_mgr;
     struct musmgr m_mgr;
+
+    void (*world_frame_user)(struct world* world);
+    void (*world_frame_render_user)(struct world* world);
+    void (*world_frame_ui_user)(struct world* world);
+    void (*world_uniforms_set)(struct world* world);
 };
 
 struct world* world_init(char** argv, int argc, GLFWwindow* window);

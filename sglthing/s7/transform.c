@@ -11,7 +11,7 @@ static int transform_type_tag = 0;
         if(!s7_is_c_object(s7_car(args)))                                               \
             return(s7_wrong_type_arg_error(sc, "transform-" #v, 1, s7_cadr(args), "transform")); \
         struct transform *o = (struct transform*)s7_c_object_value(s7_car(args));   \
-        return (s7_make_real(sc, o->v));                                            \
+        return s7_make_real(sc, o->v);                                            \
     }                                                                               \
     static s7_pointer set_transform_##v(s7_scheme* sc, s7_pointer args) {           \
         if(!s7_is_c_object(s7_car(args)))                                               \
@@ -24,6 +24,7 @@ static int transform_type_tag = 0;
     };
 #define SET_TRANSFORM_TYPE(s,v)                                                                                                                    \
     s7_define_variable(s,"transform-" #v, s7_dilambda(s, "transform-" #v, transform_##v, 1, 0, set_transform_##v, 2, 0, "transform " #v " field"));
+
 
 static s7_pointer make_transform(s7_scheme *sc, s7_pointer args)
 {
@@ -46,6 +47,7 @@ static s7_pointer make_transform(s7_scheme *sc, s7_pointer args)
 
 static s7_pointer mark_transform(s7_scheme *sc, s7_pointer obj)
 {
+    struct transform *o = (struct transform*)obj;
     return(NULL);
 }
 

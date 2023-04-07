@@ -2,6 +2,7 @@ layout(location=0) in vec2 v_pos;
 layout(location=1) in vec2 v_uv;
 
 out vec2 f_uv;
+uniform vec3 offset;
 uniform float waviness;
 uniform float time;
 uniform float depth;
@@ -20,5 +21,5 @@ void main()
     if(depth < 0.1)
         gl_Position = vec4(0,0,0,0);
         
-    gl_Position = (projection * vec4(moved_pos.xy, depth, 1.0));
+    gl_Position = (projection * vec4(vec3(moved_pos.xy, depth) + offset, 1.0));
 }

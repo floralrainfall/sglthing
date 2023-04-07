@@ -29,8 +29,8 @@ static size_t http_write_data(void *buffer, size_t size, size_t nmemb, void *use
 
 char* http_get(struct http_client* client, char* url)
 {
-    char _url[256];
-    snprintf(_url,256,"%s/%s",client->httpbase,url);
+    char _url[512];
+    snprintf(_url,512,"%s/%s",client->httpbase,url);
     curl_easy_setopt(client->easy, CURLOPT_URL, _url);
     curl_easy_setopt(client->easy, CURLOPT_WRITEFUNCTION, http_write_data);
     __http_rq rq = { .size = 0 };
@@ -68,37 +68,54 @@ void http_create(struct http_client* client, char* http_base)
     client->easy = curl_easy_init();
     strncpy(client->httpbase, http_base, 64);
 
-    char* web_motd = http_get(client, "motd.sgl");
-    printf("sglthing: motd '%s'\n", web_motd);
-    strncpy(client->motd, web_motd, 64);
-    free(web_motd);
+    char* web_motd = http_get(client, "motd");
+    if(web_motd)
+    {
+        printf("sglthing: motd '%s'\n", web_motd);
+        strncpy(client->motd, web_motd, 64);
+        free(web_motd);
+    }
+    else
+        strncpy(client->motd, " ", 64);
 
     printf("sglthing: logging into sglnet as %s\n", config_string_get(&client->web_config, "user_username"));
     char postdata[256];
-    snprintf(postdata, 256, "user_username=%s&user_password=%s", 
+    snprintf(postdata, 256, "user_username=%s&user_password=%s&server=%s", 
         config_string_get(&client->web_config, "user_username"),
-        config_string_get(&client->web_config, "user_password"));
-    char* sessionkey = http_post(client, "auth/authorize.sgl", postdata);
-    if(sessionkey && http_check_sessionkey(client, sessionkey))
+        config_string_get(&client->web_config, "user_password"),
+        client->server ? "true" : "false");
+    char* sessionkey = http_post(client, "auth/authorize", postdata);
+    client->login = false;
+    if(sessionkey)
     {
-        strncpy(client->sessionkey, sessionkey, 256);
-        printf("sglthing: logged in\n");
-        free(sessionkey);
         client->login = true;
+        if(http_check_sessionkey(client, sessionkey))
+        {
+            strncpy(client->sessionkey, sessionkey, 256);
+            printf("sglthing: logged in\n");
+            free(sessionkey);
+        }
+        else
+        {
+            printf("sglthing: key received but check failed\n");
+            client->login = false;
+        }
     }
     else
     {
-        printf("sglthing: key invalid or 0 (%s)\n", sessionkey);
-        client->login = false;
+        printf("sglthing: did not receive key\n");
     }
 }
 
 bool http_check_sessionkey(struct http_client* client, char* key)
 {
+    if(!client->login)
+        return false;
     char url[256];
-    snprintf(url, 256, "auth/check.sgl?sessionkey=%s", key);
+    snprintf(url, 256, "auth/check?sessionkey=%s", key);
     char* result = http_get(client, url);
     if(!result)
         return false;
+    printf("sglthing: check = %s\n", result);
     return (strcmp(result,"1")==0);
 }

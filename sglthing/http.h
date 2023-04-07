@@ -6,7 +6,7 @@
 #include "config.h"
 
 #ifndef SGLAPI_BASE
-#define SGLAPI_BASE "https://sgl.endoh.ca/game"
+#define SGLAPI_BASE "http://localhost:9911/game"
 #endif SGLAPI_BASE
 
 struct http_client
@@ -16,6 +16,7 @@ struct http_client
     char motd[64];
     char sessionkey[256];
     bool login;
+    bool server;
 
     struct config_file web_config;
 };
