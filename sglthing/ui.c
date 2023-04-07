@@ -136,7 +136,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 
         offset[0] = 0.0f;
         offset[1] = 0.0f;
-        offset[2] = -2.0f;
+        offset[2] = -1.0f;
 
         sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
         sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
@@ -145,7 +145,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 
         offset[0] = -2.0f;
         offset[1] = -2.0f;
-        offset[2] = -1.0f;
+        offset[2] = -2.0f;
         
         glm_vec4_divs(ui->foreground_color, 2.f, foreground_color);
         sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));

@@ -12,7 +12,7 @@
 #endif 
 #include "http.h"
 
-#define CR_PACKET_VERSION 102
+#define CR_PACKET_VERSION 103
 #define NO_DATAPACKETS_TICK 512
 
 #define MAGIC_NUMBER 0x7930793179327934
@@ -64,6 +64,17 @@ struct network_downloader {
     bool server_info;
 
     struct http_client http_client;
+};
+
+struct player_auth_list_entry
+{
+    char client_name[64];
+    bool admin;
+    int player_id;
+    
+    float player_color_r;
+    float player_color_g;
+    float player_color_b;
 };
 
 struct network_packet {
@@ -124,9 +135,13 @@ struct network_packet {
             float player_color_r;
             float player_color_g;
             float player_color_b;
+
+            int player_count;
+            struct player_auth_list_entry players[];
         } serverinfo;
         struct {
             char client_name[64];
+            bool observer;
             bool admin;
             int player_id;
 

@@ -305,6 +305,23 @@ void network_transmit_packet_all(struct network* network, struct network_packet 
     }
 }
 
+static void __populate_serverinfo_players(gpointer key, gpointer value, gpointer user)
+{
+    struct network_packet* packet = (struct network_packet*)user;
+    struct network_client* client = (struct network_client*)value;
+    if(client->authenticated)
+    {
+        int struct_id = packet->packet.serverinfo.player_count++;
+        packet->packet.serverinfo.players[struct_id].admin = client->debugger;
+        packet->packet.serverinfo.players[struct_id].player_color_r = client->player_color_r;
+        packet->packet.serverinfo.players[struct_id].player_color_g = client->player_color_g;
+        packet->packet.serverinfo.players[struct_id].player_color_b = client->player_color_b;
+        packet->packet.serverinfo.players[struct_id].player_id = client->player_id;
+        strncpy(packet->packet.serverinfo.players[struct_id].client_name, client->client_name, 64);
+        printf("sglthing: player list: %s (c: %p)\n", client->client_name, client);
+    }
+}
+
 int last_given_player_id = 0;
 
 void network_manage_socket(struct network* network, struct network_client* client)
@@ -405,28 +422,28 @@ void network_manage_socket(struct network* network, struct network_client* clien
                         struct network_packet response;
                         ZERO(response);
 
-                        if(!in_packet.packet.clientinfo.observer)
-                        {
-                            g_hash_table_insert(network->players, &client->player_id, client);
+                        g_hash_table_insert(network->players, &client->player_id, client);
+                        
+                        response.meta.packet_type = PACKETTYPE_PLAYER_ADD;
+                        response.packet.player_add.player_id = client->player_id;
+                        response.packet.player_add.admin = client->debugger;
+                        response.packet.player_add.observer = in_packet.packet.clientinfo.observer;
+                        response.packet.player_add.player_color_r = client->player_color_r;
+                        response.packet.player_add.player_color_g = client->player_color_g;
+                        response.packet.player_add.player_color_b = client->player_color_b;
+                        strncpy(response.packet.player_add.client_name, in_packet.packet.clientinfo.client_name, 64);
 
-                            response.meta.packet_type = PACKETTYPE_PLAYER_ADD;
-                            response.packet.player_add.player_id = client->player_id;
-                            response.packet.player_add.admin = client->debugger;
-                            response.packet.player_add.player_color_r = client->player_color_r;
-                            response.packet.player_add.player_color_g = client->player_color_g;
-                            response.packet.player_add.player_color_b = client->player_color_b;
-                            strncpy(response.packet.player_add.client_name, in_packet.packet.clientinfo.client_name, 64);
-
-                            network_transmit_packet_all(network, response);
-                            ZERO(response);
-                        }
+                        network_transmit_packet_all(network, response);
+                        ZERO(response);
 
                         response.meta.packet_type = PACKETTYPE_SERVERINFO;
-                        response.packet.serverinfo.player_id = response.packet.player_add.player_id;
+                        response.packet.serverinfo.player_id = client->player_id;
                         response.packet.serverinfo.sglthing_revision = GIT_COMMIT_COUNT;
                         response.packet.serverinfo.player_color_r = client->player_color_r;
                         response.packet.serverinfo.player_color_g = client->player_color_g;
                         response.packet.serverinfo.player_color_b = client->player_color_b;
+                        response.packet.serverinfo.player_count = 0;
+                        g_hash_table_foreach(network->players, __populate_serverinfo_players, (gpointer)&response);
                         memcpy(response.packet.serverinfo.session_key, network->http_client.sessionkey, 256);
                         strncpy(response.packet.serverinfo.server_motd,"I am a vey glad to meta you",128);
                         strncpy(response.packet.serverinfo.server_name,"SGLThing Server",64);
@@ -454,6 +471,29 @@ void network_manage_socket(struct network* network, struct network_client* clien
                     strncpy(network->server_motd, in_packet.packet.serverinfo.server_name, 128);
                     network->client.client_version = in_packet.packet.serverinfo.sglthing_revision;
                     network->client.authenticated = true;
+
+                    for(int i = 0; i < in_packet.packet.serverinfo.player_count; i++)
+                    {
+                        struct network_client* new_client = (struct network_client*)malloc(sizeof(struct network_client));
+                        struct player_auth_list_entry* player = &in_packet.packet.serverinfo.players[i];
+
+                        if(player->player_id == network->client.player_id)
+                            continue;
+
+                        strncpy(new_client->client_name, player->client_name, 64);
+                        new_client->debugger = player->admin;
+                        new_client->player_color_r = player->player_color_r;
+                        new_client->player_color_b = player->player_color_g;
+                        new_client->player_color_g = player->player_color_b;
+                        new_client->player_id = player->player_id;
+                        new_client->owner = network;
+                        g_hash_table_insert(network->players, &in_packet.packet.player_add.player_id, new_client);  
+
+                        if(network->new_player_callback)
+                            network->new_player_callback(network, new_client);        
+
+                        printf("sglthing: client new player (before) %s %i\n", new_client->client_name, new_client->player_id);
+                    }
                 }
                 break;
             case PACKETTYPE_PLAYER_ADD:

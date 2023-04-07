@@ -68,6 +68,13 @@ void http_create(struct http_client* client, char* http_base)
     client->easy = curl_easy_init();
     strncpy(client->httpbase, http_base, 64);
 
+    GError* error;
+    if(g_key_file_has_key(client->web_config.key_file, "sglapi", "httpbase", error))
+    {
+        strncpy(client->httpbase, g_key_file_get_string(client->web_config.key_file, "sglapi", "httpbase", error), 64);
+        printf("sglthing: using specified auth server: %s\n", client->httpbase);
+    }
+
     char* web_motd = http_get(client, "motd");
     if(web_motd)
     {
