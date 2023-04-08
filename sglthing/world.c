@@ -375,14 +375,14 @@ void world_frame(struct world* world)
     // render pass
     /*glDisable(GL_DEPTH_TEST);
     world_draw_model(world, world->gfx.sky_ball, world->sky_shader, sky_matrix, false);
-    world_draw_primitive(world, world->cloud_shader, GL_FILL, PRIMITIVE_PLANE, cloud_matrix, (vec4){1.f,1.f,1.f,1.f});
-    glEnable(GL_DEPTH_TEST);*/
+    world_draw_primitive(world, world->cloud_shader, GL_FILL, PRIMITIVE_PLANE, cloud_matrix, (vec4){1.f,1.f,1.f,1.f});*/
+    glEnable(GL_DEPTH_TEST);
 
     vec3 sun_direction_camera;
     mat4 light_projection, light_projection_far;
     mat4 light_view, light_view_far;
 
-    glm_ortho(-15.f, 15.f, -15.f, 15.f, 1.0f, 100.0f,light_projection);
+    glm_ortho(-50.f, 50.f, -50.f, 50.f, 1.0f, 100.0f,light_projection);
     glm_ortho(-100.f, 100.f, -100.f, 100.f, 1.0f, 200.0f,light_projection_far);
 
     sun_direction_camera[0] = world->gfx.sun_direction[0]*50.f + world->cam.position[0];

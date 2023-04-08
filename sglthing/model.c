@@ -23,8 +23,17 @@ static void model_load_textures(struct mesh* mesh, struct aiMesh* mesh_2, const 
         {
             aiGetMaterialTexture(material, aiTextureType_DIFFUSE, i, &path, NULL, NULL, NULL, NULL, NULL, NULL);
             char fpath[256];
+            char rsc_dir[256] = {0};
+            char rsc_path[256];
+            strncpy(rsc_path, mesh->path, 256);
+            char* last = strrchr(rsc_path, '/');
+            if(last != NULL)
+            {
+                int len = strlen(rsc_path) - strlen(last);
+                strncpy(rsc_dir, rsc_path, MIN(len,256));
+            }
             if(path.data[0] != '/')
-                snprintf(fpath,256,"test/%s",path.data);
+                snprintf(fpath,256,"%s/%s",rsc_dir,path.data);
             else
                 strncpy(fpath, path.data, 256);
             if(!get_texture(&fpath))
@@ -272,6 +281,7 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
         model->meshes[model->mesh_count].element_count = idx_count;
         model->meshes[model->mesh_count].vtx_data = vtx_array;
         model->meshes[model->mesh_count].vtx_data_count = vtx_count;
+        model->meshes[model->mesh_count].path = model->path;
         model_load_textures(&model->meshes[model->mesh_count], mesh, scene);
         model_extract_bone_weights(&model->meshes[model->mesh_count], vtx_array, mesh, scene);
         int new_mesh = create_model_vao(vtx_array, vtx_count, idx_array, idx_count, &vertex_buffer, &element_buffer);
@@ -301,6 +311,7 @@ void load_model(char* file)
         return;
     }
 
+    sel_model->path = path;
     model_parse_node(sel_model, scene->mRootNode, scene);
 
     strncpy(&sel_model->name[0], file, 64);

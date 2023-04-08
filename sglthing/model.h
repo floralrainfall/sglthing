@@ -41,6 +41,8 @@ struct mesh
     struct model_bone_info bone_info[128];
     int bone_infos;
     int bone_counter;
+
+    char* path;
 };
 
 struct model
@@ -49,6 +51,8 @@ struct model
     struct mesh meshes[64];
     int mesh_count;
     struct aiScene *scene;
+
+    char* path;
 };
 
 void model_find_bone_info(struct mesh* mesh, char* name, struct model_bone_info* info_out);
