@@ -382,18 +382,18 @@ void world_frame(struct world* world)
     mat4 light_projection, light_projection_far;
     mat4 light_view, light_view_far;
 
-    glm_ortho(-50.f, 50.f, -50.f, 50.f, 1.0f, 100.0f,light_projection);
-    glm_ortho(-100.f, 100.f, -100.f, 100.f, 1.0f, 200.0f,light_projection_far);
+    glm_ortho(-25.f, 25.f, -25.f, 25.f, 1.0f, 100.0f,light_projection);
+    glm_ortho(-75.f, 75.f, -75.f, 75.f, 1.0f, 200.0f,light_projection_far);
 
-    sun_direction_camera[0] = world->gfx.sun_direction[0]*50.f + world->cam.position[0];
-    sun_direction_camera[1] = world->gfx.sun_direction[1]*50.f + world->cam.position[1];
-    sun_direction_camera[2] = world->gfx.sun_direction[2]*50.f + world->cam.position[2];
-    glm_lookat(sun_direction_camera, world->cam.position,(vec3){0.f,1.f,0.f},light_view);
+    sun_direction_camera[0] = world->gfx.sun_direction[0]*50.f + world->gfx.sun_position[0];
+    sun_direction_camera[1] = world->gfx.sun_direction[1]*50.f + world->gfx.sun_position[1];
+    sun_direction_camera[2] = world->gfx.sun_direction[2]*50.f + world->gfx.sun_position[2];
+    glm_lookat(sun_direction_camera, world->gfx.sun_position,(vec3){0.f,1.f,0.f},light_view);
 
-    sun_direction_camera[0] = world->gfx.sun_direction[0]*100.f + world->cam.position[0];
-    sun_direction_camera[1] = world->gfx.sun_direction[1]*100.f + world->cam.position[1];
-    sun_direction_camera[2] = world->gfx.sun_direction[2]*100.f + world->cam.position[2];
-    glm_lookat(sun_direction_camera, world->cam.position,(vec3){0.f,1.f,0.f},light_view_far);
+    sun_direction_camera[0] = world->gfx.sun_direction[0]*100.f + world->gfx.sun_position[0];
+    sun_direction_camera[1] = world->gfx.sun_direction[1]*100.f + world->gfx.sun_position[1];
+    sun_direction_camera[2] = world->gfx.sun_direction[2]*100.f + world->gfx.sun_position[2];
+    glm_lookat(sun_direction_camera, world->gfx.sun_position,(vec3){0.f,1.f,0.f},light_view_far);
 
     glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
     glm_mat4_mul(light_projection_far, light_view_far, world->gfx.light_space_matrix_far);

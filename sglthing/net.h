@@ -63,7 +63,9 @@ struct network_downloader {
     char server_name[64];
     bool server_info;
 
-    struct http_client http_client;
+    struct http_client http_client;    
+    
+    struct sockaddr_in dest;
 };
 
 struct player_auth_list_entry

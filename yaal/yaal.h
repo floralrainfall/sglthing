@@ -2,7 +2,7 @@
 #define YAAL_H
 #include <sglthing/net.h>
 
-enum direction
+enum __attribute__((__packed__)) direction 
 {
     DIR_NORTH,
     DIR_SOUTH,
@@ -14,17 +14,24 @@ enum direction
 enum yaal_packet_type
 {
     YAAL_ENTER_LEVEL = 0x4a11,
+    YAAL_LEVEL_DATA,
     YAAL_UPDATE_POSITION,
 };
 
+enum __attribute__((__packed__)) yaal_light_type
+{
+    LIGHT_NONE,
+    LIGHT_OBJ4_LAMP,
+};
+
 #define MAP_SIZE_MAX_X 32
-#define MAP_SIZE_MAX_Y 32
-#define MAP_GRAPHICS_IDS 2
-#define MAP_TEXTURE_IDS 1
+#define MAP_SIZE_MAX_Y 16
+#define MAP_GRAPHICS_IDS 5
+#define MAP_TEXTURE_IDS 5
 
 struct map_tile_data
 {
-    enum {
+    enum __attribute__((__packed__)) {
         TILE_AIR,
         TILE_FLOOR,
         TILE_WALL,
@@ -34,10 +41,34 @@ struct map_tile_data
         TILE_MOVE_EVENT,
     } map_tile_type;
 
-    int tile_graphics_id;
-    int tile_graphics_ext_id;
-    int tile_graphics_tex;
+    char tile_graphics_id;
+    char tile_graphics_ext_id;
+    char tile_graphics_tex;
+    enum yaal_light_type tile_light_type;
+
     enum direction direction;
+};
+
+struct map_object
+{
+    int object_id;
+    int object_graphics_id;
+    int object_graphics_tex;
+
+    bool create_light;
+};
+
+struct map_file_data
+{
+    char level_name[64];
+    int level_song_id;
+    int level_id;
+
+    struct {
+        struct map_tile_data data[MAP_SIZE_MAX_Y];
+    } map_row[MAP_SIZE_MAX_X];
+
+    // struct map_object map_object_list[512];
 };
 
 struct xtra_packet_data
@@ -47,10 +78,14 @@ struct xtra_packet_data
         struct
         {
             int level_id;
-            int level_song_id;
-            
-            struct map_tile_data map_data[MAP_SIZE_MAX_X][MAP_SIZE_MAX_Y];
+            char level_name[64];
         } yaal_level;
+        struct
+        {
+            int level_id;
+            int yaal_x;
+            struct map_tile_data data[MAP_SIZE_MAX_Y];
+        } yaal_level_data;
         struct
         {
             int player_id;

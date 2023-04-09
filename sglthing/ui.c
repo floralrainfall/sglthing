@@ -243,7 +243,13 @@ void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, ve
     {
         float dist = glm_vec3_distance(camera_position, position);
         glm_project(mm_position, vp, viewport, dest_position);
-        ui_draw_text(ui, dest_position[0], dest_position[1], text, dist);
+
+        int txt_len = strlen(text);
+        float txt_off = (float)txt_len;
+        txt_off *= ui->ui_font->cy;
+        txt_off /= 4.f;
+
+        ui_draw_text(ui, dest_position[0] - txt_off, dest_position[1], text, dist);
     }
 }
 

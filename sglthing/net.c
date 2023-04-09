@@ -15,6 +15,7 @@
 #endif
 #include "sglthing.h"
 
+int last_connection_id = 0;
 #define ZERO(x) memset(&x,0,sizeof(x))
 
 static s7_scheme* network_get_s7_pointer(struct network* network)
@@ -38,26 +39,34 @@ void network_start_download(struct network_downloader* network, char* ip, int po
 {
     network->http_client.server = false;
     http_create(&network->http_client, SGLAPI_BASE);
-    struct sockaddr_in dest;
-    network->socket = socket(AF_INET, SOCK_STREAM, 0);  
+    int flags = 0;
+
+#ifdef NETWORK_TCP
+    flags |= SOCK_STREAM;
+#else
+    flags |= SOCK_DGRAM;
+#endif    
+    network->socket = socket(AF_INET, flags, 0);  
     if(network->socket == -1)
         printf("sglthing: downloader socket == -1, errno: %i\n", errno);
     network->server_info = false;
     network->data_offset = 0;
     network->data_packet_id = 0;
     ASSERT(network->socket != -1);
-    memset(&dest, 0, sizeof(struct sockaddr_in));
-    dest.sin_family = AF_INET;
-    inet_pton(AF_INET, ip, &dest.sin_addr);   
-    dest.sin_port = htons(port);
+    memset(&network->dest, 0, sizeof(struct sockaddr_in));
+    network->dest.sin_family = AF_INET;
+    inet_pton(AF_INET, ip, &network->dest.sin_addr);   
+    network->dest.sin_port = htons(port);
     printf("sglthing: connecting to %s:%i...\n", ip, port);    
-    if(connect(network->socket, (struct sockaddr*)&dest, sizeof(struct sockaddr)) == -1)
+    #ifdef NETWORK_TCP
+    if(connect(network->socket, (struct sockaddr*)&network->dest, sizeof(struct sockaddr)) == -1)
     {    
         printf("sglthing: connect() returned -1, failed %i (%s)\n", errno, strerror(errno));
     }
     else
     {
         printf("sglthing: downloader connection established\n");
+    #endif
         struct network_packet client_info;
         ZERO(client_info);
         client_info.meta.packet_version = CR_PACKET_VERSION;
@@ -70,9 +79,13 @@ void network_start_download(struct network_downloader* network, char* ip, int po
         strncpy(client_info.packet.clientinfo.session_key, network->http_client.sessionkey, 64);
         if(pass)
             strncpy(client_info.packet.clientinfo.server_pass, pass, 64);
-        strncpy(network->request_name, rqname, 64);        
+        strncpy(network->request_name, rqname, 64);    
+#ifdef NETWORK_TCP    
         send(network->socket, &client_info, sizeof(client_info), 0);
     }
+#else
+        sendto(network->socket, &client_info, sizeof(client_info), 0, &network->dest, sizeof(network->dest));
+#endif
 }
 
 void network_tick_download(struct network_downloader* network)
@@ -183,20 +196,28 @@ void network_connect(struct network* network, char* ip, int port)
     network->http_client.server = false;
     http_create(&network->http_client, SGLAPI_BASE);
 
+    int flags = 0;
+
+#ifdef NETWORK_TCP
+    flags |= SOCK_STREAM;
+#else
+    flags |= SOCK_DGRAM;
+#endif
+
     network->mode = NETWORKMODE_CLIENT; 
-    struct sockaddr_in dest;
-    network->client.socket = socket(AF_INET, SOCK_STREAM, 0);  
+    network->client.socket = socket(AF_INET, flags, 0);  
     ASSERT(network->client.socket != -1);
     
-    memset(&dest, 0, sizeof(struct sockaddr_in));
-    dest.sin_family = AF_INET;
-    inet_pton(AF_INET, ip, &dest.sin_addr);   
-    dest.sin_port = htons(port);
+    memset(&network->client.sockaddr, 0, sizeof(struct sockaddr_in));
+    network->client.sockaddr.sin_family = AF_INET;
+    inet_pton(AF_INET, ip, &network->client.sockaddr.sin_addr);   
+    network->client.sockaddr.sin_port = htons(port);
     network->network_frames = 0;
     strncpy(network->debugger_pass, "debugger", 64);
 
     printf("sglthing: connecting to %s:%i...\n", ip, port);
     
+#ifdef NETWORK_TCP
     if(connect(network->client.socket, (struct sockaddr*)&dest, sizeof(struct sockaddr)) == -1)
     {    
         printf("sglthing: connect() returned -1, failed %i (%s)\n", errno, strerror(errno));
@@ -205,6 +226,7 @@ void network_connect(struct network* network, char* ip, int port)
     else
     {
         printf("sglthing: connection established\n");
+#endif
         struct network_packet client_info;
         ZERO(client_info);
         network->status = NETWORKSTATUS_CONNECTED;
@@ -224,7 +246,9 @@ void network_connect(struct network* network, char* ip, int port)
             nets7_init_network(network_get_s7_pointer(network), network);
 
         network->next_tick = glfwGetTime() + 0.01;
+#ifdef NETWORK_TCP
     }
+#endif
 }
 
 void network_open(struct network* network, char* ip, int port)
@@ -233,7 +257,16 @@ void network_open(struct network* network, char* ip, int port)
     http_create(&network->http_client, SGLAPI_BASE);
 
     struct sockaddr_in serv;
-    network->client.socket = socket(AF_INET, SOCK_NONBLOCK | SOCK_STREAM, 0);
+
+    int flags = SOCK_NONBLOCK;
+
+#ifdef NETWORK_TCP
+    flags |= SOCK_STREAM;
+#else
+    flags |= SOCK_DGRAM;
+#endif
+
+    network->client.socket = socket(AF_INET, flags, 0);
     ASSERT(network->client.socket != -1);
 
     memset(&serv, 0, sizeof(struct sockaddr_in));
@@ -248,11 +281,13 @@ void network_open(struct network* network, char* ip, int port)
         return;
     }
 
+#ifdef NETWORK_TCP
     if(listen(network->client.socket, 5) == -1)
     {
         printf("sglthing: listen() failed, %i\n", errno);
         return;
     }
+#endif
 
     network->server_clients = g_array_new(false, true, sizeof(struct network_client));
     network->status = NETWORKSTATUS_CONNECTED;
@@ -291,9 +326,14 @@ int network_transmit_packet(struct network* network, struct network_client* clie
     packet.meta.network_frames = network->network_frames;
     if(!client->connected)
         return -1;
-    if(g_random_double_range(-1.0, 1.0) > 0.9)
-        return -1;
+    //if(g_random_double_range(-1.0, 1.0) > 0.9)
+    //    return -1;
+#ifdef NETWORK_TCP
     return send(client->socket, &packet, sizeof(struct network_packet), MSG_DONTWAIT | MSG_NOSIGNAL);
+#else
+    int s_cmd = sendto(network->client.socket, &packet, sizeof(struct network_packet), MSG_DONTWAIT | MSG_NOSIGNAL, &client->sockaddr, sizeof(client->sockaddr));
+    return s_cmd;
+#endif
 }
 
 void network_transmit_packet_all(struct network* network, struct network_packet packet)
@@ -309,7 +349,7 @@ static void __populate_serverinfo_players(gpointer key, gpointer value, gpointer
 {
     struct network_packet* packet = (struct network_packet*)user;
     struct network_client* client = (struct network_client*)value;
-    if(client->authenticated)
+    if(client->authenticated && client->player_id != -1  && packet->packet.serverinfo.player_id != client->player_id)
     {
         int struct_id = packet->packet.serverinfo.player_count++;
         packet->packet.serverinfo.players[struct_id].admin = client->debugger;
@@ -324,285 +364,336 @@ static void __populate_serverinfo_players(gpointer key, gpointer value, gpointer
 
 int last_given_player_id = 0;
 
-void network_manage_socket(struct network* network, struct network_client* client)
+static void network_manage_packet(struct network* network, struct network_client* client, struct network_packet in_packet)
 {
-    struct network_packet in_packet;
-    if(network->script)
-        nets7_tick_network(network_get_s7_pointer(network), network, client);
-    while(recv(client->socket, &in_packet, sizeof(struct network_packet), MSG_DONTWAIT) != -1)
+    if(in_packet.meta.magic_number != MAGIC_NUMBER)
+        return;
+    else if(in_packet.meta.packet_version != CR_PACKET_VERSION)
+        return;
+    bool passthru = true;
+    if(network->receive_packet_callback)
+        passthru = network->receive_packet_callback(network, client, &in_packet);
+    if(!passthru)
+        return;
+    switch(in_packet.meta.packet_type)
     {
-        if(in_packet.meta.magic_number != MAGIC_NUMBER)
-            return;
-        else if(in_packet.meta.packet_version != CR_PACKET_VERSION)
-            return;
-        bool passthru = true;
-        if(network->receive_packet_callback)
-            passthru = network->receive_packet_callback(network, client, &in_packet);
-        if(!passthru)
-            continue;
-        switch(in_packet.meta.packet_type)
-        {
-            case PACKETTYPE_DISCONNECT:
-                if(network->mode == NETWORKMODE_CLIENT)
-                {
-                    network_disconnect_player(network, false, in_packet.packet.disconnect.disconnect_reason, client);
-                }
-                else
-                {
-                    printf("sglthing: client '%s' disconnected '%s'\n", client->client_name, in_packet.packet.disconnect.disconnect_reason);
-                    network_disconnect_player(network, true, in_packet.packet.disconnect.disconnect_reason, client);
-                }
-                break;
-            case PACKETTYPE_PING:
-                if(network->mode == NETWORKMODE_CLIENT)
-                {
-                    struct network_packet response;
-                    ZERO(response);
-                    response.meta.packet_type = PACKETTYPE_PING;
-                    response.packet.ping.distributed_time = network->distributed_time;
-                    network_transmit_packet(network, client, response);
+        case PACKETTYPE_DISCONNECT:
+            if(network->mode == NETWORKMODE_CLIENT)
+            {
+                network_disconnect_player(network, false, in_packet.packet.disconnect.disconnect_reason, client);
+            }
+            else
+            {
+                printf("sglthing: client '%s' disconnected '%s'\n", client->client_name, in_packet.packet.disconnect.disconnect_reason);
+                network_disconnect_player(network, true, in_packet.packet.disconnect.disconnect_reason, client);
+            }
+            break;
+        case PACKETTYPE_PING:
+            if(network->mode == NETWORKMODE_CLIENT)
+            {
+                struct network_packet response;
+                ZERO(response);
+                response.meta.packet_type = PACKETTYPE_PING;
+                response.packet.ping.distributed_time = network->distributed_time;
+                network_transmit_packet(network, client, response);
 
-                    network->distributed_time = in_packet.packet.ping.distributed_time;
-                }
-                else
+                network->distributed_time = in_packet.packet.ping.distributed_time;
+            }
+            else
+            {
+                client->last_ping_time = network->distributed_time;
+                client->lag = network->distributed_time - in_packet.packet.ping.distributed_time;
+            }
+            break;
+        case PACKETTYPE_CLIENTINFO:
+            if(network->mode == NETWORKMODE_SERVER && !client->authenticated)
+            {
+                if(strlen(network->server_pass) == 0 || strncmp(in_packet.packet.clientinfo.server_pass, network->server_pass, 64) == 0)
                 {
-                    client->last_ping_time = network->distributed_time;
-                    client->lag = network->distributed_time - in_packet.packet.ping.distributed_time;
-                }
-                break;
-            case PACKETTYPE_CLIENTINFO:
-                if(network->mode == NETWORKMODE_SERVER && !client->authenticated)
-                {
-                    if(strlen(network->server_pass) == 0 || strncmp(in_packet.packet.clientinfo.server_pass, network->server_pass, 64) == 0)
+                    client->verified = true;
+                    if(!http_check_sessionkey(&network->http_client,in_packet.packet.clientinfo.session_key))
                     {
-                        client->verified = true;
-                        if(!http_check_sessionkey(&network->http_client,in_packet.packet.clientinfo.session_key))
-                        {
-                            printf("sglthing: client '%s' failed key\n", in_packet.packet.clientinfo.client_name);
-                            if(network->security)
-                                network_disconnect_player(network, true, "Bad key", client);
-                            client->verified = false;
+                        printf("sglthing: client '%s' failed key\n", in_packet.packet.clientinfo.client_name);
+                        if(network->security)
+                            network_disconnect_player(network, true, "Bad key", client);
+                        client->verified = false;
 
-                            client->player_color_r = 0.0;
-                            client->player_color_g = 1.0;
-                            client->player_color_b = 1.0;
-                        }
-                        else
-                        {
-                            char url[256];
-                            snprintf(url,256,"auth/key_owner?sessionkey=%s",in_packet.packet.clientinfo.session_key);
-                            char* username = http_get(&network->http_client,url);
-                            if(username)
-                            {
-                                strncpy(in_packet.packet.clientinfo.client_name, username, 64);
-                                free(username);
-                            }
-
-                            client->player_color_r = in_packet.packet.clientinfo.color_r;
-                            client->player_color_g = in_packet.packet.clientinfo.color_g;
-                            client->player_color_b = in_packet.packet.clientinfo.color_b;
-                        }
-
-                        if(!in_packet.packet.clientinfo.observer && strlen(network->debugger_pass) && strncmp(in_packet.packet.clientinfo.debugger_pass, network->debugger_pass, 64) == 0)
-                        {
-                            printf("sglthing: client '%s' used debugger password\n", in_packet.packet.clientinfo.client_name);
-                            client->debugger = true;
-                        }
-
-                        strncpy(client->client_name, in_packet.packet.clientinfo.client_name, 64);
-                        client->authenticated = true;
-                        client->player_id = last_given_player_id++;
-                        client->client_version = in_packet.packet.clientinfo.sglthing_revision;
-                        client->owner = network;
-                        if(client->client_version != GIT_COMMIT_COUNT)
-                            printf("sglthing: WARN: new client '%s' is on sglthing r%i, while server is on sglthing r%i\n", in_packet.packet.clientinfo.client_name, client->client_version, GIT_COMMIT_COUNT);
-
-                        printf("sglthing: client '%s' authenticated\n", in_packet.packet.clientinfo.client_name);
-
-                        struct network_packet response;
-                        ZERO(response);
-
-                        g_hash_table_insert(network->players, &client->player_id, client);
-                        
-                        response.meta.packet_type = PACKETTYPE_PLAYER_ADD;
-                        response.packet.player_add.player_id = client->player_id;
-                        response.packet.player_add.admin = client->debugger;
-                        response.packet.player_add.observer = in_packet.packet.clientinfo.observer;
-                        response.packet.player_add.player_color_r = client->player_color_r;
-                        response.packet.player_add.player_color_g = client->player_color_g;
-                        response.packet.player_add.player_color_b = client->player_color_b;
-                        strncpy(response.packet.player_add.client_name, in_packet.packet.clientinfo.client_name, 64);
-
-                        network_transmit_packet_all(network, response);
-                        ZERO(response);
-
-                        response.meta.packet_type = PACKETTYPE_SERVERINFO;
-                        response.packet.serverinfo.player_id = client->player_id;
-                        response.packet.serverinfo.sglthing_revision = GIT_COMMIT_COUNT;
-                        response.packet.serverinfo.player_color_r = client->player_color_r;
-                        response.packet.serverinfo.player_color_g = client->player_color_g;
-                        response.packet.serverinfo.player_color_b = client->player_color_b;
-                        response.packet.serverinfo.player_count = 0;
-                        g_hash_table_foreach(network->players, __populate_serverinfo_players, (gpointer)&response);
-                        memcpy(response.packet.serverinfo.session_key, network->http_client.sessionkey, 256);
-                        strncpy(response.packet.serverinfo.server_motd,"I am a vey glad to meta you",128);
-                        strncpy(response.packet.serverinfo.server_name,"SGLThing Server",64);
-                        network_transmit_packet(network, client, response);                            
-
-                        client->observer = in_packet.packet.clientinfo.observer;            
-                        client->ping_time_interval = network->client_default_tick;
-
-                        if(network->new_player_callback)
-                            network->new_player_callback(network, client);
+                        client->player_color_r = 0.0;
+                        client->player_color_g = 1.0;
+                        client->player_color_b = 1.0;
                     }
                     else
                     {
-                        printf("sglthing: client '%s' failed password (%s)\n", in_packet.packet.clientinfo.client_name, in_packet.packet.clientinfo.server_pass);
-                        network_disconnect_player(network, true, "Bad password", client);
-                    }
-                }
-                break;
-            case PACKETTYPE_SERVERINFO:
-                if(network->mode == NETWORKMODE_CLIENT)
-                {
-                    printf("sglthing: authenticated to server %s, motd: %s\n", in_packet.packet.serverinfo.server_name, in_packet.packet.serverinfo.server_motd);
-                    network->client.player_id = in_packet.packet.serverinfo.player_id;
-                    strncpy(network->server_name, in_packet.packet.serverinfo.server_name, 64);
-                    strncpy(network->server_motd, in_packet.packet.serverinfo.server_name, 128);
-                    network->client.client_version = in_packet.packet.serverinfo.sglthing_revision;
-                    network->client.authenticated = true;
+                        char url[256];
+                        snprintf(url,256,"auth/key_owner?sessionkey=%s",in_packet.packet.clientinfo.session_key);
+                        char* username = http_get(&network->http_client,url);
+                        if(username)
+                        {
+                            strncpy(in_packet.packet.clientinfo.client_name, username, 64);
+                            free(username);
+                        }
 
-                    for(int i = 0; i < in_packet.packet.serverinfo.player_count; i++)
+                        client->player_color_r = in_packet.packet.clientinfo.color_r;
+                        client->player_color_g = in_packet.packet.clientinfo.color_g;
+                        client->player_color_b = in_packet.packet.clientinfo.color_b;
+                    }
+
+                    if(!in_packet.packet.clientinfo.observer && strlen(network->debugger_pass) && strncmp(in_packet.packet.clientinfo.debugger_pass, network->debugger_pass, 64) == 0)
                     {
-                        struct network_client* new_client = (struct network_client*)malloc(sizeof(struct network_client));
-                        struct player_auth_list_entry* player = &in_packet.packet.serverinfo.players[i];
-
-                        if(player->player_id == network->client.player_id)
-                            continue;
-
-                        strncpy(new_client->client_name, player->client_name, 64);
-                        new_client->debugger = player->admin;
-                        new_client->player_color_r = player->player_color_r;
-                        new_client->player_color_b = player->player_color_g;
-                        new_client->player_color_g = player->player_color_b;
-                        new_client->player_id = player->player_id;
-                        new_client->owner = network;
-                        g_hash_table_insert(network->players, &in_packet.packet.player_add.player_id, new_client);  
-
-                        if(network->new_player_callback)
-                            network->new_player_callback(network, new_client);        
-
-                        printf("sglthing: client new player (before) %s %i\n", new_client->client_name, new_client->player_id);
+                        printf("sglthing: client '%s' used debugger password\n", in_packet.packet.clientinfo.client_name);
+                        client->debugger = true;
                     }
-                }
-                break;
-            case PACKETTYPE_PLAYER_ADD:
-                if(network->mode == NETWORKMODE_CLIENT)
-                {
-                    struct network_client* new_client = (struct network_client*)malloc(sizeof(struct network_client));
-                    printf("sglthing: client new player %s %i\n", in_packet.packet.player_add.client_name, in_packet.packet.player_add.player_id);
-                    // copy
 
-                    new_client->authenticated = true;
-                    new_client->connected = true;
-                    new_client->player_color_r = in_packet.packet.player_add.player_color_r;
-                    new_client->player_color_g = in_packet.packet.player_add.player_color_g;
-                    new_client->player_color_b = in_packet.packet.player_add.player_color_b;
-                    new_client->player_id = in_packet.packet.player_add.player_id;
-                    new_client->owner = network;
-                    strncpy(new_client->client_name, in_packet.packet.player_add.client_name, 64);
+                    strncpy(client->client_name, in_packet.packet.clientinfo.client_name, 64);
+                    client->authenticated = true;
+                    client->player_id = last_given_player_id++;
+                    client->client_version = in_packet.packet.clientinfo.sglthing_revision;
+                    client->owner = network;
+                    if(client->client_version != GIT_COMMIT_COUNT)
+                        printf("sglthing: WARN: new client '%s' is on sglthing r%i, while server is on sglthing r%i\n", in_packet.packet.clientinfo.client_name, client->client_version, GIT_COMMIT_COUNT);
 
-                    g_hash_table_insert(network->players, &in_packet.packet.player_add.player_id, new_client);        
+                    printf("sglthing: client '%s' authenticated\n", in_packet.packet.clientinfo.client_name);
+
+                    struct network_packet response;
+                    ZERO(response);
+
+                    g_hash_table_insert(network->players, &client->player_id, client);
+
+                    response.meta.packet_type = PACKETTYPE_SERVERINFO;
+                    response.packet.serverinfo.player_id = client->player_id;
+                    response.packet.serverinfo.sglthing_revision = GIT_COMMIT_COUNT;
+                    response.packet.serverinfo.player_color_r = client->player_color_r;
+                    response.packet.serverinfo.player_color_g = client->player_color_g;
+                    response.packet.serverinfo.player_color_b = client->player_color_b;
+                    response.packet.serverinfo.player_count = 0;
+                    g_hash_table_foreach(network->players, __populate_serverinfo_players, (gpointer)&response);
+                    memcpy(response.packet.serverinfo.session_key, network->http_client.sessionkey, 256);
+                    strncpy(response.packet.serverinfo.server_motd,"I am a vey glad to meta you",128);
+                    strncpy(response.packet.serverinfo.server_name,"SGLThing Server",64);
+                    network_transmit_packet(network, client, response);                            
+                    
+                    response.meta.packet_type = PACKETTYPE_PLAYER_ADD;
+                    response.packet.player_add.player_id = client->player_id;
+                    response.packet.player_add.admin = client->debugger;
+                    response.packet.player_add.observer = in_packet.packet.clientinfo.observer;
+                    response.packet.player_add.player_color_r = client->player_color_r;
+                    response.packet.player_add.player_color_g = client->player_color_g;
+                    response.packet.player_add.player_color_b = client->player_color_b;
+                    strncpy(response.packet.player_add.client_name, in_packet.packet.clientinfo.client_name, 64);
+
+                    network_transmit_packet_all(network, response);
+
+                    client->observer = in_packet.packet.clientinfo.observer;            
+                    client->ping_time_interval = network->client_default_tick;
 
                     if(network->new_player_callback)
-                        network->new_player_callback(network, new_client);        
-                }
-                break;
-            case PACKETTYPE_PLAYER_REMOVE:
-                if(network->mode == NETWORKMODE_CLIENT)
-                {
-                    printf("sglthing: client del player %i\n", in_packet.packet.player_remove.player_id);
-                    struct network_client* old_client = g_hash_table_lookup(network->players, &in_packet.packet.player_remove.player_id);
-                    if(network->del_player_callback)
-                        network->del_player_callback(network, client);
-                    g_hash_table_remove(network->players, &in_packet.packet.player_remove.player_id);
-                    free(old_client);
-                    if(in_packet.packet.player_remove.player_id == client->player_id)
-                    {
-                        client->connected = false;
-                        network->status = NETWORKSTATUS_DISCONNECTED;
-                        printf("sglthing: we ought to be out of here!\n");
-                        network_disconnect_player(network, false, "disconnected", client);
-                        return;
-                    }
-                }
-                break;
-            case PACKETTYPE_SCM_EVENT:
-                // printf("sglthing: %s received event %i, data: '%s'\n", (network->mode == NETWORKMODE_SERVER) ? "server" : "client", in_packet.packet.scm_event.event_id, in_packet.packet.scm_event.event_data);
-                if(network->script)
-                    nets7_receive_event(network_get_s7_pointer(network), network, client, &in_packet);
-                break;
-            case PACKETTYPE_CHAT_MESSAGE:
-                if(network->mode == NETWORKMODE_SERVER)
-                {
-                    in_packet.packet.chat_message.verified = client->verified;
-                    strncpy(in_packet.packet.chat_message.client_name,client->client_name,64);
-                    network_transmit_packet_all(network, in_packet);
+                        network->new_player_callback(network, client);
                 }
                 else
                 {
-                    printf("sglthing '%s: %s'", in_packet.packet.chat_message.client_name, in_packet.packet.chat_message.message);
+                    printf("sglthing: client '%s' failed password (%s)\n", in_packet.packet.clientinfo.client_name, in_packet.packet.clientinfo.server_pass);
+                    network_disconnect_player(network, true, "Bad password", client);
                 }
-                break;   
-            case PACKETTYPE_DATA_REQUEST:
-                if(network->mode == NETWORKMODE_SERVER)
-                {
-                    if(!client->observer)
-                        return;
-                    printf("sglthing: client requested %s\n", in_packet.packet.data_request.data_name);
+            }
+            break;
+        case PACKETTYPE_SERVERINFO:
+            if(network->mode == NETWORKMODE_CLIENT)
+            {
+                printf("sglthing: authenticated to server %s, motd: %s\n", in_packet.packet.serverinfo.server_name, in_packet.packet.serverinfo.server_motd);
+                network->client.player_id = in_packet.packet.serverinfo.player_id;
+                strncpy(network->server_name, in_packet.packet.serverinfo.server_name, 64);
+                strncpy(network->server_motd, in_packet.packet.serverinfo.server_name, 128);
+                network->client.client_version = in_packet.packet.serverinfo.sglthing_revision;
+                network->client.authenticated = true;
 
-                    if(strncmp(in_packet.packet.data_request.data_name,"game/data.tar",64)==0)
-                    {
-                        #define TMP_DATA_SIZE 26666666
-                        char* mdata = malloc(TMP_DATA_SIZE);
-                        z_stream strm;
-                        strm.zalloc = Z_NULL;
-                        strm.zfree = Z_NULL;
-                        strm.opaque = Z_NULL;
-                        int ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
-                        int len = strlen("Hello World")+1;
-                        strm.next_in = (z_const unsigned char*)"Hello World";
-                        strm.next_out = mdata;
-                        while (strm.total_in != len && strm.total_out < TMP_DATA_SIZE) {
-                            strm.avail_in = strm.avail_out = 1; /* force small buffers */
-                            ret = deflate(&strm, Z_NO_FLUSH);
-                        }
-                        for (;;) {
-                            strm.avail_out = 1;
-                            ret = deflate(&strm, Z_FINISH);
-                            if(ret == Z_STREAM_END) break;
-                        }
-                        ret = deflateEnd(&strm);
-                        struct network_packet response;
-                        ZERO(response);
-                        response.meta.packet_type = PACKETTYPE_DATA_REQUEST;
-                        response.packet.data_request.data_size = TMP_DATA_SIZE;
-                        network_transmit_packet(network, client, response);
-                        printf("sglthing: transmitting data\n");
-                        network_transmit_data(network, client, mdata, TMP_DATA_SIZE);
-                    }
+                for(int i = 0; i < in_packet.packet.serverinfo.player_count; i++)
+                {
+                    struct network_client* new_client = (struct network_client*)malloc(sizeof(struct network_client));
+                    struct player_auth_list_entry* player = &in_packet.packet.serverinfo.players[i];
+
+                    if(player->player_id == network->client.player_id)
+                        continue;
+
+                    strncpy(new_client->client_name, player->client_name, 64);
+                    new_client->debugger = player->admin;
+                    new_client->player_color_r = player->player_color_r;
+                    new_client->player_color_b = player->player_color_g;
+                    new_client->player_color_g = player->player_color_b;
+                    new_client->player_id = player->player_id;
+                    new_client->owner = network;
+                    g_hash_table_insert(network->players, &in_packet.packet.player_add.player_id, new_client);  
+
+                    if(network->new_player_callback)
+                        network->new_player_callback(network, new_client);        
+
+                    printf("sglthing: client new player (PACKETTYPE_SERVERINFO users) %s %i\n", new_client->client_name, new_client->player_id);
                 }
-                break;      
-            default:            
-                printf("sglthing: %s unknown packet %i\n", network->mode?"true":"false", (int)in_packet.meta.packet_type);
-                break;
+            }
+            break;
+        case PACKETTYPE_PLAYER_ADD:
+            if(network->mode == NETWORKMODE_CLIENT)
+            {
+                struct network_client* new_client = (struct network_client*)malloc(sizeof(struct network_client));
+                printf("sglthing: client new player %s %i\n", in_packet.packet.player_add.client_name, in_packet.packet.player_add.player_id);
+                // copy
+
+                new_client->authenticated = true;
+                new_client->connected = true;
+                new_client->player_color_r = in_packet.packet.player_add.player_color_r;
+                new_client->player_color_g = in_packet.packet.player_add.player_color_g;
+                new_client->player_color_b = in_packet.packet.player_add.player_color_b;
+                new_client->player_id = in_packet.packet.player_add.player_id;
+                new_client->owner = network;
+                strncpy(new_client->client_name, in_packet.packet.player_add.client_name, 64);
+
+                g_hash_table_insert(network->players, &in_packet.packet.player_add.player_id, new_client);        
+
+                if(network->new_player_callback)
+                    network->new_player_callback(network, new_client);        
+            }
+            break;
+        case PACKETTYPE_PLAYER_REMOVE:
+            if(network->mode == NETWORKMODE_CLIENT)
+            {
+                printf("sglthing: client del player %i\n", in_packet.packet.player_remove.player_id);
+                struct network_client* old_client = g_hash_table_lookup(network->players, &in_packet.packet.player_remove.player_id);
+                if(network->del_player_callback)
+                    network->del_player_callback(network, client);
+                g_hash_table_remove(network->players, &in_packet.packet.player_remove.player_id);
+                free(old_client);
+                if(in_packet.packet.player_remove.player_id == client->player_id)
+                {
+                    client->connected = false;
+                    network->status = NETWORKSTATUS_DISCONNECTED;
+                    printf("sglthing: we ought to be out of here!\n");
+                    network_disconnect_player(network, false, "disconnected", client);
+                    return;
+                }
+            }
+            break;
+        case PACKETTYPE_SCM_EVENT:
+            // printf("sglthing: %s received event %i, data: '%s'\n", (network->mode == NETWORKMODE_SERVER) ? "server" : "client", in_packet.packet.scm_event.event_id, in_packet.packet.scm_event.event_data);
+            if(network->script)
+                nets7_receive_event(network_get_s7_pointer(network), network, client, &in_packet);
+            break;
+        case PACKETTYPE_CHAT_MESSAGE:
+            if(network->mode == NETWORKMODE_SERVER)
+            {
+                in_packet.packet.chat_message.verified = client->verified;
+                strncpy(in_packet.packet.chat_message.client_name,client->client_name,64);
+                network_transmit_packet_all(network, in_packet);
+            }
+            else
+            {
+                printf("sglthing '%s: %s'", in_packet.packet.chat_message.client_name, in_packet.packet.chat_message.message);
+            }
+            break;   
+        case PACKETTYPE_DATA_REQUEST:
+            if(network->mode == NETWORKMODE_SERVER)
+            {
+                if(!client->observer)
+                    return;
+                printf("sglthing: client requested %s\n", in_packet.packet.data_request.data_name);
+
+                if(strncmp(in_packet.packet.data_request.data_name,"game/data.tar",64)==0)
+                {
+                    #define TMP_DATA_SIZE 26666666
+                    char* mdata = malloc(TMP_DATA_SIZE);
+                    z_stream strm;
+                    strm.zalloc = Z_NULL;
+                    strm.zfree = Z_NULL;
+                    strm.opaque = Z_NULL;
+                    int ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
+                    int len = strlen("Hello World")+1;
+                    strm.next_in = (z_const unsigned char*)"Hello World";
+                    strm.next_out = mdata;
+                    while (strm.total_in != len && strm.total_out < TMP_DATA_SIZE) {
+                        strm.avail_in = strm.avail_out = 1; /* force small buffers */
+                        ret = deflate(&strm, Z_NO_FLUSH);
+                    }
+                    for (;;) {
+                        strm.avail_out = 1;
+                        ret = deflate(&strm, Z_FINISH);
+                        if(ret == Z_STREAM_END) break;
+                    }
+                    ret = deflateEnd(&strm);
+                    struct network_packet response;
+                    ZERO(response);
+                    response.meta.packet_type = PACKETTYPE_DATA_REQUEST;
+                    response.packet.data_request.data_size = TMP_DATA_SIZE;
+                    network_transmit_packet(network, client, response);
+                    printf("sglthing: transmitting data\n");
+                    network_transmit_data(network, client, mdata, TMP_DATA_SIZE);
+                }
+            }
+            break;      
+        default:            
+            printf("sglthing: %s unknown packet %i\n", network->mode?"true":"false", (int)in_packet.meta.packet_type);
+            break;
+    }
+
+}
+
+void network_manage_socket(struct network* network, struct network_client* client)
+{
+    struct network_packet in_packet;
+    struct sockaddr_in sockaddr;
+    int sockaddr_len = sizeof(sockaddr);
+    if(network->script)
+        nets7_tick_network(network_get_s7_pointer(network), network, client);
+#ifdef NETWORK_TCP
+    while(recv(client->socket, &in_packet, sizeof(struct network_packet), MSG_DONTWAIT) != -1)
+#else
+    while(recvfrom(client->socket, &in_packet, sizeof(struct network_packet), MSG_DONTWAIT, &sockaddr, &sockaddr_len) != -1)
+#endif
+    {
+        #ifndef NETWORK_TCP
+        if(network->mode == NETWORKMODE_SERVER)
+        {
+            char ip_addr[64];
+            inet_ntop(AF_INET, &(sockaddr.sin_addr), ip_addr, INET_ADDRSTRLEN);
+            struct network_client* sender = NULL;
+            for(int i = 0; i < network->server_clients->len; i++)
+            {
+                struct network_client* cli = &g_array_index(network->server_clients, struct network_client, i);
+                if(cli->sockaddr.sin_addr.s_addr == sockaddr.sin_addr.s_addr && cli->sockaddr.sin_port == sockaddr.sin_port)
+                {
+                    sender = cli;
+                    break;
+                }
+            }
+
+            if(sender == NULL)
+            {
+                printf("sglthing: server: new udp connection\n");
+                struct network_client new_client;
+                new_client.sockaddr = sockaddr;
+                printf("sglthing: server: udp connection sockaddr: %x\n", new_client.sockaddr.sin_addr.s_addr);
+                new_client.authenticated = false;
+                new_client.player_id = -1;
+                new_client.connection_id = last_connection_id++;
+                new_client.connected = true;
+                new_client.last_ping_time = glfwGetTime();
+                new_client.ping_time_interval = 5.0;
+                new_client.dl_data = NULL;
+                new_client.owner = network;
+                g_array_append_val(network->server_clients, new_client);
+                sender = &g_array_index(network->server_clients, struct network_client, network->server_clients->len-1);
+            }
+
+            network_manage_packet(network, sender, in_packet);
         }
+        else
+        {
+        #endif
+        network_manage_packet(network, client, in_packet);
+        #ifndef NETWORK_TCP
+        }
+        #endif
     }
     //if(errno)
     //    printf("sglthing: send() %s\n", strerror(errno));
 }
-
-int last_connection_id = 0;
 
 void network_frame(struct network* network, float delta_time)
 {
@@ -624,10 +715,15 @@ void network_frame(struct network* network, float delta_time)
             network_close(network);
             return;
         }
+#ifndef NETWORK_TCP
+        network_manage_socket(network, &network->client);
+#endif
         for(int i = 0; i < network->server_clients->len; i++)
         {
             struct network_client* cli = &g_array_index(network->server_clients, struct network_client, i);
+#ifdef NETWORK_TCP
             network_manage_socket(network, cli);
+#endif
 
             if(cli->connected)
             {
@@ -692,6 +788,8 @@ void network_frame(struct network* network, float delta_time)
         }
         struct sockaddr_in connecting_client;
         socklen_t socksize = sizeof(struct sockaddr_in);
+
+        #ifdef NETWORK_TCP
         int new_socket = accept(network->client.socket, (struct sockaddr*)&connecting_client, &socksize);
         if(new_socket != -1)
         {
@@ -716,6 +814,7 @@ void network_frame(struct network* network, float delta_time)
             if(errno != EAGAIN)
                 printf("sglthing: accept() errno == %i %s\n", errno, strerror(errno));
         }
+        #endif
     }
     else
     {

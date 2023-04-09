@@ -42,6 +42,7 @@ struct world {
         int screen_width;
         int screen_height;
 
+        vec3 sun_position;
         int depth_map_fbo;
         int depth_map_texture;    
         int depth_map_fbo_far;

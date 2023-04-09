@@ -483,8 +483,11 @@ static s7_pointer __lightarea_use(s7_scheme* sc, s7_pointer args)
 
 static s7_pointer __light_create(s7_scheme* sc, s7_pointer args)
 {
+    if(!s7_is_c_pointer(s7_car(args)))
+        return(s7_wrong_type_arg_error(sc, "light-create", 1, s7_car(args), "light area"));
+    struct light_area* light_area = (struct light*)s7_c_pointer(s7_car(args));
     struct light* light = malloc(sizeof(struct light));
-    light_add(light);
+    light_add(light_area, light);
     return s7_make_c_pointer(sc, light);
 }
 
@@ -681,7 +684,7 @@ void sgls7_add_functions(s7_scheme* sc)
     s7_define_function(sc, "lightarea-update", __lightarea_update, 4, 0, false, "(lightarea-update a x y z)");
     s7_define_function(sc, "lightarea-use", __lightarea_use, 2, 0, false, "(lightarea-use a w)");
 
-    s7_define_function(sc, "light-create", __light_create, 0, 0, false, "(light-create)");
+    s7_define_function(sc, "light-create", __light_create, 1, 0, false, "(light-create a)");
     s7_define_function(sc, "light-set-clq", __light_set_clq, 4, 0, false, "(light-set-clq a c l q)");
     s7_define_function(sc, "light-set-position", __light_set_position, 4, 0, false, "(light-set-position a x y z)");
     s7_define_function(sc, "light-set-ambient", __light_set_ambient, 4, 0, false, "(light-set-position a r g b)");
