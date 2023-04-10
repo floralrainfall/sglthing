@@ -68,7 +68,7 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     }
 
     world->enable_script = (config_number_get(&world->config, "script_enabled") == 1.0);
-
+    
     if(!network_download)
         world->script = script_init("scripts/game.scm", world);
 
@@ -80,8 +80,14 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     world->gfx.hdr_blur_shader = create_program();
     int b_v = compile_shader("shaders/quad.vs",GL_VERTEX_SHADER);   attach_program_shader(world->gfx.hdr_blur_shader, b_v);
     int b_g = compile_shader("shaders/quad.gs",GL_GEOMETRY_SHADER); attach_program_shader(world->gfx.hdr_blur_shader, b_g);
-    int b_f = compile_shader("shaders/_game_screen.fs",GL_FRAGMENT_SHADER); attach_program_shader(world->gfx.hdr_blur_shader, b_f);
+    int b_f = compile_shader("shaders/blur.fs",GL_FRAGMENT_SHADER); attach_program_shader(world->gfx.hdr_blur_shader, b_f);
     link_programv(world->gfx.hdr_blur_shader);
+
+    world->gfx.hdr_blur2_shader = create_program();
+    b_v = compile_shader("shaders/quad.vs",GL_VERTEX_SHADER);   attach_program_shader(world->gfx.hdr_blur2_shader, b_v);
+    b_g = compile_shader("shaders/quad.gs",GL_GEOMETRY_SHADER); attach_program_shader(world->gfx.hdr_blur2_shader, b_g);
+    b_f = compile_shader("shaders/blur2.fs",GL_FRAGMENT_SHADER); attach_program_shader(world->gfx.hdr_blur2_shader, b_f);
+    link_programv(world->gfx.hdr_blur2_shader);
 #endif
     world->gfx.quad_shader = create_program();
     int q_v = compile_shader("shaders/quad.vs",GL_VERTEX_SHADER);   attach_program_shader(world->gfx.quad_shader, q_v);
@@ -175,47 +181,7 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     sglc(glReadBuffer(GL_NONE));
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));  
 
-#ifdef FBO_ENABLED
-    sglc(glGenFramebuffers(1, &world->gfx.hdr_fbo));
-    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
-    sglc(glGenTextures(2, world->gfx.hdr_color_buffers));
-    for (unsigned int i = 0; i < 2; i++)
-    {
-        sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_color_buffers[i]));
-        sglc(glTexImage2D(
-            GL_TEXTURE_2D, 0, GL_RGBA16F, world->viewport[2], world->viewport[3], 0, GL_RGBA, GL_FLOAT, NULL
-        ));
-        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
-        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
-        sglc(glFramebufferTexture2D(
-            GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, world->gfx.hdr_color_buffers[i], 0
-        ));
-    }  
-    unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    sglc(glDrawBuffers(2, attachments));  
-    sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-    
-    sglc(glGenFramebuffers(2, world->gfx.hdr_pingpong_fbos));
-    sglc(glGenTextures(2, world->gfx.hdr_pingpong_buffers));
-    for (unsigned int i = 0; i < 2; i++)
-    {
-        sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_pingpong_fbos[i]));
-        sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_pingpong_buffers[i]));
-        glTexImage2D(
-            GL_TEXTURE_2D, 0, GL_RGBA16F, world->viewport[2], world->viewport[3], 0, GL_RGBA, GL_FLOAT, NULL
-        );
-        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
-        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
-        sglc(glFramebufferTexture2D(
-            GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, world->gfx.hdr_pingpong_buffers[i], 0
-        ));
-    }
-    sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-#endif
+    world_updres(world);
 
     world->server.status = NETWORKSTATUS_DISCONNECTED;
     world->client.status = NETWORKSTATUS_DISCONNECTED;
@@ -305,11 +271,7 @@ void world_frame(struct world* world)
     world->viewport[3] = (float)world->gfx.screen_height;
     
 
-#ifdef FBO_ENABLED
-    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
-#else
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-#endif
     if(world->client.status == NETWORKSTATUS_CONNECTED)
     {
         glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]);
@@ -321,6 +283,24 @@ void world_frame(struct world* world)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+    glEnable(GL_DEPTH_TEST);
+#ifdef FBO_ENABLED
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
+    if(world->client.status == NETWORKSTATUS_CONNECTED)
+    {
+        glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]);
+    }
+    else
+    {
+        glClearColor(0.2f,0.2f,0.2f,1.0f);
+    }
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+    glEnable(GL_DEPTH_TEST);
+#else
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+#endif
 
     if(world->cam.pitch > 85.f)
         world->cam.pitch = 85.f;
@@ -376,7 +356,6 @@ void world_frame(struct world* world)
     /*glDisable(GL_DEPTH_TEST);
     world_draw_model(world, world->gfx.sky_ball, world->sky_shader, sky_matrix, false);
     world_draw_primitive(world, world->cloud_shader, GL_FILL, PRIMITIVE_PLANE, cloud_matrix, (vec4){1.f,1.f,1.f,1.f});*/
-    glEnable(GL_DEPTH_TEST);
 
     vec3 sun_direction_camera;
     mat4 light_projection, light_projection_far;
@@ -407,26 +386,21 @@ void world_frame(struct world* world)
 
     #ifdef FBO_ENABLED
         sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
+        sglc(glEnable(GL_DEPTH_TEST));  
+        sglc(glEnable(GL_CULL_FACE));  
+        sglc(glEnable(GL_BLEND));   
+        sglc(glClear(GL_DEPTH_BUFFER_BIT));
     #else
         sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     #endif
-
         world_frame_render(world);
 
     #ifdef FBO_ENABLED
-        sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-        sglc(glUseProgram(world->gfx.quad_shader));        
-        sglc(glActiveTexture(GL_TEXTURE0));
-        sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_color_buffers[0]));
-        sglc(glUniform1i(glGetUniformLocation(world->gfx.quad_shader,"image"), 0));
-        sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
-        sglc(glDrawArrays(GL_POINTS, 0, 1));
-
         bool bloom_blur_horiz = true, first_bloom_iter = true;
-        int amount = 10;
+        int amount = 5;
+        sglc(glUseProgram(world->gfx.hdr_blur_shader));
         for(int i = 0; i < amount; i++)
         {
-            sglc(glUseProgram(world->gfx.hdr_blur_shader));
             sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_pingpong_fbos[bloom_blur_horiz]));
             sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur_shader,"horizontal"), bloom_blur_horiz)); 
             //sglc(glUniform2f(glGetUniformLocation(world->gfx.hdr_blur_shader,"size"), 1.0f, 1.0f)); 
@@ -440,6 +414,21 @@ void world_frame(struct world* world)
             if(first_bloom_iter)
                 first_bloom_iter = false;
         }
+
+        sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+        sglc(glUseProgram(world->gfx.hdr_blur2_shader));        
+        
+        sglc(glActiveTexture(GL_TEXTURE0));
+        sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_color_buffers[0]));
+        sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur2_shader,"scene"), 0));
+
+        sglc(glActiveTexture(GL_TEXTURE1));
+        sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_pingpong_buffers[1]));
+        sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur2_shader,"bloom"), 1));
+
+        sglc(glUniform1f(glGetUniformLocation(world->gfx.hdr_blur2_shader,"exposure"), 0.4f));
+        sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
+        sglc(glDrawArrays(GL_POINTS, 0, 1));
     #endif
         // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
 
@@ -536,7 +525,7 @@ void world_frame(struct world* world)
     }
 
     char sglthing_v_name[32];
-    snprintf(sglthing_v_name,32,"sglthing r%i", GIT_COMMIT_COUNT);
+    snprintf(sglthing_v_name,32,"sglthing r%i (%.1f fps)", GIT_COMMIT_COUNT, world->fps);
     ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, sglthing_v_name, 15.f);
     
     mus_tick(&world->m_mgr);
@@ -579,6 +568,7 @@ static void __easy_uniforms(struct world* world, int shader_program, mat4 model_
     // misc
     glUniform4fv(glGetUniformLocation(shader_program,"viewport"), 1, world->viewport);
     glUniform3fv(glGetUniformLocation(shader_program,"sun_direction"), 1, world->gfx.sun_direction);
+    glUniform3fv(glGetUniformLocation(shader_program,"sun_position"), 1, world->gfx.sun_position);
     glUniform1f(glGetUniformLocation(shader_program,"time"), (float)world->time);
     glUniform1i(glGetUniformLocation(shader_program,"banding_effect"), world->gfx.banding_effect);
     glUniform1i(glGetUniformLocation(shader_program,"sel_map"), world->gfx.current_map);
@@ -711,4 +701,66 @@ void world_deinit(struct world* world)
             http_get(&world->client.http_client,url);
     }
     network_stop_download(&world->downloader);
+}
+
+void world_updres(struct world* world)
+{
+#ifdef FBO_ENABLED
+    glDeleteTextures(1, &world->gfx.hdr_depth_buffer);
+    glDeleteFramebuffers(1, &world->gfx.hdr_fbo);
+    glDeleteTextures(2, world->gfx.hdr_color_buffers);
+    glDeleteFramebuffers(2, world->gfx.hdr_pingpong_fbos);
+    glDeleteTextures(2, world->gfx.hdr_pingpong_buffers);
+    glGetError(); // consume error since it doesnt matter
+
+    sglc(glGenTextures(1, &world->gfx.hdr_depth_buffer));
+    sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_depth_buffer));
+    sglc(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+    sglc(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+    sglc(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+    sglc(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+    sglc(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, world->viewport[2], world->viewport[3], 0, GL_DEPTH_COMPONENT, GL_BYTE, NULL));
+
+    sglc(glGenFramebuffers(1, &world->gfx.hdr_fbo));
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
+    sglc(glGenTextures(2, world->gfx.hdr_color_buffers));
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_color_buffers[i]));
+        sglc(glTexImage2D(
+            GL_TEXTURE_2D, 0, GL_RGBA, world->viewport[2], world->viewport[3], 0, GL_RGBA, GL_FLOAT, NULL
+        ));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+        sglc(glFramebufferTexture2D(
+            GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, world->gfx.hdr_color_buffers[i], 0
+        ));
+        sglc(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, world->gfx.hdr_depth_buffer, 0));
+    }  
+    unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    sglc(glDrawBuffers(2, attachments));  
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+    
+    sglc(glGenFramebuffers(2, world->gfx.hdr_pingpong_fbos));
+    sglc(glGenTextures(2, world->gfx.hdr_pingpong_buffers));
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_pingpong_fbos[i]));
+        sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_pingpong_buffers[i]));
+        sglc(glTexImage2D(
+            GL_TEXTURE_2D, 0, GL_RGBA, world->viewport[2], world->viewport[3], 0, GL_RGBA, GL_FLOAT, NULL
+        ));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+        sglc(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+        sglc(glFramebufferTexture2D(
+            GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, world->gfx.hdr_pingpong_buffers[i], 0
+        ));
+    }
+
+    sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+#endif
 }

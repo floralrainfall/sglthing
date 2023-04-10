@@ -91,9 +91,11 @@ int main(int argc, char** argv)
     world->last_time = glfwGetTime();
     glfwSwapInterval(config_number_get(&world->config, "swap_interval"));
 
-    printf("sglthing: %p\n", &world->world_frame_user);
     sglthing_init_api(world);
 
+    vec4 old_viewport;
+    glfwGetFramebufferSize(window, &world->gfx.screen_width, &world->gfx.screen_height);
+    glm_vec4_copy(world->viewport, old_viewport);
     while(!glfwWindowShouldClose(window))
     {
         double frame_start = glfwGetTime();
@@ -103,9 +105,17 @@ int main(int argc, char** argv)
             world->frames_in_second = 0;
             world->last_time += 1.0;
         }        
+
         glfwGetFramebufferSize(window, &world->gfx.screen_width, &world->gfx.screen_height);
         
         world_frame(world);
+
+        if(!glm_vec4_eqv(old_viewport, world->viewport))
+        {
+            printf("sglthing: updres\n");
+            world_updres(world);
+            glm_vec4_copy(world->viewport, old_viewport);
+        }
 
         glfwSwapBuffers(window); 
         float frame_end = glfwGetTime();

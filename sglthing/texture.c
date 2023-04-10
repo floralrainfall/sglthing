@@ -47,7 +47,7 @@ struct texture_load_info load_texture(char* file)
         sglc(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB4, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data));
         sglc(glGenerateMipmap(GL_TEXTURE_2D));
         strncpy(texture->file,file,64);
-        printf("sglthing: loaded texture %s, %ix%i, %i channels\n", file, image_width, image_height, image_channels);
+        printf("sglthing: loaded texture %s, %ix%i, %i channels (%i)\n", file, image_width, image_height, image_channels, texture->texture_handle);
         stbi_image_free(data);
     }
     else

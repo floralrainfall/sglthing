@@ -89,14 +89,25 @@ static void __animation_create2(struct animation* anim, struct mesh* model, int 
 int animation_create(char* animation_path, struct mesh* model, int id, struct animation* anim)
 {
     char path[256];
-    int f = file_get_path(path, 256, animation_path);
+    int f = 0;
+    if(animation_path)
+        f = file_get_path(path, 256, animation_path);
     if(f != -1)
     {
-        printf("sglthing: loading anim %i from %s\n", id, animation_path);
-        const struct aiScene* scene = aiImportFile(path, aiProcess_Triangulate);
+        struct aiScene* scene;
+        if(animation_path == 0)
+            scene = model->model_parent->scene;
+        else
+        {
+            printf("sglthing: loading anim %i from %s\n", id, animation_path);
+            scene = aiImportFile(path, aiProcess_Triangulate);
+        }
         ASSERT(scene && scene->mRootNode && scene->mAnimations);
+        if(id >= scene->mNumAnimations)
+            return -1;
         __animation_create2(anim, model, id, scene);
-        printf("sglthing: loaded anim %s duration %0.2f\n", animation_path, anim->duration/anim->ticks_per_second);
+        printf("sglthing: loaded anim %s duration %0.2f\n", animation_path ? animation_path : scene->mAnimations[id]->mName.data, anim->duration/anim->ticks_per_second);
+        strncpy(anim->name, scene->mAnimations[id]->mName.data, 64);
         return 0;
     }
     return -1;
@@ -138,7 +149,6 @@ void animator_update(struct animator* animate, float delta_time)
 void animator_set_animation(struct animator* animate, struct animation* anim)
 {
     animate->animation = anim;
-    animate->current_time = 0.f;
     animate->animation_speed = 1.f;
 }
 

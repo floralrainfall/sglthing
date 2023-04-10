@@ -17,7 +17,7 @@ struct vertex_normal
     int x = glGetError();\
     if(x)\
     {\
-        printf("sglthing: gl error %i above from %s:%i\n", x, __FILE__, __LINE__);\
+        printf("sglthing: gl error %04x above from %s:%i\n", x, __FILE__, __LINE__);\
         raise(SIGINT);\
         exit(-1);\
     }\

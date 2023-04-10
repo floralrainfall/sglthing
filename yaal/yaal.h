@@ -16,6 +16,7 @@ enum yaal_packet_type
     YAAL_ENTER_LEVEL = 0x4a11,
     YAAL_LEVEL_DATA,
     YAAL_UPDATE_POSITION,
+    YAAL_UPDATE_PLAYERANIM,
 };
 
 enum __attribute__((__packed__)) yaal_light_type
@@ -27,7 +28,7 @@ enum __attribute__((__packed__)) yaal_light_type
 #define MAP_SIZE_MAX_X 32
 #define MAP_SIZE_MAX_Y 16
 #define MAP_GRAPHICS_IDS 5
-#define MAP_TEXTURE_IDS 5
+#define MAP_TEXTURE_IDS 6
 
 struct map_tile_data
 {
@@ -54,8 +55,6 @@ struct map_object
     int object_id;
     int object_graphics_id;
     int object_graphics_tex;
-
-    bool create_light;
 };
 
 struct map_file_data
@@ -68,7 +67,7 @@ struct map_file_data
         struct map_tile_data data[MAP_SIZE_MAX_Y];
     } map_row[MAP_SIZE_MAX_X];
 
-    // struct map_object map_object_list[512];
+    struct map_object map_object_list[512];
 };
 
 struct xtra_packet_data
@@ -92,6 +91,11 @@ struct xtra_packet_data
             vec3 delta_pos;
             vec2 delta_angles;
         } update_position;
+        struct 
+        {
+            int player_id;
+            int animation_id;
+        } update_playeranim;
     } packet;
 };
 

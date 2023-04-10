@@ -14,20 +14,18 @@ struct light_area* light_create_area()
     return new_area;
 }
 
-static vec3 __c_position;
-static int __light_sort(gconstpointer a, gconstpointer b)
+static int __light_sort(gconstpointer a, gconstpointer b, gpointer user_data)
 {
-    struct light* a_l = (struct light*)a;
-    struct light* b_l = (struct light*)b;
-    float a_dist = glm_vec3_distance(a_l->position, __c_position);
-    float b_dist = glm_vec3_distance(b_l->position, __c_position);
+    float* position = (float*)user_data;
+    struct light* a_l = *(struct light**)a;
+    struct light* b_l = *(struct light**)b;
 
-    if(a_dist > b_dist)
-        return 1;
-    if(a_dist == b_dist)
-        return 0;
-    if(a_dist < b_dist)
-        return -1;
+    float a_dist = glm_vec3_distance(a_l->position, position);
+    float b_dist = glm_vec3_distance(b_l->position, position);
+
+    // printf("(%f, %f, %f) %p %f (%f,%f,%f) %p %f (%f,%f,%f)\n", position[0], position[1], position[2], a_l, a_dist, a_l->position[0], a_l->position[1], a_l->position[2], b_l, b_dist, b_l->position[0], b_l->position[1], b_l->position[2]);
+
+    return a_dist - b_dist;
 }
 
 void light_update(struct light_area* area, vec3 position)
@@ -35,10 +33,7 @@ void light_update(struct light_area* area, vec3 position)
     if(!area)
         return;
 
-    __c_position[0] = position[0];
-    __c_position[1] = position[1];
-    __c_position[2] = position[2];
-    g_array_sort(area->scene_lights, __light_sort);
+    g_array_sort_with_data(area->scene_lights, __light_sort, position);
     int lights_allocated_in_area = 0;
     for(int i = 0; i < area->scene_lights->len; i++)
     {
@@ -50,8 +45,9 @@ void light_update(struct light_area* area, vec3 position)
             if(dist < 64.f)
             {
                 area->active_lights[lights_allocated_in_area] = l;
+                area->active_lights[lights_allocated_in_area]->distance = dist;
                 lights_allocated_in_area++;
-                if(lights_allocated_in_area == 4)
+                if(lights_allocated_in_area == MAX_LIGHTS)
                     break;
             }
         }
@@ -60,6 +56,7 @@ void light_update(struct light_area* area, vec3 position)
 
 void light_add(struct light_area* area, struct light* light)
 {
+    printf("sglthing: added light %p\n", light);
     g_array_append_val(area->scene_lights, light);
 }
 
@@ -97,6 +94,8 @@ void light_set_uniforms(int id, struct light* light, int shader_program)
     glUniform1f(glGetUniformLocation(shader_program,uniform_name), light->quadratic);
     snprintf(uniform_name,64,"lights[%i].intensity",id);
     glUniform1f(glGetUniformLocation(shader_program,uniform_name), light->intensity);
+    snprintf(uniform_name,64,"lights[%i].dist",id);
+    glUniform1f(glGetUniformLocation(shader_program,uniform_name), light->distance);
 
     snprintf(uniform_name,64,"lights[%i].present",id);
     glUniform1f(glGetUniformLocation(shader_program,uniform_name), 1.f);

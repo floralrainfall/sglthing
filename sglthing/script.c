@@ -34,7 +34,9 @@ struct script_system* script_init(char* file, void* world)
     printf("sglthing: s7 is poisoned (S7_DEBUGGING)\n");
 #endif
 
-#ifndef S7_DISABLE
+#ifdef S7_DISABLE
+    printf("sglthing: S7_DISABLE is defined\n");
+#else
     struct world* _world = (struct world*)world;
     char rsc_path[64] = {0};
     char rsc_dir[64] = {0};

@@ -11,6 +11,8 @@
 struct assimp_node_data;
 
 struct animation {
+    char name[64];
+
     float duration;
     int ticks_per_second;
     GArray* bones;

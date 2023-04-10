@@ -43,6 +43,7 @@ struct mesh
     int bone_counter;
 
     char* path;
+    struct model* model_parent;
 };
 
 struct model

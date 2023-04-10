@@ -19,6 +19,7 @@
 
 #define SHADOW_WIDTH 2048
 #define SHADOW_HEIGHT 2048
+#define FBO_ENABLED
 
 struct world {
     struct {
@@ -58,7 +59,9 @@ struct world {
         int hdr_color_buffers[2];
         int hdr_pingpong_fbos[2];
         int hdr_pingpong_buffers[2];
+        int hdr_depth_buffer;
         int hdr_blur_shader;
+        int hdr_blur2_shader;
 #endif
 
         int quad_shader;
@@ -134,5 +137,6 @@ enum primitive_type
     PRIMITIVE_PLANE,
 };
 void world_draw_primitive(struct world* world, int shader, int fill, enum primitive_type type, mat4 model_matrix, vec4 color);
+void world_updres(struct world* world);
 
 #endif

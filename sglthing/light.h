@@ -13,6 +13,7 @@ struct light {
     float linear;
     float quadratic;
     float intensity;
+    float distance;
 
     vec3 ambient;
     vec3 diffuse;

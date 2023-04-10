@@ -1,5 +1,4 @@
 #define PI 3.1415926538
-#define MAX_LIGHTS 4
 
 layout (location = 0) out vec4 FragColor;
 layout (location = 1) out vec4 BrightColor;  

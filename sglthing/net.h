@@ -186,6 +186,8 @@ struct network_packet {
     } packet;
 };
 
+#define NETWORK_HISTORY_FRAMES 16
+
 struct network {
     enum { NETWORKMODE_SERVER, NETWORKMODE_CLIENT, NETWORKMODE_UNKNOWN } mode;
     enum { NETWORKSTATUS_DISCONNECTED, NETWORKSTATUS_CONNECTED } status;
@@ -216,6 +218,10 @@ struct network {
     void (*del_player_callback)(struct network* network, struct network_client* client);
 
     GHashTable* players;
+
+    int packet_tx_numbers[NETWORK_HISTORY_FRAMES];
+    int packet_rx_numbers[NETWORK_HISTORY_FRAMES];
+    int packet_time;
 };
 
 void network_init(struct network* network, struct script_system* script);

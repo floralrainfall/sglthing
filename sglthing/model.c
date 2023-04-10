@@ -282,6 +282,7 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
         model->meshes[model->mesh_count].vtx_data = vtx_array;
         model->meshes[model->mesh_count].vtx_data_count = vtx_count;
         model->meshes[model->mesh_count].path = model->path;
+        model->meshes[model->mesh_count].model_parent = model;
         model_load_textures(&model->meshes[model->mesh_count], mesh, scene);
         model_extract_bone_weights(&model->meshes[model->mesh_count], vtx_array, mesh, scene);
         int new_mesh = create_model_vao(vtx_array, vtx_count, idx_array, idx_count, &vertex_buffer, &element_buffer);
