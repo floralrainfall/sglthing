@@ -20,6 +20,7 @@ struct light {
     vec3 specular;
 
     int flags;
+    void* user_data;
 };
 
 struct light_area {

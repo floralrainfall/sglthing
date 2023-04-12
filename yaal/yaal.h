@@ -37,9 +37,7 @@ struct map_tile_data
         TILE_FLOOR,
         TILE_WALL,
         TILE_WALL_CHEAP,
-
-        // event
-        TILE_MOVE_EVENT,
+        TILE_WALKAIR,
     } map_tile_type;
 
     char tile_graphics_id;
@@ -67,6 +65,11 @@ struct map_file_data
         struct map_tile_data data[MAP_SIZE_MAX_Y];
     } map_row[MAP_SIZE_MAX_X];
 
+    int map_right_id;
+    int map_top_id;
+    int map_left_id;
+    int map_bottom_id;
+
     struct map_object map_object_list[512];
 };
 
@@ -90,6 +93,7 @@ struct xtra_packet_data
             int player_id;
             vec3 delta_pos;
             vec2 delta_angles;
+            bool urgent;
         } update_position;
         struct 
         {

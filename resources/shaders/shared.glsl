@@ -106,7 +106,7 @@ vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_lig
     vec3 specular = 0.5 * spec * vec3(255.0/255.0,204.0/255.0,51.0/255.0);  
 
     // calculate shadow lighting
-    float shadow = shadow_calculate(camera_position, 0.05, 0.0015, depth_map, frag_pos, f_pos_light, normal, (sun_direction*50.0));   
+    float shadow = shadow_calculate(camera_position, 0.05, 0.0002, depth_map, frag_pos, f_pos_light, normal, (sun_direction*50.0));   
     if(shadow == -1)   
         shadow = shadow_calculate(camera_position, 0.5, 0.005, depth_map_far, frag_pos, f_pos_light_far, normal, (sun_direction*100.0));      
     if(shadow == -1)

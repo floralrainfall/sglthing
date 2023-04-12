@@ -25,6 +25,10 @@ struct player {
     vec3 old_position;
 
     int player_id;
+    int level_id;
+
+    int map_tile_x;
+    int map_tile_y;
 
     mat4 model_matrix;
     mat4 ghost_matrix;
@@ -54,15 +58,32 @@ struct yaal_state {
     GHashTable* map_objects;
     GHashTable* maps;
     
-    bool cols_received[MAP_SIZE_MAX_X];
+    bool map_downloaded[MAP_SIZE_MAX_X];
+    bool map_downloading;
     struct map_tile_data map_data[MAP_SIZE_MAX_X][MAP_SIZE_MAX_Y];
-
 };
 
 struct yaal_state yaal_state;
 struct yaal_state server_state;
 
 struct model* map_model;
+
+static bool __determine_tile_collision(struct map_tile_data tile)
+{
+    if(tile.tile_graphics_ext_id)
+        return true;
+    switch(tile.map_tile_type)
+    {
+        case TILE_AIR:
+        case TILE_WALL:
+        case TILE_WALL_CHEAP:
+            return true;
+        default:
+        case TILE_WALKAIR:
+        case TILE_FLOOR:
+            return false;
+    }
+}
 
 static void __update_player_transform(struct player* player)
 {
@@ -97,6 +118,8 @@ static void __sglthing_new_player(struct network* network, struct network_client
             x_data2->packet.yaal_level.level_id = map->level_id;
             strncpy(x_data2->packet.yaal_level.level_name,map->level_name,64);
             network_transmit_packet(network, client, upd_pak);
+
+            new_player->level_id = intro_id;
         }
         else
             printf("yaal: no map id 0\n");
@@ -122,6 +145,7 @@ static void __sglthing_new_player(struct network* network, struct network_client
         new_player->player_light.specular[2] = 1.0f;
         
         light_add(yaal_state.area, &new_player->player_light);
+        new_player->player_light.user_data = new_player;
 
         animator_create(&new_player->animator);
         animator_set_animation(&new_player->animator, &yaal_state.player_animations[1]);
@@ -130,8 +154,11 @@ static void __sglthing_new_player(struct network* network, struct network_client
             yaal_state.current_player = new_player;
     }
 
-    glm_vec3_zero(new_player->old_position);
     glm_vec3_zero(new_player->player_position);
+
+    new_player->player_position[0] = 3*MAP_TILE_SIZE;
+    new_player->player_position[2] = 3*MAP_TILE_SIZE;
+    glm_vec3_copy(new_player->player_position,new_player->old_position);
 
     __update_player_transform(new_player);
 
@@ -158,7 +185,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 if(yaal_state.current_player)
                 {
                     float dist = glm_vec3_distance(yaal_state.current_player->player_position, yaal_state.current_player->old_position);
-                    if(dist > 0.0001f)
+                    if(dist > 0.00001f)
                     {
                         //printf("yaal: [%s] tx position %f\n", (network->mode == NETWORKMODE_SERVER)?"server":"client", dist);
                         struct network_packet upd_pak;
@@ -170,7 +197,6 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                         glm_vec3_copy(delta, x_data2->packet.update_position.delta_pos);
                         glm_vec3_copy(yaal_state.current_player->player_position, yaal_state.current_player->old_position);
                         network_transmit_packet(network, client, upd_pak);
-
                         __update_player_transform(yaal_state.current_player);
                     }
                 }
@@ -188,7 +214,16 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
             {
                 printf("yaal: receiving %i bytes in level data\n", sizeof(x_data->packet.yaal_level_data));
                 memcpy(&yaal_state.map_data[x_data->packet.yaal_level_data.yaal_x], &x_data->packet.yaal_level_data.data[0], sizeof(x_data->packet.yaal_level_data));
-
+                yaal_state.map_downloaded[x_data->packet.yaal_level_data.yaal_x] = true;
+                for(int i = 0; i < MAP_SIZE_MAX_X; i++)
+                {
+                    yaal_state.map_downloading = false;
+                    if(!yaal_state.map_downloaded[i])
+                    {
+                        yaal_state.map_downloading = false;
+                        break;
+                    }
+                }
                 for(int i = 0; i < MAP_SIZE_MAX_Y; i++)
                 {
                     vec3 map_pos = { x_data->packet.yaal_level_data.yaal_x * MAP_TILE_SIZE, 0.f, i * MAP_TILE_SIZE };
@@ -258,9 +293,10 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
 
 #define LEVEL_TRANSMISSION
 #ifdef LEVEL_TRANSMISSION
+                yaal_state.map_downloading = true;
                 for(int i = 0; i < MAP_SIZE_MAX_X; i++)
                 {
-                    yaal_state.cols_received[i] = 0;
+                    yaal_state.map_downloaded[i] = false;
 
                     struct network_packet upd_pak;
                     struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
@@ -291,13 +327,41 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                     printf("yaal: client without client_player is attempting to update position\n");
                 //printf("yaal: [server] updating player position %i\n", client_player->player_id);
 
-                glm_vec3_add(client_player->player_position, x_data->packet.update_position.delta_pos, client_player->player_position);
-                glm_vec3_copy(client_player->player_position, client_player->old_position);
+                vec3 new_position;
+                glm_vec3_add(client_player->player_position, x_data->packet.update_position.delta_pos, new_position);
+
+                int map_tile_x = (int)roundf(new_position[0] / (MAP_TILE_SIZE));
+                int map_tile_y = (int)roundf(new_position[2] / (MAP_TILE_SIZE));
+
+                bool collide;
+                if(map_tile_x < MAP_SIZE_MAX_X && map_tile_y < MAP_SIZE_MAX_Y && map_tile_x >= 0 && map_tile_y >= 0)
+                {
+                    struct map_file_data* map = g_hash_table_lookup(server_state.maps, &client_player->level_id);
+                    if(!map)
+                        printf("yaal: client out of this world (%i, id %i)\n", client_player->player_id, client_player->level_id);
+                    struct map_tile_data* tile = &map->map_row[map_tile_x].data[map_tile_y];
+                    printf("%i\n",tile->map_tile_type);
+                    if(glm_vec3_distance(new_position, client_player->player_position) > 1.5f)
+                        collide = true;
+                    else                           
+                        collide = __determine_tile_collision(*tile);
+                }
+                else
+                    collide = true;
+
+                if(!collide)
+                {
+                    glm_vec3_copy(new_position, client_player->player_position);
+                    glm_vec3_copy(new_position, client_player->old_position);
+                }
+                else
+                    printf("collision\n");
 
                 struct network_packet upd_pak;
                 struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
                 upd_pak.meta.packet_type = YAAL_UPDATE_POSITION;
                 x_data2->packet.update_position.player_id = client->player_id;
+                x_data2->packet.update_position.urgent = !collide;
                 glm_vec3_copy(client_player->player_position, x_data2->packet.update_position.delta_pos);
                 network_transmit_packet_all(network, upd_pak);
             }
@@ -309,7 +373,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                     //if(upd_client->player_id != yaal_state.player_id)
                     //    printf("yaal: updating client that is not user\n");
                     struct player* upd_player = (struct player*)upd_client->user_data;
-                    if(upd_player->player_id != yaal_state.player_id || glm_vec3_distance(x_data->packet.update_position.delta_pos, upd_player->old_position) > 1.f)
+                    if(upd_player->player_id != yaal_state.player_id || (glm_vec3_distance(x_data->packet.update_position.delta_pos, upd_player->old_position) > 1.f || !x_data->packet.update_position.urgent))
                     {
                         glm_vec3_copy(x_data->packet.update_position.delta_pos, upd_player->old_position);
                         glm_vec3_copy(x_data->packet.update_position.delta_pos, upd_player->player_position);
@@ -359,6 +423,9 @@ static void __sglthing_frame(struct world* world)
 
         if(yaal_state.current_player)
         {
+            yaal_state.current_player->map_tile_x = (int)roundf(yaal_state.current_player->old_position[0] / (MAP_TILE_SIZE));
+            yaal_state.current_player->map_tile_y = (int)roundf(yaal_state.current_player->old_position[2] / (MAP_TILE_SIZE));
+
             light_update(world->render_area, yaal_state.current_player->old_position);
 
             glm_vec3_copy(yaal_state.current_player->old_position, world->gfx.sun_position);
@@ -368,10 +435,17 @@ static void __sglthing_frame(struct world* world)
             world->cam.yaw = 45.f;
             world->cam.pitch = -45.f;
 
-            vec3 pot_move;
+            vec3 pot_move, new_vec;
             pot_move[0] = -get_input("x_axis") * world->delta_time * 3.f;
+            pot_move[1] = 0.f;
             pot_move[2] = get_input("z_axis") * world->delta_time * 3.f;
-            glm_vec3_add(pot_move, yaal_state.current_player->player_position, yaal_state.current_player->player_position);
+            glm_vec3_add(pot_move, yaal_state.current_player->player_position, new_vec);
+
+            int map_tile_x = (int)roundf(new_vec[0] / (MAP_TILE_SIZE));
+            int map_tile_y = (int)roundf(new_vec[2] / (MAP_TILE_SIZE));
+            bool collide = __determine_tile_collision(yaal_state.map_data[map_tile_x][map_tile_y]);
+            if(!collide)
+                glm_vec3_copy(new_vec, yaal_state.current_player->player_position);
         }
     }
 
@@ -406,7 +480,7 @@ static void __player_render(gpointer key, gpointer value, gpointer user)
             mat4 render_matrix;
             glm_mat4_copy(player->model_matrix, render_matrix);
             glm_scale(render_matrix, (vec3){0.01f,0.01f,0.01f});
-            animator_set_bone_uniform_matrices(&player->animator, yaal_state.player_shader);
+            animator_set_bone_uniform_matrices(&player->animator, world->gfx.shadow_pass?world->gfx.lighting_shader:yaal_state.player_shader);
             world_draw_model(world, yaal_state.player_model, yaal_state.player_shader, render_matrix, true);
             world_draw_model(world, yaal_state.player_model, yaal_state.player_shader, render_matrix, true);
         }
@@ -421,7 +495,7 @@ static void __sglthing_frame_render(struct world* world)
         for(int map_y = 0; map_y < MAP_SIZE_MAX_Y; map_y++)
         {
             struct map_tile_data* map_tile = &yaal_state.map_data[map_x][map_y];
-            if(map_tile->map_tile_type == TILE_AIR || !yaal_state.current_player)
+            if(map_tile->map_tile_type == TILE_AIR || map_tile->map_tile_type == TILE_WALKAIR || !yaal_state.current_player)
             {
 
             }
@@ -431,9 +505,9 @@ static void __sglthing_frame_render(struct world* world)
                 float dist = glm_vec3_distance(map_pos, yaal_state.current_player->player_position);
                 float distx = fabsf(map_pos[0] - yaal_state.current_player->player_position[0]);
                 float disty = fabsf(map_pos[2] - yaal_state.current_player->player_position[2]);
-                if(distx > 32.f)
+                if(distx > 20.f)
                     continue;
-                if(disty > 32.f)
+                if(disty > 20.f)
                     continue;
                 vec3 direction;
                 glm_vec3_sub(map_pos,world->cam.position,direction);
@@ -449,6 +523,11 @@ static void __sglthing_frame_render(struct world* world)
                     glm_translate_y(model_matrix, 4.f);
                     glm_scale(model_matrix, (vec3){1.f, 4.f, 1.f});
                 }
+                /*if(yaal_state.current_player)
+                    if(map_x == yaal_state.current_player->map_tile_x && map_y == yaal_state.current_player->map_tile_y)
+                        {
+                            glm_translate_y(model_matrix, 1.f);
+                        }*/
                 // glm_rotate(model_matrix, (map_tile->direction * 90.f) * (180 / M_PIf), (vec3){0.f,1.f,0.f});
                 struct model* mdl = yaal_state.map_tiles[map_tile->tile_graphics_id];
                 if(mdl)
@@ -461,6 +540,7 @@ static void __sglthing_frame_render(struct world* world)
                         sglc(glActiveTexture(GL_TEXTURE0));
                         sglc(glBindTexture(GL_TEXTURE_2D, tex_id));                
                         sglc(glUniform1i(glGetUniformLocation(yaal_state.object_shader,"diffuse0"), 0));
+                        sglc(glUniform4f(glGetUniformLocation(yaal_state.object_shader,"color"), 0.5, 0.5, 0.5, 1.0));
                         world_draw_model(world, mdl, yaal_state.object_shader, model_matrix, false);
                     }
                     else
@@ -487,14 +567,17 @@ static void __sglthing_frame_ui(struct world* world)
     char txinfo[256];
     if(yaal_state.current_player)
     {
-        snprintf(txinfo,256,"P=(%f,%f,%f), O=(%f,%f,%f), player id = %i\n",
+        snprintf(txinfo,256,"P=(%f,%f,%f), O=(%f,%f,%f)\nplayer id = %i, M=(%i,%i), %s\n",
             yaal_state.current_player->player_position[0],
             yaal_state.current_player->player_position[1],
             yaal_state.current_player->player_position[2],
             yaal_state.current_player->old_position[0],
             yaal_state.current_player->old_position[1],
             yaal_state.current_player->old_position[2],
-            yaal_state.current_player->player_id);
+            yaal_state.current_player->player_id,
+            yaal_state.current_player->map_tile_x,
+            yaal_state.current_player->map_tile_y,
+            yaal_state.map_downloading?"map is downloading":"no map is being downloaded");
     }
     else
     {
@@ -543,7 +626,7 @@ void sglthing_init_api(struct world* world)
     world->gfx.fog_color[0] = 0.f;
     world->gfx.fog_color[1] = 0.f;
     world->gfx.fog_color[2] = 0.f;
-    world->gfx.fog_maxdist = 64.f;
+    world->gfx.fog_maxdist = 40.f;
     world->gfx.fog_mindist = 32.f;
 
     yaal_state.area = light_create_area();

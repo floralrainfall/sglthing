@@ -397,7 +397,7 @@ void world_frame(struct world* world)
 
     #ifdef FBO_ENABLED
         bool bloom_blur_horiz = true, first_bloom_iter = true;
-        int amount = 5;
+        int amount = 25;
         sglc(glUseProgram(world->gfx.hdr_blur_shader));
         for(int i = 0; i < amount; i++)
         {

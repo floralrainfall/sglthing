@@ -6,7 +6,7 @@ uniform float time;
 uniform float fog_maxdist;
 uniform float fog_mindist;
 uniform vec4 fog_color;
-uniform vec4 color;
+uniform vec4 color = vec4(1,1,1,1);
 uniform int banding_effect;
 
 in vec3 f_pos;
@@ -29,6 +29,7 @@ void main()
 
     // lighting
     out_color *= vec4(lighting,1.0);
+    out_color *= color;
 
     // color banding effect
     vec4 out_color_raw = out_color;
@@ -52,6 +53,6 @@ void main()
     FragColor = vec4(out_color.xyz, min(out_color.w,fog_factor));
 
     float brightness = dot(FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-    BrightColor = max(vec4(0), vec4(FragColor.rgb, 1.0) * (brightness - 1.0));
+    BrightColor = max(vec4(0), vec4(FragColor.rgb, 1.0) * (brightness + 0.25));
 
 }

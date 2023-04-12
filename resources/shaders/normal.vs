@@ -33,7 +33,7 @@ void main()
     f_pos_light = lsm * vec4(f_pos, 1.0);
     f_pos_light_far = lsm_far * vec4(f_pos, 1.0);
     f_m_pos = v_pos;
-    gl_Position = snap(projection * view * model * vec4(v_pos, 1.0),vec2(320/2,240/2));
+    gl_Position = snap(projection * view * model * vec4(v_pos, 1.0),vec2(viewport.z/4,viewport.w/4));
 
     vec4 vertex_view = view * model * vec4(v_pos, 1.0);
     float dist = length(vertex_view);
