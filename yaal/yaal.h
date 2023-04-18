@@ -17,6 +17,7 @@ enum yaal_packet_type
     YAAL_LEVEL_DATA,
     YAAL_UPDATE_POSITION,
     YAAL_UPDATE_PLAYERANIM,
+    YAAL_UPDATE_OBJECT,
 };
 
 enum __attribute__((__packed__)) yaal_light_type
@@ -28,7 +29,8 @@ enum __attribute__((__packed__)) yaal_light_type
 #define MAP_SIZE_MAX_X 32
 #define MAP_SIZE_MAX_Y 16
 #define MAP_GRAPHICS_IDS 5
-#define MAP_TEXTURE_IDS 6
+#define MAP_TEXTURE_IDS 7
+#define ACTION_PICTURE_IDS 1
 
 struct map_tile_data
 {
@@ -38,6 +40,7 @@ struct map_tile_data
         TILE_WALL,
         TILE_WALL_CHEAP,
         TILE_WALKAIR,
+        TILE_DEBUG,
     } map_tile_type;
 
     char tile_graphics_id;
@@ -50,9 +53,15 @@ struct map_tile_data
 
 struct map_object
 {
-    int object_id;
-    int object_graphics_id;
-    int object_graphics_tex;
+    char object_id;
+    char object_graphics_id;
+    char object_graphics_tex;
+    int object_tile_x;
+    int object_tile_y;
+
+    char object_name[64];
+    int object_data_id;
+
 };
 
 struct map_file_data
@@ -70,7 +79,16 @@ struct map_file_data
     int map_left_id;
     int map_bottom_id;
 
-    struct map_object map_object_list[512];
+    int map_object_count;
+    struct map_object map_objects[UCHAR_MAX];
+};
+
+struct player_action
+{
+    int action_id;
+    int action_picture_id;
+    char action_name[64];
+    char action_desc[256];
 };
 
 struct xtra_packet_data
@@ -100,6 +118,18 @@ struct xtra_packet_data
             int player_id;
             int animation_id;
         } update_playeranim;
+        struct
+        {
+
+        } map_object_create;
+        struct
+        {
+            
+        } map_object_update;
+        struct
+        {
+
+        } map_object_destroy;
     } packet;
 };
 

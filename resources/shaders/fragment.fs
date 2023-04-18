@@ -53,6 +53,6 @@ void main()
     FragColor = vec4(out_color.xyz, min(out_color.w,fog_factor));
 
     float brightness = dot(FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-    BrightColor = max(vec4(0), vec4(FragColor.rgb, 1.0) * (brightness + 0.25));
-
+    //BrightColor = max(vec4(0), vec4(FragColor.rgb, 1.0) * (brightness + 0.25));
+    BrightColor = vec4(0);
 }

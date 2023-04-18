@@ -16,6 +16,14 @@ struct keyboard_mapping
     char name[16];
 };
 
+struct mouse_state
+{
+    bool mouse_button_r;
+    bool mouse_button_m;
+    bool mouse_button_l;
+};
+
+extern struct mouse_state mouse_state;
 extern vec2 mouse_position;
 extern int keys_down[GLFW_KEY_LAST];
 

@@ -17,6 +17,7 @@ struct ui_font
 struct ui_data
 {
     int ui_program;
+    int ui_img_program;
     struct ui_font* ui_font;
 
     int ui_vao;
@@ -45,8 +46,8 @@ struct ui_data
 
 // depth should be 1.f
 void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* text, float depth);
-bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, char* text, float depth);
-void ui_draw_image(struct ui_data* ui, float position_x, float position_y, int image, float depth);
+bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, int image, float depth);
+void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, int image, float depth);
 void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, vec3 camera_front, vec3 position, float fov, mat4 m, mat4 vp, char* text);
 void ui_init(struct ui_data* ui);
 struct ui_font* ui_load_font(char* file, float cx, float cy, float cw, float ch);

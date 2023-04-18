@@ -222,6 +222,8 @@ struct network {
     int packet_tx_numbers[NETWORK_HISTORY_FRAMES];
     int packet_rx_numbers[NETWORK_HISTORY_FRAMES];
     int packet_time;
+
+    struct world* world;
 };
 
 void network_init(struct network* network, struct script_system* script);
@@ -236,6 +238,7 @@ void network_frame(struct network* network, float delta_time);
 #ifdef SGLTHING_COMPILE
 void network_dbg_ui(struct network* network, struct ui_data* ui);
 #endif
+struct network_client* network_get_player(struct network* network, int* player_id);
 void network_close(struct network* network);
 
 void network_start_download(struct network_downloader* network, char* ip, int port, char* rqname, char* pass);

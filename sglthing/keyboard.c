@@ -6,6 +6,8 @@
 struct keyboard_mapping mappings[MAX_KEYBORAD_MAPPINGS];
 int mapping_count = 0;
 
+
+struct mouse_state mouse_state = {0};
 int keys_down[GLFW_KEY_LAST] = {0};
 vec2 mouse_position = { 0, 0 };
 bool mouse_focus = false;
@@ -40,6 +42,7 @@ static void __kbd_callback(GLFWwindow* window, int key, int scancode, int action
                 mappings[i].value = -0.f;
         }
     }
+    
 
     if(action == GLFW_PRESS || action == GLFW_RELEASE)
     {
@@ -49,10 +52,20 @@ static void __kbd_callback(GLFWwindow* window, int key, int scancode, int action
     }
 }
 
+static void __click_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if(button == GLFW_MOUSE_BUTTON_RIGHT)
+        mouse_state.mouse_button_r = action == GLFW_PRESS;
+    else if(button == GLFW_MOUSE_BUTTON_MIDDLE)
+        mouse_state.mouse_button_m = action == GLFW_PRESS;
+    else if(button == GLFW_MOUSE_BUTTON_LEFT)
+        mouse_state.mouse_button_l = action == GLFW_PRESS;
+}
+
 void init_kbd(GLFWwindow* window)
 {
     glfwSetKeyCallback(window, __kbd_callback);
-    //glfwSetMouseButtonCallback(window, __mouset_callback);
+    glfwSetMouseButtonCallback(window, __click_callback);
     glfwSetCursorPosCallback(window, __mouse_callback);
 }
 
@@ -81,7 +94,7 @@ void set_focus(GLFWwindow* window, bool state)
     if(state == true)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     if(state == false)
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     mouse_focus = state;   
 }
 

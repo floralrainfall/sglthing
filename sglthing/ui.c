@@ -174,14 +174,97 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     ui->background_color[3] = old_background;
 }
 
-bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
+bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, int image, float depth)
 {
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return false;
 
-    ui_draw_text(ui, position_x, position_y, text, depth);
+    ui_draw_image(ui, position_x, position_y, size_x, size_y, image, depth);
+
+    if(mouse_state.mouse_button_r)
+    {
+        printf("%f,%f\n", mouse_position[0], mouse_position[1]);
+    }
 
     return false;
+}
+
+void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, int image, float depth)
+{
+    if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
+        return false;
+    vec2 points[6][2] = {0};
+    vec2 v_up_left    = {position_x,position_y};
+    vec2 v_up_right   = {position_x+size_x,position_y};
+    vec2 v_down_left  = {position_x,position_y-size_y};
+    vec2 v_down_right = {position_x+size_x,position_y-size_y};
+
+    // tri 1
+
+    points[0][0][0] = v_up_left[0];
+    points[0][0][1] = v_up_left[1];
+
+    points[1][0][0] = v_down_left[0];
+    points[1][0][1] = v_down_left[1];
+
+    points[2][0][0] = v_up_right[0];
+    points[2][0][1] = v_up_right[1];
+
+    // tri 2
+
+    points[3][0][0] = v_down_right[0];
+    points[3][0][1] = v_down_right[1];
+
+    points[4][0][0] = v_up_right[0];
+    points[4][0][1] = v_up_right[1];
+
+    points[5][0][0] = v_down_left[0];
+    points[5][0][1] = v_down_left[1];
+
+    vec2 uv_up_left    = {0.f,0.f};
+    vec2 uv_up_right   = {1.f,0.f};
+    vec2 uv_down_left  = {0.f,1.f};
+    vec2 uv_down_right = {1.f,1.f};
+
+    // tri 1
+
+    points[0][1][0] = uv_up_left[0];
+    points[0][1][1] = uv_up_left[1];
+
+    points[1][1][0] = uv_down_left[0];
+    points[1][1][1] = uv_down_left[1];
+
+    points[2][1][0] = uv_up_right[0];
+    points[2][1][1] = uv_up_right[1];
+
+    // tri 2
+
+    points[3][1][0] = uv_down_right[0];
+    points[3][1][1] = uv_down_right[1];
+
+    points[4][1][0] = uv_up_right[0];
+    points[4][1][1] = uv_up_right[1];
+
+    points[5][1][0] = uv_down_left[0];
+    points[5][1][1] = uv_down_left[1];
+
+    sglc(glBindVertexArray(ui->ui_vao));
+    sglc(glBindBuffer(GL_ARRAY_BUFFER, ui->ui_vbo));
+    sglc(glBufferSubData(GL_ARRAY_BUFFER, 0, 6*2*2*sizeof(float), points));
+    sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
+
+    sglc(glUseProgram(ui->ui_img_program));
+    sglc(glActiveTexture(GL_TEXTURE0));
+    sglc(glBindTexture(GL_TEXTURE_2D, image));
+    vec3 offset = {0.f, 0.f};
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"time"), (float)glfwGetTime()));
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"waviness"), ui->waviness));
+    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_program,"projection"), 1, GL_FALSE, ui->projection[0])); 
+    sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
+    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
+    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
+    sglc(glDrawArrays(GL_TRIANGLES, 0, 6));
 }
 
 void ui_init(struct ui_data* ui)
@@ -189,6 +272,10 @@ void ui_init(struct ui_data* ui)
     int ui_vertex = compile_shader("uiassets/shaders/ui.vs", GL_VERTEX_SHADER);
     int ui_frag = compile_shader("uiassets/shaders/ui.fs", GL_FRAGMENT_SHADER);
     ui->ui_program = link_program(ui_vertex, ui_frag);
+
+    int ui_i_vertex = compile_shader("uiassets/shaders/ui.vs", GL_VERTEX_SHADER);
+    int ui_i_frag = compile_shader("uiassets/shaders/ui_picture.fs", GL_FRAGMENT_SHADER);
+    ui->ui_img_program = link_program(ui_i_vertex, ui_i_frag);
 
     ui->default_font = ui_load_font("uiassets/font.png", 8, 16, 1, 256);
 

@@ -55,7 +55,10 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     config_load(&world->config, "config.ini");
     for(int i = 2; i < argc; i += 2)
         g_key_file_set_value(world->config.key_file, "sglthing", argv[i-1], argv[i]);
+
     char* net_mode = config_string_get(&world->config,"network_mode");
+    if(net_mode && strcmp(net_mode,"server") == 0)
+        g_key_file_set_value(world->config.key_file, "sglthing", "swap_interval", "0");
 
     bool network_download = false;
     world->assets_downloading = false;
@@ -188,6 +191,8 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     network_init(&world->server, world->script);
     if(!network_download)
         network_init(&world->client, world->script);
+    world->server.world = world;
+    world->client.world = world;
     world->client.security = (config_number_get(&world->config,"network_security") == 1.0);
     world->server.security = (config_number_get(&world->config,"network_security") == 1.0);
     world->server.shutdown_empty = (config_number_get(&world->config,"shutdown_empty") == 1.0);
@@ -201,9 +206,20 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     strncpy(world->server.server_motd,config_string_get(&world->config,"server_motd"),128);
     strncpy(world->server.server_name,config_string_get(&world->config,"server_name"),64);
 
-    world->client.client.player_color_r = config_number_get(&world->config, "user_color_r");
-    world->client.client.player_color_g = config_number_get(&world->config, "user_color_g");
-    world->client.client.player_color_b = config_number_get(&world->config, "user_color_b");
+    if(g_key_file_has_key(world->config.key_file,"sglthing","user_color_r",NULL))
+        world->client.client.player_color_r = config_number_get(&world->config, "user_color_r");
+    else
+        world->client.client.player_color_r = g_random_double_range(0.0, 1.0);
+
+    if(g_key_file_has_key(world->config.key_file,"sglthing","user_color_g",NULL))
+        world->client.client.player_color_g = config_number_get(&world->config, "user_color_g");
+    else
+        world->client.client.player_color_g = g_random_double_range(0.0, 1.0);
+
+    if(g_key_file_has_key(world->config.key_file,"sglthing","user_color_b",NULL))
+        world->client.client.player_color_b = config_number_get(&world->config, "user_color_b");
+    else
+        world->client.client.player_color_b = g_random_double_range(0.0, 1.0);
 
     if(strcmp(net_mode,"server")==0)
     {
@@ -224,6 +240,7 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     snd_init(&world->s_mgr);
     mus_init(&world->m_mgr, &world->s_mgr);
     world->m_mgr.world_ptr = (void*)world;
+    world->m_mgr.dbgmgr = config_number_get(&world->config,"config_mode") == 1.0;
 
     world->world_frame_user = NULL;
     world->world_frame_ui_user = NULL;
@@ -408,7 +425,8 @@ void world_frame(struct world* world)
             sglc(glActiveTexture(GL_TEXTURE0));
             sglc(glBindTexture(GL_TEXTURE_2D, first_bloom_iter ? world->gfx.hdr_color_buffers[1] : world->gfx.hdr_pingpong_buffers[!bloom_blur_horiz]));
             sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur_shader,"image"), 0));
-            sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
+            sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));            
+            sglc(glBindVertexArray(1));
             sglc(glDrawArrays(GL_POINTS, 0, 1));
             bloom_blur_horiz = !bloom_blur_horiz;
             if(first_bloom_iter)
@@ -432,11 +450,12 @@ void world_frame(struct world* world)
     #endif
         // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
 
+        glClear(GL_DEPTH_BUFFER_BIT);
+
         if(config_number_get(&world->config,"debug_mode") == 1.0)
         {
             char dbg_info[256];
             int old_elements = world->ui->ui_elements;
-            world->ui->ui_elements = 0;
             snprintf(dbg_info, 256, "DEBUG\n\ncam: V=(%.2f,%.2f,%.2f)\nY=%.2f,P=%.2f\nU=(%.2f,%.2f,%.2f)\nF=(%.2f,%.2f,%.2f)\nR=(%.f,%.f,%.f)\nF=%.f\nv=(%i,%i)\nr (scene)=%i,r (ui)=%i\nt=%f, F=%i, d=%f, fps=%f\n\n"
 #ifdef ODE_ENABLED
                 "physics pause=%s\nphysics geoms=%i\ncollisions in frame=%i\n"
@@ -465,10 +484,11 @@ void world_frame(struct world* world)
                 snprintf(dbg_info, 256, "FS Archive %i: %s", i, archives[i].directory);
                 ui_draw_text(world->ui, world->gfx.screen_width/2, world->gfx.screen_height-(16.f*3)-(i*16.f), dbg_info, 1.f);
             }
+            
+            network_dbg_ui(&world->client, world->ui);
+            network_dbg_ui(&world->server, world->ui);
         }
 
-        network_dbg_ui(&world->client, world->ui);
-        network_dbg_ui(&world->server, world->ui);
         if(!world->assets_downloading)
             script_frame_ui(world->script);
         if(world->world_frame_ui_user)
@@ -524,10 +544,12 @@ void world_frame(struct world* world)
         set_focus(world->gfx.window, false);
     }
 
+    world->ui->persist = true;
     char sglthing_v_name[32];
-    snprintf(sglthing_v_name,32,"sglthing r%i (%.1f fps)", GIT_COMMIT_COUNT, world->fps);
+    snprintf(sglthing_v_name,32,"sglthing r%i (%.2f fps)", GIT_COMMIT_COUNT, world->fps);
     ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, sglthing_v_name, 15.f);
-    
+    world->ui->persist = false;
+
     mus_tick(&world->m_mgr);
 
     if(world->client.status == NETWORKSTATUS_DISCONNECTED && world->server.status == NETWORKSTATUS_DISCONNECTED && (config_number_get(&world->config, "shutdown_empty") == 1.0))
@@ -548,6 +570,7 @@ void world_frame(struct world* world)
     if(!world->frames)
         printf("sglthing: frame 1 done\n");
     world->frames++;
+    world->ui->ui_elements = 0;
 }
 
 static void __easy_uniforms(struct world* world, int shader_program, mat4 model_matrix)

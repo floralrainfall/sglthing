@@ -14,6 +14,7 @@
 #include "yaal.h"
 
 #define MAP_TILE_SIZE 2
+#define HOTBAR_NUM_KEYS 9
 
 struct player {
     struct network_client* client;
@@ -58,9 +59,14 @@ struct yaal_state {
     GHashTable* map_objects;
     GHashTable* maps;
     
+    int map_downloaded_count;
     bool map_downloaded[MAP_SIZE_MAX_X];
     bool map_downloading;
     struct map_tile_data map_data[MAP_SIZE_MAX_X][MAP_SIZE_MAX_Y];
+
+    struct player_action player_actions[9];
+    bool player_action_debounce[9];
+    int player_action_images[ACTION_PICTURE_IDS];
 };
 
 struct yaal_state yaal_state;
@@ -81,6 +87,7 @@ static bool __determine_tile_collision(struct map_tile_data tile)
         default:
         case TILE_WALKAIR:
         case TILE_FLOOR:
+        case TILE_DEBUG:
             return false;
     }
 }
@@ -108,7 +115,7 @@ static void __sglthing_new_player(struct network* network, struct network_client
 
     if(network->mode == NETWORKMODE_SERVER)
     {
-        int intro_id = 1;
+        int intro_id = 2;
         struct map_file_data* map = g_hash_table_lookup(server_state.maps, &intro_id);
         if(map)
         {
@@ -212,15 +219,15 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
         case YAAL_LEVEL_DATA:
             if(network->mode == NETWORKMODE_CLIENT)
             {
-                printf("yaal: receiving %i bytes in level data\n", sizeof(x_data->packet.yaal_level_data));
                 memcpy(&yaal_state.map_data[x_data->packet.yaal_level_data.yaal_x], &x_data->packet.yaal_level_data.data[0], sizeof(x_data->packet.yaal_level_data));
+                yaal_state.map_downloaded_count++;
                 yaal_state.map_downloaded[x_data->packet.yaal_level_data.yaal_x] = true;
                 for(int i = 0; i < MAP_SIZE_MAX_X; i++)
                 {
                     yaal_state.map_downloading = false;
                     if(!yaal_state.map_downloaded[i])
                     {
-                        yaal_state.map_downloading = false;
+                        yaal_state.map_downloading = true;
                         break;
                     }
                 }
@@ -269,7 +276,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 struct map_file_data* map = g_hash_table_lookup(server_state.maps, &x_data->packet.yaal_level_data.level_id);
                 if(map)
                 {
-                    printf("yaal: sending %i bytes in level data from id %i\n", sizeof(x_data->packet.yaal_level_data), x_data->packet.yaal_level_data.level_id);
+                    // printf("yaal: sending %i bytes in level data from id %i\n", sizeof(x_data->packet.yaal_level_data), x_data->packet.yaal_level_data.level_id);
                     memcpy(&x_data->packet.yaal_level_data.data[0], &map->map_row[x_data->packet.yaal_level_data.yaal_x].data[0], sizeof(x_data->packet.yaal_level_data));
                     network_transmit_packet(network, client, *packet);
                 }
@@ -289,6 +296,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 printf("yaal: entering level %s (%i)\n", x_data->packet.yaal_level.level_name, x_data->packet.yaal_level.level_id);
 
                 yaal_state.current_level_id = x_data->packet.yaal_level.level_id;
+                yaal_state.map_downloaded_count = 0;
                 strncpy(yaal_state.level_name, x_data->packet.yaal_level.level_name, 64);
 
 #define LEVEL_TRANSMISSION
@@ -306,6 +314,13 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                     network_transmit_packet(network, client, upd_pak);
                 }
 #endif
+
+                for(int map_x = 0; map_x < MAP_SIZE_MAX_X; map_x++)
+                    for(int map_y = 0; map_y < MAP_SIZE_MAX_Y; map_y++)
+                    {
+                        struct map_tile_data* map_tile = &yaal_state.map_data[map_x][map_y];
+                        map_tile->map_tile_type = TILE_DEBUG;
+                    }
             }
             return false;
         case YAAL_UPDATE_PLAYERANIM:
@@ -340,7 +355,6 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                     if(!map)
                         printf("yaal: client out of this world (%i, id %i)\n", client_player->player_id, client_player->level_id);
                     struct map_tile_data* tile = &map->map_row[map_tile_x].data[map_tile_y];
-                    printf("%i\n",tile->map_tile_type);
                     if(glm_vec3_distance(new_position, client_player->player_position) > 1.5f)
                         collide = true;
                     else                           
@@ -386,21 +400,27 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
             }
             return false;
         default: // unknown packet, for system
-            printf("yaal: [%s] unknown packet %i\n", (network->mode == NETWORKMODE_SERVER)?"server":"client", packet->meta.packet_type);
+            // printf("yaal: [%s] unknown packet %i\n", (network->mode == NETWORKMODE_SERVER)?"server":"client", packet->meta.packet_type);
             return true;
     }
 }
 
 static void __player_iter(gpointer key, gpointer value, gpointer user)
 {
-    struct world* world = (struct world*)user;
-    struct network_client* client = (struct network_client*)value;
+    struct network* network = (struct network*)user;
+    struct network_client* client = NULL;
+    if(network->mode == NETWORKMODE_SERVER)
+        client = network_get_player(network, client);
+    else
+        client = (struct network_client*)value;
+    if(!client)
+        return;
     struct player* player = (struct player*)client->user_data;
-    if(client->owner == &world->client)
+    if(network->mode == NETWORKMODE_CLIENT)
     {
         if(player)
         {
-            animator_update(&player->animator, world->delta_time);
+            animator_update(&player->animator, network->world->delta_time);
         }
     }
     else
@@ -419,7 +439,7 @@ static void __sglthing_frame(struct world* world)
             if(yaal_state.current_player)
                 printf("yaal: ok we are %p %i\n", yaal_state.current_player, yaal_state.player_id);
         }
-        g_hash_table_foreach(world->client.players, __player_iter, (gpointer)world);
+        g_hash_table_foreach(world->client.players, __player_iter, (gpointer)&world->client);
 
         if(yaal_state.current_player)
         {
@@ -451,7 +471,7 @@ static void __sglthing_frame(struct world* world)
 
     if(world->server.status == NETWORKSTATUS_CONNECTED)
     {
-        g_hash_table_foreach(world->server.players, __player_iter, (gpointer)world);        
+        g_hash_table_foreach(world->server.players, __player_iter, (gpointer)&world->server);        
     }
 }
 
@@ -465,16 +485,6 @@ static void __player_render(gpointer key, gpointer value, gpointer user)
     {
         char nameplate_txt[256];
         snprintf(nameplate_txt, 256, "%s", client->client_name, player->animator.current_time);
-
-        world->ui->foreground_color[0] = player->client->player_color_r;
-        world->ui->foreground_color[1] = player->client->player_color_g;
-        world->ui->foreground_color[2] = player->client->player_color_b;
-        world->ui->background_color[3] = 0.f;
-        world->ui->persist = true;
-        if(!world->gfx.shadow_pass)
-            ui_draw_text_3d(world->ui, world->viewport, world->cam.position, world->cam.front, (vec3){0.f,2.f,0.f}, world->cam.fov, player->model_matrix, world->vp, nameplate_txt);
-        world->ui->persist = false;
-
         if(yaal_state.player_model)
         {
             mat4 render_matrix;
@@ -484,6 +494,15 @@ static void __player_render(gpointer key, gpointer value, gpointer user)
             world_draw_model(world, yaal_state.player_model, yaal_state.player_shader, render_matrix, true);
             world_draw_model(world, yaal_state.player_model, yaal_state.player_shader, render_matrix, true);
         }
+
+        world->ui->foreground_color[0] = player->client->player_color_r;
+        world->ui->foreground_color[1] = player->client->player_color_g;
+        world->ui->foreground_color[2] = player->client->player_color_b;
+        world->ui->background_color[3] = 0.f;
+        world->ui->persist = true;
+        if(!world->gfx.shadow_pass)
+            ui_draw_text_3d(world->ui, world->viewport, world->cam.position, world->cam.front, (vec3){0.f,2.f,0.f}, world->cam.fov, player->model_matrix, world->vp, nameplate_txt);
+        world->ui->persist = false;
     }
 }
 
@@ -530,10 +549,19 @@ static void __sglthing_frame_render(struct world* world)
                         }*/
                 // glm_rotate(model_matrix, (map_tile->direction * 90.f) * (180 / M_PIf), (vec3){0.f,1.f,0.f});
                 struct model* mdl = yaal_state.map_tiles[map_tile->tile_graphics_id];
+                bool has_tex = map_tile->tile_graphics_tex;
+                int tex_id = yaal_state.map_graphics_tiles[map_tile->tile_graphics_tex];
+                if(map_tile->map_tile_type == TILE_DEBUG)   
+                {
+                    mdl = yaal_state.map_tiles[1];
+                    tex_id = 0;
+                    has_tex = true;
+                }
                 if(mdl)
-                    if(map_tile->tile_graphics_tex)
+                    if(has_tex)
                     {
-                        int tex_id = yaal_state.map_graphics_tiles[map_tile->tile_graphics_tex];
+                        if(tex_id < MAP_TEXTURE_IDS)
+                            tex_id = 0;
                         if(tex_id == 0)
                             tex_id = yaal_state.map_graphics_tiles[0];
                         sglc(glUseProgram(yaal_state.object_shader));
@@ -584,7 +612,39 @@ static void __sglthing_frame_ui(struct world* world)
         snprintf(txinfo,256,"Waiting for player (%i)", yaal_state.player_id);
     }
 
+    vec4 oldfg, oldbg;
+    glm_vec4_copy(world->ui->foreground_color, oldfg);
+    glm_vec4_copy(world->ui->background_color, oldbg);
+    vec2 action_bar_base = { 0, 64 };
+    for(int i = 0; i < sizeof(yaal_state.player_actions)/sizeof(struct player_action); i++)
+    {
+        struct player_action* action = &yaal_state.player_actions[i];
+        char act_name[64];
+        snprintf(act_name, 64, "%i", i+1);
+        ui_draw_text(world->ui, action_bar_base[0] + (64.f * i), action_bar_base[1] - 16.f, act_name, 1.0f);
+        bool press = ui_draw_button(world->ui, action_bar_base[0] + (64.f * i), action_bar_base[1], 64.f, 64.f, yaal_state.player_action_images[action->action_picture_id], 1.0f);
+        if(press || keys_down[GLFW_KEY_1 + i])
+        {
+            if(!yaal_state.player_action_debounce[i])
+            {
+                yaal_state.player_action_debounce[i] = true;
+            }
+        }       
+        else
+            yaal_state.player_action_debounce[i] = false; 
+    }
+    glm_vec4_copy(oldfg, world->ui->foreground_color);
+    glm_vec4_copy(oldbg, world->ui->background_color);
+
     ui_draw_text(ui, 0.f, 16.f, txinfo, 1.f);
+
+    if(yaal_state.map_downloading)
+    {
+        for(int i = 0; i < MAP_SIZE_MAX_X; i++)
+            ui_draw_text(ui, (fmodf(i,world->viewport[2] / 16.f)*8.f), 32.f, yaal_state.map_downloaded[i]?"D":"?", 1.f);
+        snprintf(txinfo,256,"%f%% done (%i received, %i max)", ((float)yaal_state.map_downloaded_count/MAP_SIZE_MAX_X)*100.f, yaal_state.map_downloaded_count, MAP_SIZE_MAX_X);
+        ui_draw_text(ui, 8.f+8.f*MAP_SIZE_MAX_X, 32.f, txinfo, 1.f);
+    }
 }
 
 static void __load_map(const char* file_name)
@@ -619,13 +679,12 @@ void sglthing_init_api(struct world* world)
     world->server.new_player_callback = __sglthing_new_player;
     world->server.del_player_callback = __sglthing_del_player;
 
-    world->gfx.clear_color[0] = 0.f;
-    world->gfx.clear_color[1] = 0.f;
-    world->gfx.clear_color[2] = 0.f;
+    world->gfx.clear_color[0] = 0.00f;
+    world->gfx.clear_color[1] = 0.00f;
+    world->gfx.clear_color[2] = 0.01f;
 
-    world->gfx.fog_color[0] = 0.f;
-    world->gfx.fog_color[1] = 0.f;
-    world->gfx.fog_color[2] = 0.f;
+    glm_vec4_copy(world->gfx.clear_color, world->gfx.fog_color);
+
     world->gfx.fog_maxdist = 40.f;
     world->gfx.fog_mindist = 32.f;
 
@@ -634,13 +693,23 @@ void sglthing_init_api(struct world* world)
     yaal_state.player_id = -1;
     server_state.maps = g_hash_table_new(g_int_hash, g_int_equal);
 
-    yaal_state.map_graphics_tiles[0] = 0;
+    load_texture("pink_checkerboard.png");
+
+    yaal_state.map_graphics_tiles[0] = get_texture("pink_checkerboard.png");
     for(int i = 1; i < MAP_TEXTURE_IDS; i++)
     {
         char texname[64];
         snprintf(texname, 64, "yaal/map/tex_%i.png", i);
         load_texture(texname);
         yaal_state.map_graphics_tiles[i] = get_texture(texname);
+    }
+
+    for(int i = 0; i < MAP_TEXTURE_IDS; i++)
+    {
+        char texname[64];
+        snprintf(texname, 64, "yaal/ui/hotbar_%i.png", i);
+        load_texture(texname);
+        yaal_state.player_action_images[i] = get_texture(texname);
     }
 
     yaal_state.map_tiles[0] = NULL;
@@ -651,31 +720,6 @@ void sglthing_init_api(struct world* world)
         load_model(mdlname);
         yaal_state.map_tiles[i] = get_model(mdlname);
     }
-
-    load_texture("pink_checkerboard.png");
-
-    /*for(int map_x = 0; map_x < MAP_SIZE_MAX_X; map_x++)
-    {
-        for(int map_y = 0; map_y < MAP_SIZE_MAX_Y; map_y++)
-        {
-            struct map_tile_data* map_tile = &server_state.map_data[map_x][map_y];
-            map_tile->map_tile_type = ((map_x%5==0)||(map_y%7==0))?TILE_WALL:TILE_FLOOR;
-            if(map_tile->map_tile_type == TILE_WALL)
-                map_tile->tile_graphics_id = 2;
-            else
-                map_tile->tile_graphics_id = 1;
-            int rng = rand();
-            if(map_tile->map_tile_type == TILE_FLOOR && (rng % 5) == 0)
-                map_tile->tile_graphics_ext_id = 3;
-            else if(map_tile->map_tile_type == TILE_FLOOR && (rng % 5) == 1)
-            {
-                map_tile->tile_graphics_ext_id = 4;
-                map_tile->tile_light_type = LIGHT_OBJ4_LAMP;    
-            }
-            map_tile->tile_graphics_tex = 0;
-            map_tile->direction = rand() * DIR_MAX;
-        }
-    }*/
 
     __load_map("yaal/maps/introduction.map");
     __load_map("yaal/maps/prison.map");

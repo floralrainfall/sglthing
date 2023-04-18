@@ -128,6 +128,9 @@ void mus_tick(struct musmgr* mgr)
                 }
             }
             glm_vec4_copy(old_color, world->ui->foreground_color);
+
+            ui_draw_text(world->ui, 0.f, 128.f, "sglmustracker", 1.f);
+            ui_draw_text(world->ui, 0.f, 128.f-16.f, mgr->current_music->name, 1.f);
         }
 
         if(mgr->playing)
@@ -159,10 +162,5 @@ void mus_tick(struct musmgr* mgr)
         {
 
         }
-
-        ui_draw_text(world->ui, 0.f, 128.f, "sglmustracker", 1.f);
-        ui_draw_text(world->ui, 0.f, 128.f-16.f, mgr->current_music->name, 1.f);
-
-
     }
 }
