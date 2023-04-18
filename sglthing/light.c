@@ -42,21 +42,17 @@ void light_update(struct light_area* area, vec3 position)
         if((l->flags & area->mask) == 0)
         {
             float dist = glm_vec3_distance(position,l->position);
-            if(dist < 64.f)
-            {
-                area->active_lights[lights_allocated_in_area] = l;
-                area->active_lights[lights_allocated_in_area]->distance = dist;
-                lights_allocated_in_area++;
-                if(lights_allocated_in_area == MAX_LIGHTS)
-                    break;
-            }
+            area->active_lights[lights_allocated_in_area] = l;
+            area->active_lights[lights_allocated_in_area]->distance = dist;
+            lights_allocated_in_area++;
+            if(lights_allocated_in_area == MAX_LIGHTS)
+                break;
         }
     }
 }
 
 void light_add(struct light_area* area, struct light* light)
 {
-    printf("sglthing: added light %p\n", light);
     g_array_append_val(area->scene_lights, light);
 }
 

@@ -18,10 +18,7 @@ void main()
     result = hdrColor / (hdrColor + vec3(1.0));
 
     // tone mapping
-    // result = vec3(1.0) - exp(-hdrColor * exposure);
-
-    // also gamma correct while we're at it       
-    result = pow(result, vec3(1.0 / gamma));
+    result = vec3(1.0) - exp(-hdrColor * exposure);
 
     FragColor = vec4(result, 1.0);
 }  

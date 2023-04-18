@@ -36,7 +36,7 @@ static void model_load_textures(struct mesh* mesh, struct aiMesh* mesh_2, const 
                 snprintf(fpath,256,"%s/%s",rsc_dir,path.data);
             else
                 strncpy(fpath, path.data, 256);
-            if(!get_texture(&fpath))
+            if(!get_texture2(&fpath))
             {
                 if(path.data[0] == '*')
                     printf("sglthing: embedded textures not supported\n");

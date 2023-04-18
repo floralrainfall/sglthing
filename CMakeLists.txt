@@ -55,6 +55,8 @@ if(YAAL_COMPILE)
     add_executable(Yaal
         yaal/yaal.c
         yaal/yaal.h
+        yaal/util.c
+        yaal/util.h
     )
     set_target_properties(Yaal PROPERTIES OUTPUT_NAME "thesglyaal")
 endif()

@@ -53,6 +53,8 @@ struct world {
         mat4 light_space_matrix;
         mat4 light_space_matrix_far;
         int current_map;
+    
+        int sgl_background_image;
 
 #ifdef FBO_ENABLED
         int hdr_fbo;

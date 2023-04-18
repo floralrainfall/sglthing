@@ -7,7 +7,7 @@
 
 struct config_file
 {
-    struct GKeyFile* key_file;    
+    GKeyFile* key_file;    
 };
 
 void config_load(struct config_file* config, char* file);

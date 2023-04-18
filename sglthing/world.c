@@ -71,7 +71,10 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     }
 
     world->enable_script = (config_number_get(&world->config, "script_enabled") == 1.0);
-    
+
+    load_texture("uiassets/sglthing.png");
+    world->gfx.sgl_background_image = get_texture("uiassets/sglthing.png");
+
     if(!network_download)
         world->script = script_init("scripts/game.scm", world);
 
@@ -444,7 +447,7 @@ void world_frame(struct world* world)
         sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_pingpong_buffers[1]));
         sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur2_shader,"bloom"), 1));
 
-        sglc(glUniform1f(glGetUniformLocation(world->gfx.hdr_blur2_shader,"exposure"), 0.4f));
+        sglc(glUniform1f(glGetUniformLocation(world->gfx.hdr_blur2_shader,"exposure"), 1.0f));
         sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
         sglc(glDrawArrays(GL_POINTS, 0, 1));
     #endif
@@ -500,6 +503,7 @@ void world_frame(struct world* world)
         world->gfx.current_map = 0;
         world->ui->ui_elements = 0;
         world->gfx.shadow_pass = false;
+        ui_draw_image(world->ui, world->gfx.screen_width/2 - 255.f/2, world->gfx.screen_height/2 + 64.f/2, 255.f, 64.f, world->gfx.sgl_background_image, 1.f);
         if(world->assets_downloading)
         {
             char tx[256];

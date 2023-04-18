@@ -134,6 +134,16 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
         vec4 background_color = { 0.0f, 0.0f, 0.0f, 0.0f };
         vec4 foreground_color;
 
+        offset[0] = -2.0f;
+        offset[1] = -1.0f;
+        offset[2] = -2.0f;
+        
+        glm_vec4_divs(ui->foreground_color, 2.f, foreground_color);
+        sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
+        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, foreground_color));
+        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, background_color));
+        sglc(glDrawArrays(GL_TRIANGLES, 0, point_count));
+
         offset[0] = 0.0f;
         offset[1] = 0.0f;
         offset[2] = -1.0f;
@@ -141,16 +151,6 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
         sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
         sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
         sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
-        sglc(glDrawArrays(GL_TRIANGLES, 0, point_count));
-
-        offset[0] = -2.0f;
-        offset[1] = -2.0f;
-        offset[2] = -2.0f;
-        
-        glm_vec4_divs(ui->foreground_color, 2.f, foreground_color);
-        sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
-        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, foreground_color));
-        sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, background_color));
         sglc(glDrawArrays(GL_TRIANGLES, 0, point_count));
 
         offset[0] = 0.0f;
@@ -257,13 +257,13 @@ void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float
     sglc(glActiveTexture(GL_TEXTURE0));
     sglc(glBindTexture(GL_TEXTURE_2D, image));
     vec3 offset = {0.f, 0.f};
-    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
-    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"time"), (float)glfwGetTime()));
-    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"waviness"), ui->waviness));
-    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_program,"projection"), 1, GL_FALSE, ui->projection[0])); 
-    sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
-    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
-    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_img_program,"depth"), -depth));
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_img_program,"time"), (float)glfwGetTime()));
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_img_program,"waviness"), ui->waviness));
+    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_img_program,"projection"), 1, GL_FALSE, ui->projection[0])); 
+    sglc(glUniform3fv(glGetUniformLocation(ui->ui_img_program,"offset"), 1, offset));
+    sglc(glUniform4fv(glGetUniformLocation(ui->ui_img_program,"foreground_color"), 1, ui->foreground_color));
+    sglc(glUniform4fv(glGetUniformLocation(ui->ui_img_program,"background_color"), 1, ui->background_color));
     sglc(glDrawArrays(GL_TRIANGLES, 0, 6));
 }
 
