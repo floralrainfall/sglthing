@@ -1,7 +1,7 @@
 #ifndef LIGHT_H
 #define LIGHT_H
 
-#define MAX_LIGHTS 16
+#define MAX_LIGHTS 32
 #include <cglm/cglm.h>
 #include <stdbool.h>
 #include <glib.h>
@@ -19,6 +19,7 @@ struct light {
     vec3 diffuse;
     vec3 specular;
 
+    bool disable;
     int flags;
     void* user_data;
 };

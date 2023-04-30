@@ -24,6 +24,7 @@ struct ui_data
     int ui_vbo;
 
     mat4 projection;
+    vec2 screen_size;
 
     int ui_elements;
 
@@ -42,6 +43,7 @@ struct ui_data
 
     bool shadow;
     bool persist;
+    bool debounce;
 };
 
 // depth should be 1.f

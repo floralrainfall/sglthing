@@ -31,6 +31,9 @@ struct world {
         vec3 front;
         vec3 right;
         float fov;
+        float random_shake;
+        float wobble; // yaw = sin(2t), pitch = cos(t) where t is time in seconds
+        float lsd;
     } cam;
 
     struct {
@@ -42,6 +45,7 @@ struct world {
         int banding_effect;
         int screen_width;
         int screen_height;
+        int white_texture;
 
         vec3 sun_position;
         int depth_map_fbo;
@@ -55,6 +59,7 @@ struct world {
         int current_map;
     
         int sgl_background_image;
+        int chat_bar_image;
 
 #ifdef FBO_ENABLED
         int hdr_fbo;
@@ -121,6 +126,8 @@ struct world {
     void (*world_frame_render_user)(struct world* world);
     void (*world_frame_ui_user)(struct world* world);
     void (*world_uniforms_set)(struct world* world);
+
+    bool debug_mode;
 };
 
 struct world* world_init(char** argv, int argc, GLFWwindow* window);

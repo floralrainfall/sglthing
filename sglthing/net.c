@@ -84,7 +84,7 @@ void network_start_download(struct network_downloader* network, char* ip, int po
         send(network->socket, &client_info, sizeof(client_info), 0);
     }
 #else
-        sendto(network->socket, &client_info, sizeof(client_info), 0, &network->dest, sizeof(network->dest));
+        sendto(network->socket, &client_info, sizeof(client_info), MSG_NOSIGNAL, &network->dest, sizeof(network->dest));
 #endif
 }
 
@@ -462,8 +462,8 @@ static void network_manage_packet(struct network* network, struct network_client
                     response.packet.serverinfo.player_color_b = client->player_color_b;
                     response.packet.serverinfo.player_count = 0;
                     memcpy(response.packet.serverinfo.session_key, network->http_client.sessionkey, 256);
-                    strncpy(response.packet.serverinfo.server_motd,"I am a vey glad to meta you",128);
-                    strncpy(response.packet.serverinfo.server_name,"SGLThing Server",64);
+                    strncpy(response.packet.serverinfo.server_motd, network->server_motd,128);
+                    strncpy(response.packet.serverinfo.server_name, network->server_name,64);
                     network_transmit_packet(network, client, response);                            
 
                     response.meta.packet_type = PACKETTYPE_PLAYER_ADD;
@@ -593,13 +593,15 @@ static void network_manage_packet(struct network* network, struct network_client
         case PACKETTYPE_CHAT_MESSAGE:
             if(network->mode == NETWORKMODE_SERVER)
             {
+                printf("sglthing '%s: %s'\n", client->client_name, in_packet.packet.chat_message.message);
                 in_packet.packet.chat_message.verified = client->verified;
+                in_packet.packet.chat_message.player_id = client->player_id;
                 strncpy(in_packet.packet.chat_message.client_name,client->client_name,64);
                 network_transmit_packet_all(network, in_packet);
             }
             else
             {
-                printf("sglthing '%s: %s'", in_packet.packet.chat_message.client_name, in_packet.packet.chat_message.message);
+                printf("sglthing '%s: %s'\n", in_packet.packet.chat_message.client_name, in_packet.packet.chat_message.message);
             }
             break;   
         case PACKETTYPE_DATA_REQUEST:
@@ -847,6 +849,9 @@ void network_disconnect_player(struct network* network, bool transmit_disconnect
 {
     if(network->mode == NETWORKMODE_SERVER)
     {
+        if(network->del_player_callback)
+            network->del_player_callback(network, client);
+        g_hash_table_remove(network->players, &client->player_id);
         for(int i = 0; i < network->server_clients->len; i++)
         {
             struct network_client* v = &g_array_index(network->server_clients,struct network_client,i);
@@ -856,9 +861,6 @@ void network_disconnect_player(struct network* network, bool transmit_disconnect
                 break;
             }
         }
-        if(network->del_player_callback)
-            network->del_player_callback(network, client);
-        g_hash_table_remove(network->players, &client->player_id);
         if(client->authenticated && transmit_disconnect)
         {
             struct network_packet response;

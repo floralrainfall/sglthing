@@ -120,7 +120,8 @@ int main(int argc, char** argv)
         glfwSwapBuffers(window); 
         float frame_end = glfwGetTime();
         world->delta_time = (frame_end - frame_start);
-        kbd_frame_end();    
+        if(get_focus())
+            kbd_frame_end();    
         glfwPollEvents();   
     }
 

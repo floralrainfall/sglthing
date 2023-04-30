@@ -53,10 +53,16 @@ set(YAAL_COMPILE yes)
 if(YAAL_COMPILE)
     project(Yaal)
     add_executable(Yaal
+        yaal/netmgr.c
+        yaal/netmgr.h
         yaal/yaal.c
         yaal/yaal.h
         yaal/util.c
         yaal/util.h
+        yaal/chat.c
+        yaal/chat.h
+        yaal/map.c
+        yaal/map.h
     )
     set_target_properties(Yaal PROPERTIES OUTPUT_NAME "thesglyaal")
 endif()
@@ -77,6 +83,8 @@ add_library(sglthing STATIC
 
     sglthing/primitives.h
     sglthing/primitives.c 
+    sglthing/particles.h
+    sglthing/particles.c
     sglthing/animator.h
     sglthing/animator.c
     sglthing/sglthing.c

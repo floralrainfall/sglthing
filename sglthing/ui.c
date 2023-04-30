@@ -8,7 +8,7 @@
 #include "texture.h"
 #include "keyboard.h"
 
-#define MAX_CHARACTERS_STRING 32767
+#define MAX_CHARACTERS_STRING 65535
 #define MAX_UI_ELEMENTS 512
 
 void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
@@ -16,13 +16,15 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return;
 
+    int txlen = strlen(text);
+
     vec2 points[MAX_CHARACTERS_STRING][2] = {0};
     int point_count = 0;
 
     int line = 0;
     int keys = 0;
 
-    for(int i = 0; i < strlen(text); i++)
+    for(int i = 0; i < txlen; i++)
     {
         if(text[i] == '\n')
         {
@@ -121,7 +123,6 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     sglc(glActiveTexture(GL_TEXTURE0));
     sglc(glBindTexture(GL_TEXTURE_2D, ui->ui_font->font_texture));
     vec3 offset;
-    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"time"), (float)glfwGetTime()));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"waviness"), ui->waviness));
     sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_program,"projection"), 1, GL_FALSE, ui->projection[0]));      
@@ -136,9 +137,10 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 
         offset[0] = -2.0f;
         offset[1] = -1.0f;
-        offset[2] = -2.0f;
+        offset[2] = -0.2f;
         
         glm_vec4_divs(ui->foreground_color, 2.f, foreground_color);
+        sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
         sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
         sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, foreground_color));
         sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, background_color));
@@ -146,8 +148,9 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 
         offset[0] = 0.0f;
         offset[1] = 0.0f;
-        offset[2] = -1.0f;
+        offset[2] = -0.1f;
 
+        sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
         sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
         sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
         sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
@@ -157,6 +160,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
         offset[1] = 0.0f;
         offset[2] = 0.0f;
 
+        sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
         sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
         sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->background_color));
         sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
@@ -164,6 +168,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     }
     else
     {    
+        sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
         sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
         sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
         sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
@@ -181,10 +186,21 @@ bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, floa
 
     ui_draw_image(ui, position_x, position_y, size_x, size_y, image, depth);
 
-    if(mouse_state.mouse_button_r)
+    if(mouse_state.mouse_button_l && !ui->debounce)
     {
-        printf("%f,%f\n", mouse_position[0], mouse_position[1]);
+        float rel_m_px = mouse_position[0];
+        float rel_m_py = ui->screen_size[1] - mouse_position[1];
+        if(rel_m_px > position_x &&
+           rel_m_px < position_x+size_x &&
+           rel_m_py < position_y &&
+           rel_m_py > position_y-size_y)
+           {
+               ui->debounce = true;
+               return true;
+           }
     }
+    if(!mouse_state.mouse_button_l)
+        ui->debounce = false;
 
     return false;
 }

@@ -6,11 +6,13 @@
 struct keyboard_mapping mappings[MAX_KEYBORAD_MAPPINGS];
 int mapping_count = 0;
 
-
 struct mouse_state mouse_state = {0};
 int keys_down[GLFW_KEY_LAST] = {0};
 vec2 mouse_position = { 0, 0 };
 bool mouse_focus = false;
+char input_text[MAX_INPUT_TEXT] = {0};
+bool input_disable = false;
+int input_cursor = 0;
 
 static void __mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
@@ -24,6 +26,20 @@ static void __kbd_callback(GLFWwindow* window, int key, int scancode, int action
 {
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+
+    if(input_disable)
+    {
+        if(action == GLFW_PRESS && key == GLFW_KEY_ENTER)
+            input_disable = false;
+        else if((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_BACKSPACE)
+        {
+            if(input_cursor == 0)
+                return;
+            input_cursor--;
+            input_text[input_cursor] = 0;
+        }
+        return;
+    }
 
     for(int i = 0; i < mapping_count; i++)
     {
@@ -62,11 +78,22 @@ static void __click_callback(GLFWwindow* window, int button, int action, int mod
         mouse_state.mouse_button_l = action == GLFW_PRESS;
 }
 
+static void __chara_callback(GLFWwindow* window, unsigned int codepoint)
+{
+    if(!input_disable)
+        return;
+    char chara = (char)codepoint;
+    input_text[input_cursor] = chara;
+    input_cursor++;
+}
+
 void init_kbd(GLFWwindow* window)
 {
     glfwSetKeyCallback(window, __kbd_callback);
     glfwSetMouseButtonCallback(window, __click_callback);
     glfwSetCursorPosCallback(window, __mouse_callback);
+    glfwSetCharCallback(window, __chara_callback);
+    input_disable = false;
 }
 
 
@@ -107,4 +134,11 @@ void kbd_frame_end()
 {
     mouse_position[0] = 0.f;
     mouse_position[1] = 0.f;
+}
+
+void start_text_input()
+{
+    input_disable = true;
+    input_cursor = 0;
+    memset(input_text, 0, sizeof(input_text));
 }

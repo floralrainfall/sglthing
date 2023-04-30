@@ -48,6 +48,7 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     world->cam.world_up[2] = 0.f;
     world->cam.fov = 45.f;
     world->cam.yaw = 0.f;
+    world->cam.lsd = 0.f;
 
     world->frames = 0;
     world->fps = 0.0;
@@ -74,6 +75,8 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
 
     load_texture("uiassets/sglthing.png");
     world->gfx.sgl_background_image = get_texture("uiassets/sglthing.png");
+    load_texture("uiassets/text_input_bar.png");
+    world->gfx.chat_bar_image = get_texture("uiassets/text_input_bar.png");
 
     if(!network_download)
         world->script = script_init("scripts/game.scm", world);
@@ -200,6 +203,7 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     world->server.security = (config_number_get(&world->config,"network_security") == 1.0);
     world->server.shutdown_empty = (config_number_get(&world->config,"shutdown_empty") == 1.0);
     world->server.client_default_tick = config_number_get(&world->config,"server_default_tick");
+    world->debug_mode = g_key_file_get_boolean(world->config.key_file,"sglthing","debug_mode", NULL);
 
     strncpy(world->server.debugger_pass,config_string_get(&world->config,"debugger_pass"),64);
     strncpy(world->server.server_pass,config_string_get(&world->config,"server_pass"),64);
@@ -208,6 +212,11 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
 
     strncpy(world->server.server_motd,config_string_get(&world->config,"server_motd"),128);
     strncpy(world->server.server_name,config_string_get(&world->config,"server_name"),64);
+
+    if(g_key_file_get_boolean(world->config.key_file, "sglthing", "fullscreen", NULL))
+        glfwSetWindowMonitor(window, glfwGetPrimaryMonitor(), 0, 0, 
+            g_key_file_get_integer(world->config.key_file, "sglthing", "fullscreen_x", NULL), 
+            g_key_file_get_integer(world->config.key_file, "sglthing", "fullscreen_y", NULL), GLFW_DONT_CARE);
 
     if(g_key_file_has_key(world->config.key_file,"sglthing","user_color_r",NULL))
         world->client.client.player_color_r = config_number_get(&world->config, "user_color_r");
@@ -249,6 +258,9 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     world->world_frame_ui_user = NULL;
     world->world_frame_render_user = NULL;
     world->world_uniforms_set = NULL;
+
+    load_texture("uiassets/white.png");
+    world->gfx.white_texture = get_texture("uiassets/white.png");
 
     return world;
 }
@@ -322,6 +334,8 @@ void world_frame(struct world* world)
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 #endif
 
+    if(world->world_frame_user)
+        world->world_frame_user(world);
     if(world->cam.pitch > 85.f)
         world->cam.pitch = 85.f;
     if(world->cam.pitch < -85.f)
@@ -329,10 +343,15 @@ void world_frame(struct world* world)
 
     glm_perspective(world->cam.fov * M_PI_180f, world->gfx.screen_width/world->gfx.screen_height, 0.1f, world->gfx.fog_maxdist, world->p);
     glm_ortho(0.f, world->viewport[2], 0.f, world->viewport[3], 0.1f, 1000.f, world->ui->projection);
+    world->ui->screen_size[0] = world->viewport[2];
+    world->ui->screen_size[1] = world->viewport[3];
 
-    world->cam.front[0] = cosf(world->cam.yaw * M_PI_180f) * cosf(world->cam.pitch * M_PI_180f);
-    world->cam.front[1] = sinf(world->cam.pitch * M_PI_180f);
-    world->cam.front[2] = sinf(world->cam.yaw * M_PI_180f) * cosf(world->cam.pitch * M_PI_180f);
+    float yaw = world->cam.yaw + (g_random_double() * world->cam.random_shake) + (sinf(glfwGetTime()*2.f) * world->cam.wobble);
+    float pitch = world->cam.pitch + (g_random_double() * world->cam.random_shake) + (cosf(glfwGetTime()) * world->cam.wobble); 
+
+    world->cam.front[0] = cosf(yaw * M_PI_180f) * cosf(pitch * M_PI_180f);
+    world->cam.front[1] = sinf(pitch * M_PI_180f);
+    world->cam.front[2] = sinf(yaw * M_PI_180f) * cosf(pitch * M_PI_180f);
 
     glm_normalize(world->cam.front);
     glm_cross(world->cam.front, world->cam.world_up, world->cam.right);
@@ -356,8 +375,6 @@ void world_frame(struct world* world)
     {
         glBindFramebuffer(GL_FRAMEBUFFER,2);
     }
-    if(world->world_frame_user)
-        world->world_frame_user(world);
     if(!world->assets_downloading)
         script_frame(world->script);
     if(world->client.status != NETWORKSTATUS_CONNECTED)
@@ -447,13 +464,43 @@ void world_frame(struct world* world)
         sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_pingpong_buffers[1]));
         sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur2_shader,"bloom"), 1));
 
+        sglc(glActiveTexture(GL_TEXTURE2));
+        sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.hdr_depth_buffer));
+        sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur2_shader,"depth"), 2));
+
         sglc(glUniform1f(glGetUniformLocation(world->gfx.hdr_blur2_shader,"exposure"), 1.0f));
+        sglc(glUniform1f(glGetUniformLocation(world->gfx.hdr_blur2_shader,"time"), glfwGetTime()));
+        sglc(glUniform1f(glGetUniformLocation(world->gfx.hdr_blur2_shader,"lsd"), world->cam.lsd));
         sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
         sglc(glDrawArrays(GL_POINTS, 0, 1));
     #endif
         // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
 
         glClear(GL_DEPTH_BUFFER_BIT);
+
+        if(input_disable)
+        {
+            ui_draw_image(world->ui, 0.f, world->gfx.screen_height, world->gfx.screen_width, 16.f, world->gfx.chat_bar_image, 0.9f);
+            vec4 oldbg, oldfg;
+            glm_vec4_copy(world->ui->background_color, oldbg);
+            glm_vec4_copy(world->ui->foreground_color, oldfg);
+            world->ui->background_color[0] = 0.f;
+            world->ui->background_color[1] = 0.f;
+            world->ui->background_color[2] = 0.f;
+            world->ui->background_color[3] = 0.f;
+
+            world->ui->foreground_color[0] = 0.f;
+            world->ui->foreground_color[1] = 0.f;
+            world->ui->foreground_color[2] = 0.f;
+            world->ui->foreground_color[3] = 1.f;
+            world->ui->shadow = false;
+
+            ui_draw_text(world->ui, 0.f, world->gfx.screen_height-(16.f), input_text, 0.8f);
+
+            world->ui->shadow = true;
+            glm_vec4_copy(oldbg, world->ui->background_color);
+            glm_vec4_copy(oldfg, world->ui->foreground_color);
+        }
 
         if(config_number_get(&world->config,"debug_mode") == 1.0)
         {
@@ -503,7 +550,7 @@ void world_frame(struct world* world)
         world->gfx.current_map = 0;
         world->ui->ui_elements = 0;
         world->gfx.shadow_pass = false;
-        ui_draw_image(world->ui, world->gfx.screen_width/2 - 255.f/2, world->gfx.screen_height/2 + 64.f/2, 255.f, 64.f, world->gfx.sgl_background_image, 1.f);
+        ui_draw_image(world->ui, world->gfx.screen_width/2 - 256.f/2, world->gfx.screen_height/2 + 64.f/2, 256.f, 64.f, world->gfx.sgl_background_image, 1.f);
         if(world->assets_downloading)
         {
             char tx[256];

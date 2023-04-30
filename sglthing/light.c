@@ -2,8 +2,6 @@
 #include <glad/glad.h>
 #include "world.h"
 
-#define MAX_SCENE_LIGHTS 255
-
 struct light_area* light_create_area()
 {
     struct light_area* new_area = malloc(sizeof(struct light_area));
@@ -24,6 +22,11 @@ static int __light_sort(gconstpointer a, gconstpointer b, gpointer user_data)
     float b_dist = glm_vec3_distance(b_l->position, position);
 
     // printf("(%f, %f, %f) %p %f (%f,%f,%f) %p %f (%f,%f,%f)\n", position[0], position[1], position[2], a_l, a_dist, a_l->position[0], a_l->position[1], a_l->position[2], b_l, b_dist, b_l->position[0], b_l->position[1], b_l->position[2]);
+
+    if(a_l->disable)
+        return -1;
+    if(b_l->disable)
+        return 1;
 
     return a_dist - b_dist;
 }
@@ -53,6 +56,7 @@ void light_update(struct light_area* area, vec3 position)
 
 void light_add(struct light_area* area, struct light* light)
 {
+    light->disable = false;
     g_array_append_val(area->scene_lights, light);
 }
 
@@ -105,13 +109,13 @@ void light_area_set_uniforms(struct light_area* area, int shader_program)
     {
         char uniform_name[64];
         while(glGetError()!=0);
-        if(area->active_lights[i])
+        if(area->active_lights[i] && area->active_lights[i]->disable == false)
         {
             light_set_uniforms(i,area->active_lights[i],shader_program);
         }
         else
         {
-            snprintf(uniform_name,64,"lights[%i].present",i);
+            snprintf(uniform_name,64,"lights[%i].present",0.0);
             glUniform1f(glGetUniformLocation(shader_program,uniform_name), 0.f);
         }
     }
