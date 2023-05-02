@@ -1,5 +1,7 @@
 #include "chat.h"
+#ifndef HEADLESS
 #include <GLFW/glfw3.h>
+#endif
 
 void chat_render_player(struct world* world, struct chat_system* chat, struct player* player, mat4 matrix)
 {
