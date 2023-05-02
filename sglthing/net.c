@@ -9,7 +9,9 @@
 #include <sys/socket.h>
 #include <zlib.h>
 #ifdef SGLTHING_COMPILE
+#ifndef HEADLESS
 #include <GLFW/glfw3.h>
+#endif
 #include "s7/script_networking.h"
 #include "io.h"
 #endif
