@@ -331,7 +331,9 @@ static s7_pointer __input_get_focus(s7_scheme* sc, s7_pointer args)
     return s7_make_boolean(sc, get_focus());
 }
 
+#ifdef ODE_ENABLED
 #include <ode/ode.h>
+#endif 
 
 static s7_pointer __physics_set_transform(s7_scheme* sc, s7_pointer args)
 {
