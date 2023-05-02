@@ -124,6 +124,8 @@ struct world* world_init(char** argv, int argc, void* p)
     world->viewport[1] = 0.f;
     world->viewport[2] = 640.f;
     world->viewport[3] = 480.f;
+    world->gfx.screen_width = 640;
+    world->gfx.screen_width = 480;
 
     world->delta_time = 0.0;
 
