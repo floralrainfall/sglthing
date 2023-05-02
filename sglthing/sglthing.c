@@ -132,6 +132,8 @@ int main(int argc, char** argv)
     glm_vec4_copy(world->viewport, old_viewport);
     while(!glfwWindowShouldClose(window) && !should_close)
 #else
+    world->gfx.screen_width = 640;
+    world->gfx.screen_height = 480;
     while(!should_close)
 #endif
     {
