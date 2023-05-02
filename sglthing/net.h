@@ -202,6 +202,7 @@ struct network {
     struct script_system* script;
 #endif
     double distributed_time;
+    double time;
     int network_frames;
 
     GArray* server_clients;
@@ -234,7 +235,7 @@ int network_transmit_packet(struct network* network, struct network_client* clie
 void network_transmit_packet_all(struct network* network, struct network_packet packet);
 void network_transmit_data(struct network* network, struct network_client* client, char* data, int data_length);
 void network_disconnect_player(struct network* network, bool transmit_disconnect, char* reason, struct network_client* client);
-void network_frame(struct network* network, float delta_time);
+void network_frame(struct network* network, float delta_time, double time);
 #ifdef SGLTHING_COMPILE
 void network_dbg_ui(struct network* network, struct ui_data* ui);
 #endif

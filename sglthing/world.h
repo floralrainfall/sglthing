@@ -14,8 +14,10 @@
 #include "net.h"
 #include "snd.h"
 #include "mus.h"
+#ifndef HEADLESS
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#endif
 
 #define SHADOW_WIDTH 2048
 #define SHADOW_HEIGHT 2048
@@ -73,7 +75,9 @@ struct world {
 
         int quad_shader;
 
+#ifndef HEADLESS
         GLFWwindow *window;
+#endif
     } gfx;
 
     bool assets_downloading;
@@ -130,7 +134,12 @@ struct world {
     bool debug_mode;
 };
 
+#ifndef HEADLESS
 struct world* world_init(char** argv, int argc, GLFWwindow* window);
+#else
+struct world* world_init(char** argv, int argc, void* a);
+#endif
+
 void world_deinit(struct world* world);
 
 void world_frame(struct world* world);

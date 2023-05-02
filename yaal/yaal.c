@@ -8,8 +8,10 @@
 #include <sglthing/animator.h>
 #include <sglthing/light.h>
 #include <sglthing/io.h>
+#ifndef HEADLESS
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#endif
 #include <stdlib.h>
 #include "yaal.h"
 #include "util.h"
@@ -47,7 +49,6 @@ static void __player_iter(gpointer key, gpointer value, gpointer user)
 
 static void __sglthing_frame(struct world* world)
 {
-    world->cam.lsd = 0.25f;
     if(world->client.status == NETWORKSTATUS_CONNECTED)
     {
         if(!yaal_state.current_player && yaal_state.player_id != -1)
@@ -134,6 +135,9 @@ static void __player_render(gpointer key, gpointer value, gpointer user)
 
     if(player)
     {
+        if(player->level_id != yaal_state.current_level_id)
+            return;
+
         char nameplate_txt[256];
         snprintf(nameplate_txt, 256, "%s", client->client_name, player->animator.current_time);
         if(yaal_state.player_model)
@@ -178,7 +182,7 @@ static void __sglthing_frame_render(struct world* world)
         glm_mat4_identity(arrow_matrix);
         glm_translate(arrow_matrix, yaal_state.aiming_arrow_position);
         if(!world->gfx.shadow_pass)
-            glDisable(GL_DEPTH_TEST);
+            sglc(glDisable(GL_DEPTH_TEST));
         sglc(glUseProgram(yaal_state.object_shader));
         sglc(glActiveTexture(GL_TEXTURE0));
         sglc(glBindTexture(GL_TEXTURE_2D, world->gfx.white_texture));                
@@ -194,9 +198,11 @@ static void __sglthing_frame_render(struct world* world)
                 .texture = yaal_state.select_particle_tex, 
                 .dim = 2.5f
             });
-            glEnable(GL_DEPTH_TEST);
+            sglc(glEnable(GL_DEPTH_TEST));
         }
     }
+
+    render_fx(world,&yaal_state.fx_manager);
 
     if(!world->gfx.shadow_pass)
     {
@@ -229,13 +235,28 @@ static void __sglthing_frame_ui(struct world* world)
         snprintf(txinfo,256,"Waiting for player (%i)", yaal_state.player_id);
     }
 
+#ifndef HEADLESS
     if(!keys_down[GLFW_KEY_EQUAL])
         chat_render(world, yaal_state.chat);
-
+#endif
 
     vec4 oldfg, oldbg;
     glm_vec4_copy(world->ui->foreground_color, oldfg);
     glm_vec4_copy(world->ui->background_color, oldbg);
+
+    if(yaal_state.show_rpg_message)
+    {
+        int s = strlen(yaal_state.rpg_message) + 4;
+        int pos = (world->gfx.screen_width/2)-((s*8)/2);
+        ui_draw_text(world->ui, pos, 16*8.f, yaal_state.rpg_message, 1.f);
+        if(ui_draw_button(world->ui, pos+8.f*strlen(yaal_state.rpg_message), 16*9.f, 32.f, 16.f, yaal_state.player_ok_button_tex, 1.f))
+        {
+            yaal_state.show_rpg_message = false;
+        }
+    }
+
+    glm_vec4_copy(oldfg, world->ui->foreground_color);
+    glm_vec4_copy(oldbg, world->ui->background_color);
 
     world->ui->background_color[0] = 0.f;
     world->ui->background_color[1] = 0.f;
@@ -271,6 +292,7 @@ static void __sglthing_frame_ui(struct world* world)
         }
         if(action->combat_mode && !yaal_state.current_player->combat_mode)
             continue;
+#ifndef HEADLESS
         if(press || keys_down[GLFW_KEY_1 + i])
             if(!yaal_state.player_action_debounce[i])
             {
@@ -291,6 +313,7 @@ static void __sglthing_frame_ui(struct world* world)
             }
         if(yaal_state.player_action_debounce[i] && !(press || keys_down[GLFW_KEY_1 + i]))
             yaal_state.player_action_debounce[i] = false; 
+#endif
     }    
 
     if(yaal_state.current_player)
@@ -323,6 +346,7 @@ static void __sglthing_frame_ui(struct world* world)
         char player_stat_info[255];
         snprintf(player_stat_info, 255, "%02i/%02iHP", yaal_state.current_player->player_health, yaal_state.current_player->player_max_health);
         ui_draw_text(world->ui, offset[0], offset[1]-16.f, player_stat_info, 1.f);
+        offset[0] += 16.f;
         offset[0] += strlen(player_stat_info) * 8.f;
         float player_manas = yaal_state.current_player->player_mana/2.f;
         int player_full_manas = floorf(player_manas);
@@ -353,9 +377,19 @@ static void __sglthing_frame_ui(struct world* world)
         ui_draw_text(world->ui, offset[0], offset[1]-16.f, player_stat_info, 1.f);
         offset[0] -= 16.f;
         ui_draw_image(world->ui, offset[0], offset[1], 16.f, 16.f, yaal_state.friends_tex, 1.f);
+        offset[0] -= 16.f;
+
+        snprintf(player_stat_info, 255, "%i$", yaal_state.current_player->player_coins);
+        offset[0] -= strlen(player_stat_info) * 8.f;
+        ui_draw_text(world->ui, offset[0], offset[1]-16.f, player_stat_info, 1.f);
+        offset[0] -= 16.f;
+        ui_draw_image(world->ui, offset[0], offset[1], 16.f, 16.f, yaal_state.player_coins_tex, 1.f);
         world->ui->shadow = true;
 
-        if(ui_draw_button(world->ui, (9*64.f), 16.f+64.f, 32.f, 64.f, yaal_state.current_player->combat_mode ? yaal_state.player_combat_on_tex : yaal_state.player_combat_off_tex, 1.f))
+        bool cmb_button = ui_draw_button(world->ui, (9*64.f), 16.f+64.f, 32.f, 64.f, yaal_state.current_player->combat_mode ? yaal_state.player_combat_on_tex : yaal_state.player_combat_off_tex, 1.f);
+        bool chat_button = ui_draw_button(world->ui, (9*64.f)+32.f, 16.f+64.f, 32.f, 64.f, yaal_state.player_chat_mode ? yaal_state.player_chat_on_tex : yaal_state.player_chat_off_tex, 1.f);
+        bool menu_button = ui_draw_button(world->ui, (9*64.f), 16.f+8.f+64.f, 64.f, 8.f, yaal_state.player_menu_button_tex, 1.f);
+        if(cmb_button)
         {
             struct network_packet upd_pak;
             struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
@@ -364,7 +398,7 @@ static void __sglthing_frame_ui(struct world* world)
             x_data2->packet.update_combat_mode.combat_mode = !yaal_state.current_player->combat_mode;
             network_transmit_packet(yaal_state.current_player->client->owner, &yaal_state.current_player->client->owner->client, upd_pak);
         }
-        else if(ui_draw_button(world->ui, (9*64.f)+32.f, 16.f+64.f, 32.f, 64.f, yaal_state.player_chat_mode ? yaal_state.player_chat_on_tex : yaal_state.player_chat_off_tex, 1.f))
+        else if(chat_button)
         {
             yaal_state.player_chat_mode = !yaal_state.player_chat_mode;
             if(yaal_state.player_chat_mode)
@@ -372,7 +406,7 @@ static void __sglthing_frame_ui(struct world* world)
             else
                 input_disable = false;
         }
-        else if(ui_draw_button(world->ui, (9*64.f), 16.f+8.f+64.f, 64.f, 8.f, yaal_state.player_menu_button_tex, 1.f))
+        else if(menu_button)
         {
 
         }
@@ -435,12 +469,14 @@ static void __sglthing_frame_ui(struct world* world)
             }
         }
 
+#ifndef HEADLESS
         if(keys_down[GLFW_KEY_C] && !yaal_state.player_chat_mode)
         {
             keys_down[GLFW_KEY_C] = 0;
             yaal_state.player_chat_mode = true;
             start_text_input();
         }
+#endif
     }
 
     world->ui->persist = true;
@@ -467,8 +503,10 @@ static void __sglthing_frame_ui(struct world* world)
     world->ui->background_color[1] = 0.f;
     world->ui->background_color[2] = 0.f;
     
+#ifndef HEADLESS
     if(keys_down[GLFW_KEY_EQUAL])
         g_hash_table_foreach(world->client.players, __player_ui_list_render, world);
+#endif
 
     glm_vec4_copy(oldbg, world->ui->background_color);
 
@@ -502,7 +540,9 @@ static void __load_map(const char* file_name)
 void sglthing_init_api(struct world* world)
 {
     printf("yaal: you're running yaalonline\n");
+#ifndef HEADLESS
     glfwSetWindowTitle(world->gfx.window, "YaalOnline");
+#endif
 
     world->world_frame_user = __sglthing_frame;
     world->world_frame_render_user = __sglthing_frame_render;
@@ -526,6 +566,7 @@ void sglthing_init_api(struct world* world)
     yaal_state.player_id = -1;
     yaal_state.current_aiming_action = -1;
     server_state.maps = g_hash_table_new(g_int_hash, g_int_equal);
+    yaal_state.map_objects = g_hash_table_new(g_int_hash, g_int_equal);
 
     load_texture("pink_checkerboard.png");
     load_texture("yaal/ui/yaal_image.png");
@@ -568,6 +609,8 @@ void sglthing_init_api(struct world* world)
 
     world->gfx.sgl_background_image = get_texture("yaal/ui/yaal_image.png");
 
+    yaal_state.tmp_range_calculation = NEW_RADIUS;
+
     load_texture("yaal/ui/heart_2.png");
     yaal_state.player_heart_full_tex = get_texture("yaal/ui/heart_2.png");
     load_texture("yaal/ui/heart_1.png");
@@ -600,7 +643,10 @@ void sglthing_init_api(struct world* world)
     yaal_state.friends_tex = get_texture("yaal/ui/people.png");
     load_texture("yaal/select_particle.png");
     yaal_state.select_particle_tex = get_texture("yaal/select_particle.png");
-
+    load_texture("yaal/ui/coins.png");
+    yaal_state.player_coins_tex = get_texture("yaal/ui/coins.png");
+    load_texture("yaal/ui/ok_button.png");
+    yaal_state.player_ok_button_tex = get_texture("yaal/ui/ok_button.png");
 
     load_model("test/box.obj");
     load_model("yaal/models/player.fbx");
@@ -634,4 +680,7 @@ void sglthing_init_api(struct world* world)
     int f = compile_shader("shaders/fragment.fs", GL_FRAGMENT_SHADER);
     yaal_state.object_shader = link_program(compile_shader("shaders/normal.vs", GL_VERTEX_SHADER), f);
     yaal_state.player_shader = link_program(compile_shader("shaders/rigged.vs", GL_VERTEX_SHADER), f);
+
+    init_fx(&yaal_state.fx_manager, yaal_state.object_shader, &yaal_state.particles);
+    yaal_state.show_rpg_message = false;
 }

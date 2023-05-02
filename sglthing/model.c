@@ -5,7 +5,9 @@
 #include "io.h"
 #include <string.h>
 #include <cglm/cglm.h>
+#ifndef HEADLESS
 #include <glad/glad.h>
+#endif
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -225,6 +227,7 @@ static void model_parse_mesh(struct model_vertex* vtx_array, int* vtx_count, uns
 // FIXME: only until recently i had figured out that vertex array switching is an expensive operation
 int create_model_vao(struct model_vertex* vtx_array, int vtx_count, int* idx_array, int idx_count, int* vertex_buffer, int* element_buffer)
 {
+    #ifndef HEADLESS
     int vertex_array;
 
     sglc(glGenVertexArrays(1, &vertex_array));
@@ -261,6 +264,9 @@ int create_model_vao(struct model_vertex* vtx_array, int vtx_count, int* idx_arr
     sglc(glBindVertexArray(0));
 
     return vertex_array;
+    #else  
+    return 0;
+    #endif
 }
 
 static void model_parse_node(struct model* model, struct aiNode* node, const struct aiScene* scene)
@@ -317,6 +323,8 @@ void load_model(char* file)
 
     strncpy(&sel_model->name[0], file, 64);
     sel_model->scene = scene;
+
+    printf("sglthing: model %s loaded\n", file);
 
     models_loaded++;
 }

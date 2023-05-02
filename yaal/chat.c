@@ -9,7 +9,7 @@ void chat_render_player(struct world* world, struct chat_system* chat, struct pl
     for(int i = chat->chat_messages->len-1; i >= 0; i--)
     {
         struct chat_message msg = g_array_index(chat->chat_messages, struct chat_message, i);
-        if(msg.player_id == player->player_id && glfwGetTime() - msg.msg_time < 16.0)
+        if(msg.player_id == player->player_id && world->time - msg.msg_time < 16.0)
         {
             snprintf(tx,256,"'%s'",msg.message);
             ui_draw_text_3d(world->ui, world->viewport, world->cam.position, world->cam.front, (vec3){0.f,2.f,0.f}, world->cam.fov, player->model_matrix, world->vp, tx);
@@ -20,7 +20,6 @@ void chat_render_player(struct world* world, struct chat_system* chat, struct pl
 
 void chat_new_message(struct chat_system* chat, struct chat_message message)
 {
-    message.msg_time = glfwGetTime();
     g_array_append_val(chat->chat_messages, message);
 }
 
@@ -29,7 +28,7 @@ void chat_init(struct chat_system* chat)
     chat->chat_messages = g_array_new(true, true, sizeof(struct chat_message));
     chat->max_messages = 16;
     for(int i = 0; i < 2; i++)
-        chat_new_message(chat, (struct chat_message){.player_id = -1, .message = "Welcome to YaalOnline.", .player_name = "System", .msg_time = glfwGetTime()});
+        chat_new_message(chat, (struct chat_message){.player_id = -1, .message = "Welcome to YaalOnline.", .player_name = "System", .msg_time = 0.f});
 }
 
 void chat_render(struct world* world, struct chat_system* chat)

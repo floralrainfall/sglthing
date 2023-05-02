@@ -19,17 +19,32 @@ static void __work_action(struct network_packet* packet, struct network* network
             break;
         case ACTION_BOMB_DROP:
         case ACTION_BOMB_THROW:
-            if(player->player_bombs == 0)
+            if(network->mode == NETWORKMODE_SERVER)
             {
-                // dont have enough
-                break;
+                if(player->player_bombs == 0)
+                {
+                    // dont have enough
+                    break;
+                }
+                player->player_bombs--;
+                
+                BOMB_THROW_ACTION_UPDATE(player, client, network);            
             }
-            player->player_bombs--;
-            if(x_data->packet.player_action.action_id == ACTION_BOMB_THROW)
+            else
             {
-
+                if(x_data->packet.player_action.player_id != -1)
+                    add_fx(&yaal_state.fx_manager, (struct fx){
+                        .start[0] = player->player_position[0],
+                        .start[1] = player->player_position[1],
+                        .start[2] = player->player_position[2],
+                        .target[0] = x_data->packet.player_action.position[0],
+                        .target[1] = x_data->packet.player_action.position[1],
+                        .target[2] = x_data->packet.player_action.position[2],
+                        .type = FX_BOMB_THROW,
+                        .max_time = 3.f,
+                        .speed = 1.f,
+                    });
             }
-            BOMB_THROW_ACTION_UPDATE(player, client, network);            
             break;
         default:
             printf("yaal: unknown action id %i\n", x_data->packet.player_action.action_id);
@@ -46,7 +61,8 @@ static void __sglthing_new_player(struct network* network, struct network_client
 
     if(network->mode == NETWORKMODE_SERVER)
     {
-        int intro_id = 0;
+        int intro_id = client->connection_id;
+        new_player->level_id = intro_id;
         struct map_file_data* map = g_hash_table_lookup(server_state.maps, &intro_id);
         if(map)
         {
@@ -56,8 +72,6 @@ static void __sglthing_new_player(struct network* network, struct network_client
             x_data2->packet.yaal_level.level_id = map->level_id;
             strncpy(x_data2->packet.yaal_level.level_name,map->level_name,64);
             network_transmit_packet(network, client, upd_pak);
-
-            new_player->level_id = intro_id;
         }
         else
             printf("yaal: no map id 0\n");        
@@ -100,7 +114,7 @@ static void __sglthing_new_player(struct network* network, struct network_client
             strncpy(welc_msg.player_name,"System",64);
             strncpy(welc_msg.message,welc_txt,255);
             welc_msg.player_id = -1;
-            welc_msg.msg_time = glfwGetTime();
+            welc_msg.msg_time = network->distributed_time;
             chat_new_message(yaal_state.chat, welc_msg);
         }
     }
@@ -140,7 +154,7 @@ static void __sglthing_del_player(struct network* network, struct network_client
     strncpy(welc_msg.player_name,"System",64);
     strncpy(welc_msg.message,welc_txt,255);
     welc_msg.player_id = -1;
-    welc_msg.msg_time = glfwGetTime();
+    welc_msg.msg_time = network->distributed_time;
     chat_new_message(yaal_state.chat, welc_msg);
 
     free(old_player);
@@ -187,7 +201,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 strncpy(welc_msg.player_name,"System",64);
                 strncpy(welc_msg.message,welc_txt,255);
                 welc_msg.player_id = -1;
-                welc_msg.msg_time = glfwGetTime();
+                welc_msg.msg_time = network->distributed_time;
                 chat_new_message(yaal_state.chat, welc_msg);
                 snprintf(welc_txt,256,"%s", packet->packet.serverinfo.server_motd);
                 strncpy(welc_msg.message,welc_txt,255);
@@ -352,10 +366,11 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 struct network_packet upd_pak;
                 struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
                 upd_pak.meta.packet_type = YAAL_UPDATE_POSITION;
+                glm_vec3_copy(client_player->player_position, x_data2->packet.update_position.delta_pos);
                 x_data2->packet.update_position.player_id = client->player_id;
                 x_data2->packet.update_position.urgent = !collide;
                 x_data2->packet.update_position.lag = client->lag;
-                glm_vec3_copy(client_player->player_position, x_data2->packet.update_position.delta_pos);
+                x_data2->packet.update_position.level_id = client_player->level_id;
                 network_transmit_packet_all(network, upd_pak);
             }
             else
@@ -367,6 +382,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                     //if(upd_client->player_id != yaal_state.player_id)
                     //    printf("yaal: updating client that is not user\n");
                     struct player* upd_player = (struct player*)upd_client->user_data;
+                    upd_player->level_id = x_data->packet.update_position.level_id;
                     if(upd_player->player_id != yaal_state.player_id || (glm_vec3_distance(x_data->packet.update_position.delta_pos, upd_player->old_position) > 1.f || !x_data->packet.update_position.urgent))
                     {
                         glm_vec3_copy(x_data->packet.update_position.delta_pos, upd_player->old_position);
@@ -411,6 +427,13 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 upd_pak.meta.packet_type = YAAL_UPDATE_COMBAT_MODE;
                 x_data2->packet.update_combat_mode.player_id = client->player_id;
                 x_data2->packet.update_combat_mode.combat_mode = client_player->combat_mode;
+                struct map_file_data* map = g_hash_table_lookup(server_state.maps, &client_player->level_id);
+                if(!client_player->client->debugger)
+                    if(map->map_pvp_enabled == false)
+                    {
+                        x_data2->packet.update_combat_mode.combat_mode = false;
+                        client_player->combat_mode = false;
+                    }
                 network_transmit_packet_all(network, upd_pak);            
             }
             return false;
@@ -433,6 +456,13 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
             else
             {
                 __work_action(packet, network, client);
+            }
+            return false;
+        case YAAL_RPG_MESSAGE:
+            if(network->mode == NETWORKMODE_CLIENT)
+            {
+                strncpy(yaal_state.rpg_message, x_data->packet.rpg_message.text, 255);
+                yaal_state.show_rpg_message = true;
             }
             return false;
         case PACKETTYPE_CHAT_MESSAGE:
@@ -461,4 +491,29 @@ void net_init(struct world* world)
     world->server.receive_packet_callback = __sglthing_packet;
     world->server.new_player_callback = __sglthing_new_player;
     world->server.del_player_callback = __sglthing_del_player;
+}
+
+void net_players_in_radius(GArray* clients, float radius, vec3 position, int level_id, GArray* out)
+{
+    if(out->len != 0)
+        g_array_remove_range(out, 0, out->len);
+    for(int i = 0; i < clients->len; i++)
+    {
+        struct network_client* client = &g_array_index(clients, struct network_client, i);
+        if(client->user_data)
+        {
+            struct player* player = (struct player*)client->user_data;
+            if(player->level_id == level_id)
+            {
+                float distance = glm_vec3_distance(position, player->old_position);
+                if(distance < radius)
+                {
+                    struct net_radius_detection det;
+                    det.distance = distance;
+                    det.client = client;
+                    g_array_append_val(out, det);
+                }
+            }
+        }
+    }
 }

@@ -14,6 +14,7 @@ char input_text[MAX_INPUT_TEXT] = {0};
 bool input_disable = false;
 int input_cursor = 0;
 
+#ifndef HEADLESS
 static void __mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
     mouse_position[0] = xpos;
@@ -89,12 +90,15 @@ static void __chara_callback(GLFWwindow* window, unsigned int codepoint)
 
 void init_kbd(GLFWwindow* window)
 {
+    if(!window)
+        return;
     glfwSetKeyCallback(window, __kbd_callback);
     glfwSetMouseButtonCallback(window, __click_callback);
     glfwSetCursorPosCallback(window, __mouse_callback);
     glfwSetCharCallback(window, __chara_callback);
     input_disable = false;
 }
+#endif
 
 
 void add_input(struct keyboard_mapping mapping)
@@ -116,14 +120,18 @@ float get_input(char* name)
     return 0.f;
 }
 
+#ifndef HEADLESS
 void set_focus(GLFWwindow* window, bool state)
 {
+    if(!window)
+        return;
     if(state == true)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     if(state == false)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     mouse_focus = state;   
 }
+#endif
 
 bool get_focus()
 {

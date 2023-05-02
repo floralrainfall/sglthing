@@ -1,5 +1,7 @@
 #include "light.h"
+#ifndef HEADLESS
 #include <glad/glad.h>
+#endif
 #include "world.h"
 
 struct light_area* light_create_area()
@@ -75,6 +77,7 @@ void light_del(struct light_area* area, struct light* light)
 
 void light_set_uniforms(int id, struct light* light, int shader_program)
 {
+#ifndef HEADLESS
     char uniform_name[255];
     snprintf(uniform_name,64,"lights[%i].position",id);
     glUniform3fv(glGetUniformLocation(shader_program,uniform_name), 1, light->position);
@@ -101,10 +104,12 @@ void light_set_uniforms(int id, struct light* light, int shader_program)
     glUniform1f(glGetUniformLocation(shader_program,uniform_name), 1.f);
     
     while(glGetError()!=0);
+#endif
 }
 
 void light_area_set_uniforms(struct light_area* area, int shader_program)
 {
+#ifndef HEADLESS
     for(int i = 0; i < MAX_LIGHTS; i++)
     {
         char uniform_name[64];
@@ -119,4 +124,5 @@ void light_area_set_uniforms(struct light_area* area, int shader_program)
             glUniform1f(glGetUniformLocation(shader_program,uniform_name), 0.f);
         }
     }
+#endif
 }

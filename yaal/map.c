@@ -56,7 +56,7 @@ void map_render(struct world* world, struct map_tile_data map[MAP_SIZE_MAX_X][MA
                     glm_scale(model_matrix, (vec3){1.f, 4.f, 1.f});
                     break;
                 case TILE_WATER:
-                    glm_translate_y(model_matrix, sinf(glfwGetTime()+map_x+map_y)*0.5f);
+                    glm_translate_y(model_matrix, sinf(world->time+map_x+map_y)*0.5f);
                     break;
                 default:
                     break;
@@ -88,15 +88,33 @@ void map_render(struct world* world, struct map_tile_data map[MAP_SIZE_MAX_X][MA
                         sglc(glActiveTexture(GL_TEXTURE0));
                         sglc(glBindTexture(GL_TEXTURE_2D, tex_id));                
                         sglc(glUniform1i(glGetUniformLocation(yaal_state.object_shader,"diffuse0"), 0));
-                        sglc(glUniform4f(glGetUniformLocation(yaal_state.object_shader,"color"), 0.5, 0.5, 0.5, 1.0));
+                        sglc(glUniform4f(glGetUniformLocation(yaal_state.object_shader,"color"), 1.0, 1.0, 1.0, 1.0));
                         world_draw_model(world, mdl, yaal_state.object_shader, model_matrix, false);
                     }
                     else
+                    {
+
+                        sglc(glUseProgram(yaal_state.object_shader));
+                        sglc(glUniform4f(glGetUniformLocation(yaal_state.object_shader,"color"), 1.0, 1.0, 1.0, 1.0));
                         world_draw_model(world, mdl, yaal_state.object_shader, model_matrix, true);
+                    }
                 struct model* mdl2 = yaal_state.map_tiles[map_tile->tile_graphics_ext_id];
                 if(mdl2 && dist < 32.f)
                     world_draw_model(world, mdl2, yaal_state.object_shader, model_matrix, true);
             }
         }
     }    
+}
+
+void server_determine_tile_event(struct player* player, int x, int y, int level_id)
+{
+    struct map_file_data* map = g_hash_table_lookup(server_state.maps, &level_id);
+    for(int i = 0; i < map->map_object_count; i++)
+    {
+        struct map_object object = map->map_objects[i];
+        if(object.object_tile_x == x && object.object_tile_y == y)
+        {
+
+        }
+    }
 }

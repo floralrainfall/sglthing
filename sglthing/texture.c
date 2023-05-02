@@ -1,5 +1,7 @@
 #include "texture.h"
+#ifndef HEADLESS
 #include <glad/glad.h>
+#endif
 #include <string.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"

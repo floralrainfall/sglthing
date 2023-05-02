@@ -7,8 +7,10 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include "io.h"
+#ifndef HEADLESS
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#endif
 
 #ifdef ODE_ENABLED
 static void world_physics_callback(void* data, dGeomID o1, dGeomID o2)
@@ -31,11 +33,17 @@ static void world_physics_callback(void* data, dGeomID o1, dGeomID o2)
 }
 #endif
 
+#ifndef HEADLESS
 struct world* world_init(char** argv, int argc, GLFWwindow* window)
+#else
+struct world* world_init(char** argv, int argc, void* p)
+#endif
 {
     struct world* world = malloc(sizeof(struct world));
 
+#ifndef HEADLESS
     world->gfx.window = window;
+#endif
 
     world->cam.position[0] = 0.f;
     world->cam.position[1] = 0.f;
@@ -104,9 +112,11 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     int q_f = compile_shader("shaders/quad.fs",GL_FRAGMENT_SHADER); attach_program_shader(world->gfx.quad_shader, q_f);
     link_programv(world->gfx.quad_shader);
 
+#ifndef HEADLESS
     add_input((struct keyboard_mapping){.key_positive = GLFW_KEY_D, .key_negative = GLFW_KEY_A, .name = "x_axis"});
     add_input((struct keyboard_mapping){.key_positive = GLFW_KEY_Q, .key_negative = GLFW_KEY_E, .name = "y_axis"});
     add_input((struct keyboard_mapping){.key_positive = GLFW_KEY_W, .key_negative = GLFW_KEY_S, .name = "z_axis"});
+#endif
 
     world->ui = (struct ui_data*)malloc(sizeof(struct ui_data));
     ui_init(world->ui);
@@ -213,10 +223,12 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     strncpy(world->server.server_motd,config_string_get(&world->config,"server_motd"),128);
     strncpy(world->server.server_name,config_string_get(&world->config,"server_name"),64);
 
+#ifndef HEADLESS
     if(g_key_file_get_boolean(world->config.key_file, "sglthing", "fullscreen", NULL))
         glfwSetWindowMonitor(window, glfwGetPrimaryMonitor(), 0, 0, 
             g_key_file_get_integer(world->config.key_file, "sglthing", "fullscreen_x", NULL), 
             g_key_file_get_integer(world->config.key_file, "sglthing", "fullscreen_y", NULL), GLFW_DONT_CARE);
+#endif
 
     if(g_key_file_has_key(world->config.key_file,"sglthing","user_color_r",NULL))
         world->client.client.player_color_r = config_number_get(&world->config, "user_color_r");
@@ -233,11 +245,21 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
     else
         world->client.client.player_color_b = g_random_double_range(0.0, 1.0);
 
+#ifdef HEADLESS
+    if(strcmp(net_mode,"server")!=0)
+    {
+        printf("sglthing: headless mode only supports dedicated server\n");
+        exit(-1);
+    }
+#endif
+
     if(strcmp(net_mode,"server")==0)
     {
+#ifndef HEADLESS
         char v_name[32];
         snprintf(v_name,32,"sglthing r%i DEDICATED SERVER",GIT_COMMIT_COUNT);
         glfwSetWindowTitle(world->gfx.window, v_name);
+#endif
         network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
     } else if(strcmp(net_mode,"client")==0)
     {
@@ -267,17 +289,20 @@ struct world* world_init(char** argv, int argc, GLFWwindow* window)
 
 void world_frame_render(struct world* world)
 {    
+    #ifndef HEADLESS
     glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Scene");
     if(!world->assets_downloading)
         script_frame_render(world->script, world->gfx.shadow_pass);
     if(world->world_frame_render_user)
         world->world_frame_render_user(world);
     //world_draw_model(world, world->test_object, world->normal_shader, test_model, true);
-    glPopDebugGroupKHR();   
+    glPopDebugGroupKHR();  
+    #endif 
 }
 
 void world_frame_light_pass(struct world* world, float quality, int framebuffer, int framebuffer_x, int framebuffer_y)
 {
+    #ifndef HEADLESS
     glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Light Pass");
     world->gfx.shadow_pass = true;
 
@@ -292,44 +317,44 @@ void world_frame_light_pass(struct world* world, float quality, int framebuffer,
     
     world->gfx.shadow_pass = false;
     glPopDebugGroupKHR();   
+    #endif
 }
 
 void world_frame(struct world* world)
 {
     world->render_count = 0;
 
-    glViewport(0, 0, world->gfx.screen_width, world->gfx.screen_height);
+    sglc(glViewport(0, 0, world->gfx.screen_width, world->gfx.screen_height));
     world->viewport[2] = (float)world->gfx.screen_width;
     world->viewport[3] = (float)world->gfx.screen_height;
-    
 
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     if(world->client.status == NETWORKSTATUS_CONNECTED)
     {
-        glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]);
+        sglc(glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]));
     }
     else
     {
-        glClearColor(0.2f,0.2f,0.2f,1.0f);
+        sglc(glClearColor(0.2f,0.2f,0.2f,1.0f));
     }
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
-    glEnable(GL_DEPTH_TEST);
+    sglc(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
+    sglc(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));  
+    sglc(glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO));
+    sglc(glEnable(GL_DEPTH_TEST));
 #ifdef FBO_ENABLED
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
     if(world->client.status == NETWORKSTATUS_CONNECTED)
     {
-        glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]);
+        sglc(glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]));
     }
     else
     {
-        glClearColor(0.2f,0.2f,0.2f,1.0f);
+        sglc(glClearColor(0.2f,0.2f,0.2f,1.0f));
     }
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
-    glEnable(GL_DEPTH_TEST);
+    sglc(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
+    sglc(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));  
+    sglc(glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO));
+    sglc(glEnable(GL_DEPTH_TEST));
 #else
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 #endif
@@ -346,8 +371,8 @@ void world_frame(struct world* world)
     world->ui->screen_size[0] = world->viewport[2];
     world->ui->screen_size[1] = world->viewport[3];
 
-    float yaw = world->cam.yaw + (g_random_double() * world->cam.random_shake) + (sinf(glfwGetTime()*2.f) * world->cam.wobble);
-    float pitch = world->cam.pitch + (g_random_double() * world->cam.random_shake) + (cosf(glfwGetTime()) * world->cam.wobble); 
+    float yaw = world->cam.yaw + (g_random_double() * world->cam.random_shake) + (sinf(world->time*2.f) * world->cam.wobble);
+    float pitch = world->cam.pitch + (g_random_double() * world->cam.random_shake) + (cosf(world->time) * world->cam.wobble); 
 
     world->cam.front[0] = cosf(yaw * M_PI_180f) * cosf(pitch * M_PI_180f);
     world->cam.front[1] = sinf(pitch * M_PI_180f);
@@ -367,19 +392,19 @@ void world_frame(struct world* world)
 
     glm_mul(world->p, world->v, world->vp);
     
-    network_frame(&world->server, world->delta_time);
+    network_frame(&world->server, world->delta_time, world->time);
     if(!world->assets_downloading)
-        network_frame(&world->client, world->delta_time);
+        network_frame(&world->client, world->delta_time, world->time);
 
     if(world->client.status != NETWORKSTATUS_CONNECTED)
     {
-        glBindFramebuffer(GL_FRAMEBUFFER,2);
+        sglc(glBindFramebuffer(GL_FRAMEBUFFER,2));
     }
     if(!world->assets_downloading)
         script_frame(world->script);
     if(world->client.status != NETWORKSTATUS_CONNECTED)
     {
-        glBindFramebuffer(GL_FRAMEBUFFER,0);
+        sglc(glBindFramebuffer(GL_FRAMEBUFFER,0));
     }
     //if(get_focus())
     //{
@@ -476,7 +501,7 @@ void world_frame(struct world* world)
     #endif
         // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
 
-        glClear(GL_DEPTH_BUFFER_BIT);
+        sglc(glClear(GL_DEPTH_BUFFER_BIT));
 
         if(input_disable)
         {
@@ -592,7 +617,9 @@ void world_frame(struct world* world)
         }
         if(world->server.status == NETWORKSTATUS_CONNECTED)
             network_dbg_ui(&world->server, world->ui);
+#ifndef HEADLESS
         set_focus(world->gfx.window, false);
+#endif
     }
 
     world->ui->persist = true;
@@ -606,9 +633,12 @@ void world_frame(struct world* world)
     if(world->client.status == NETWORKSTATUS_DISCONNECTED && world->server.status == NETWORKSTATUS_DISCONNECTED && (config_number_get(&world->config, "shutdown_empty") == 1.0))
     {
         printf("sglthing: server empty/offline or client disconnected\n");
+#ifndef HEADLESS
         glfwSetWindowShouldClose(world->gfx.window, true);
+#endif
     }
 
+#ifndef HEADLESS
     if(keys_down[GLFW_KEY_GRAVE_ACCENT])
     {
         char* pixels = (char*)malloc(3*world->gfx.screen_width*world->gfx.screen_height);
@@ -617,6 +647,7 @@ void world_frame(struct world* world)
         stbi_write_png("screenshot.png", world->gfx.screen_width, world->gfx.screen_height, 3, pixels, 0);
         free(pixels);
     }
+#endif
 
     if(!world->frames)
         printf("sglthing: frame 1 done\n");
@@ -626,6 +657,7 @@ void world_frame(struct world* world)
 
 static void __easy_uniforms(struct world* world, int shader_program, mat4 model_matrix)
 {
+#ifndef HEADLESS
     // camera
     glUniformMatrix4fv(glGetUniformLocation(shader_program,"model"), 1, GL_FALSE, model_matrix[0]);
     glUniformMatrix4fv(glGetUniformLocation(shader_program,"view"), 1, GL_FALSE, world->v[0]);
@@ -659,6 +691,7 @@ static void __easy_uniforms(struct world* world, int shader_program, mat4 model_
         world->world_uniforms_set(world);
 
     while(glGetError()!=0);
+#endif
 }
 
 void world_draw(struct world* world, int count, int vertex_array, int shader_program, mat4 model_matrix)
@@ -677,6 +710,7 @@ void world_draw(struct world* world, int count, int vertex_array, int shader_pro
 
 void world_draw_model(struct world* world, struct model* model, int shader_program, mat4 model_matrix, bool set_textures)
 {
+#ifndef HEADLESS
     mat4 mvp;
 
     ASSERT(model != 0);
@@ -726,10 +760,12 @@ void world_draw_model(struct world* world, struct model* model, int shader_progr
         //ui_draw_text_3d(world->ui, world->viewport, world->cam.position, world->cam.front, (vec3){0.f,1.f,0.f}, world->cam.fov, model_matrix, world->vp, txbuf);
         //world_draw_primitive(world, PRIMITIVE_BOX, model_matrix, (vec4){1.f, 1.f, 1.f, 1.f});
     }
+#endif
 }
 
 void world_draw_primitive(struct world* world, int shader, int fill, enum primitive_type type, mat4 model_matrix, vec4 color)
 {
+#ifndef HEADLESS
     sglc(glUseProgram(shader));
     __easy_uniforms(world, shader, model_matrix);
     glUniform4fv(glGetUniformLocation(shader,"color"), 1, color);
@@ -754,6 +790,7 @@ void world_draw_primitive(struct world* world, int shader, int fill, enum primit
             sglc(glPolygonMode(GL_FRONT_AND_BACK,GL_FILL));
             break;
     }
+#endif
 }
 
 // TODO: this
@@ -779,6 +816,7 @@ void world_deinit(struct world* world)
 
 void world_updres(struct world* world)
 {
+#ifndef HEADLESS
 #ifdef FBO_ENABLED
     glDeleteTextures(1, &world->gfx.hdr_depth_buffer);
     glDeleteFramebuffers(1, &world->gfx.hdr_fbo);
@@ -836,5 +874,6 @@ void world_updres(struct world* world)
     }
 
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+#endif
 #endif
 }

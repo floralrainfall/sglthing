@@ -1,7 +1,9 @@
 #include "primitives.h"
 #include "sglthing.h"
 #include "graphic.h"
+#ifndef HEADLESS
 #include <glad/glad.h>
+#endif
 
 float box_data[] = {
     -0.5f,-0.5f,-0.5f, // triangle 1 : begin

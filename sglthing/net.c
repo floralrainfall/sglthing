@@ -106,7 +106,7 @@ void network_tick_download(struct network_downloader* network)
                     response.meta.packet_version = CR_PACKET_VERSION;
                     response.meta.magic_number = MAGIC_NUMBER;
                     response.meta.packet_type = PACKETTYPE_PING;
-                    response.packet.ping.distributed_time = glfwGetTime();
+                    response.packet.ping.distributed_time = 0.f;
                     send(network->socket, &response, sizeof(response), 0);
                 }
                 break;
@@ -245,7 +245,7 @@ void network_connect(struct network* network, char* ip, int port)
         if(network->script)
             nets7_init_network(network_get_s7_pointer(network), network);
 
-        network->next_tick = glfwGetTime() + 0.01;
+        network->next_tick = network->distributed_time + 0.01;
 #ifdef NETWORK_TCP
     }
 #endif
@@ -291,7 +291,7 @@ void network_open(struct network* network, char* ip, int port)
 
     network->server_clients = g_array_new(false, true, sizeof(struct network_client));
     network->status = NETWORKSTATUS_CONNECTED;
-    network->next_tick = glfwGetTime() + 0.01;
+    network->next_tick = network->distributed_time + 0.01;
     network->mode = NETWORKMODE_SERVER;
     network->network_frames = 0;
     network->shutdown_ready = false;
@@ -689,7 +689,7 @@ void network_manage_socket(struct network* network, struct network_client* clien
                 new_client.player_id = -1;
                 new_client.connection_id = last_connection_id++;
                 new_client.connected = true;
-                new_client.last_ping_time = glfwGetTime();
+                new_client.last_ping_time = network->distributed_time;
                 new_client.ping_time_interval = 5.0;
                 new_client.dl_data = NULL;
                 new_client.owner = network;                    
@@ -713,7 +713,7 @@ void network_manage_socket(struct network* network, struct network_client* clien
     //    printf("sglthing: send() %s\n", strerror(errno));
 }
 
-void network_frame(struct network* network, float delta_time)
+void network_frame(struct network* network, float delta_time, double time)
 {
     if(!network)
         return;
@@ -727,10 +727,11 @@ void network_frame(struct network* network, float delta_time)
     network->packet_rx_numbers[network->packet_time] = 0;
 
     network->network_frames++;
+    network->time = time;
 
     if(network->mode == NETWORKMODE_SERVER)
     {
-        network->distributed_time = glfwGetTime();
+        network->distributed_time = time;
         if(network->server_clients->len == 0 && network->shutdown_ready && network->shutdown_empty)
         {
             printf("sglthing: server shutting down because it is empty\n");
@@ -763,7 +764,7 @@ void network_frame(struct network* network, float delta_time)
                     response.packet.ping.distributed_time = network->distributed_time;
                     response.packet.ping.player_lag = cli->lag;
                     network_transmit_packet(network, cli, response);
-                    cli->next_ping_time = glfwGetTime() + cli->ping_time_interval;
+                    cli->next_ping_time = network->time + cli->ping_time_interval;
                     if(cli->dl_data)
                     {
                         struct network_packet data_packet;
@@ -962,7 +963,7 @@ void network_dbg_ui(struct network* network, struct ui_data* ui)
         if(network->status == NETWORKSTATUS_DISCONNECTED)
             ui_draw_text(ui,pos_base[0],pos_base[1]+16.f,network->disconnect_reason,1.f);
 
-        if(network->client.authenticated && GIT_COMMIT_COUNT != network->client.client_version && (int)glfwGetTime() % 2 == 0)
+        if(network->client.authenticated && GIT_COMMIT_COUNT != network->client.client_version && (int)network->time % 2 == 0)
         {
             snprintf(tx,256,"WARNING: Client (sglthing r%i) and server (sglthing r%i) versions dont match",GIT_COMMIT_COUNT,network->client.client_version);
             ui->foreground_color[2] = 0.f;    

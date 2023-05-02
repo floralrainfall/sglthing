@@ -71,6 +71,7 @@ void mus_set_file(struct musmgr* mgr, struct mus_file* file)
 
 void mus_tick(struct musmgr* mgr)
 {
+#ifndef HEADLESS
     if(!mgr->world_ptr)
         return;
     struct world* world = (struct world*)mgr->world_ptr;
@@ -163,4 +164,5 @@ void mus_tick(struct musmgr* mgr)
 
         }
     }
+#endif
 }

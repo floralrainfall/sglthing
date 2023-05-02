@@ -3,11 +3,14 @@
 #include "io.h"
 #include <stdio.h>
 #include <string.h>
+#ifndef HEADLESS
 #include <glad/glad.h>
+#endif
 #include "sglthing.h"
 
 int compile_shader(const char* shader_name, int type)
 {
+#ifndef HEADLESS
     void* shader_data = malloc(65535);
     memset(shader_data, 0, 65535);
     void* c_shader_data = malloc(65535);
@@ -53,13 +56,18 @@ int compile_shader(const char* shader_name, int type)
         printf("sglthing: couldn't find shader '%s'\n", shader_name);
         return 0;
     }
+#endif
 }
 
 int create_program()
 {
+#ifndef HEADLESS
     int program = glCreateProgram();
     ASSERT(program);
     return program;
+#else
+    return 0;
+#endif
 }
 
 int attach_program_shader(int program, int shader)
@@ -70,22 +78,24 @@ int attach_program_shader(int program, int shader)
 
 int link_programv(int program)
 {    
+#ifndef HEADLESS
     int success;
     sglc(glLinkProgram(program));
 
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    sglc(glGetProgramiv(program, GL_LINK_STATUS, &success));
     if(!success) {
         char info_log[512];
         glGetProgramInfoLog(program, 512, NULL, info_log);
         printf("sglthing: program compilation failed\n%s\n",info_log);
     }
     printf("sglthing: linked program %i\n", program);
-
     return success;
+#endif
 }
 
 int link_program(int vertex, int fragment)
 {
+#ifndef HEADLESS
     ASSERT(vertex && fragment);
     int program = create_program();
     if(vertex)
@@ -103,4 +113,5 @@ int link_program(int vertex, int fragment)
     link_programv(program);
     printf("sglthing: linked program %i; v: %i, f: %i\n", program, vertex, fragment);
     return program;
+#endif
 }

@@ -1,6 +1,8 @@
 #include "ui.h"
+#ifndef HEADLESS
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#endif
 #include <string.h>
 #include "keyboard.h"
 #include "sglthing.h"
@@ -13,6 +15,7 @@
 
 void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
 {
+    #ifndef HEADLESS
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return;
 
@@ -177,12 +180,15 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 
     ui->ui_elements++;
     ui->background_color[3] = old_background;
+    #endif
 }
 
 bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, int image, float depth)
 {
+    #ifndef HEADLESS
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return false;
+    #endif
 
     ui_draw_image(ui, position_x, position_y, size_x, size_y, image, depth);
 
@@ -207,8 +213,10 @@ bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, floa
 
 void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, int image, float depth)
 {
+    #ifndef HEADLESS
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return false;
+    #endif
     vec2 points[6][2] = {0};
     vec2 v_up_left    = {position_x,position_y};
     vec2 v_up_right   = {position_x+size_x,position_y};
@@ -297,12 +305,12 @@ void ui_init(struct ui_data* ui)
 
     ui->ui_font = ui->default_font;
 
-    glGenVertexArrays(1,&ui->ui_vao);    
-    glGenBuffers(1,&ui->ui_vbo);
-    glBindVertexArray(ui->ui_vao);
+    sglc(glGenVertexArrays(1,&ui->ui_vao));    
+    sglc(glGenBuffers(1,&ui->ui_vbo));
+    sglc(glBindVertexArray(ui->ui_vao));
 
-    glBindBuffer(GL_ARRAY_BUFFER, ui->ui_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 2 * MAX_CHARACTERS_STRING * 2, NULL, GL_DYNAMIC_DRAW);
+    sglc(glBindBuffer(GL_ARRAY_BUFFER, ui->ui_vbo));
+    sglc(glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 2 * MAX_CHARACTERS_STRING * 2, NULL, GL_DYNAMIC_DRAW));
 
     // vec2: position
     sglc(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2) * 2, (void*)0));
@@ -312,7 +320,7 @@ void ui_init(struct ui_data* ui)
     sglc(glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2) * 2, (void*)(sizeof(float)*2)));
     sglc(glEnableVertexAttribArray(1));
 
-    glBindVertexArray(0);
+    sglc(glBindVertexArray(0));
 
     ui->background_color[0] = 0.4f;
     ui->background_color[1] = 0.4f;
@@ -333,8 +341,10 @@ void ui_init(struct ui_data* ui)
 
 void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, vec3 camera_front, vec3 position, float fov, mat4 m, mat4 vp, char* text)
 {
+    #ifndef HEADLESS
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return;
+    #endif
         
     vec3 dest_position;
     vec3 direction;

@@ -1,6 +1,8 @@
 #include "script_functions.h"
+#ifndef HEADLESS
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,9 +32,11 @@ static s7_pointer __engine_set_title(s7_scheme *sc, s7_pointer args)
         return(s7_wrong_type_arg_error(sc, "engine-set-title", 2, s7_cadr(args), "world"));
     struct world* world = (struct world*)s7_c_pointer(s7_cadr(args));
 
+#ifndef HEADLESS
     char v_name[32];
     snprintf(v_name,32,"%s (sglthing r%i)",str,GIT_COMMIT_COUNT);
     glfwSetWindowTitle(world->gfx.window, v_name);
+#endif
 
     return s7_nil(sc);
 }
@@ -112,7 +116,11 @@ static s7_pointer __link_program(s7_scheme* sc, s7_pointer args)
 
 static s7_pointer __world_time(s7_scheme *sc, s7_pointer args)
 {
+#ifndef HEADLESS
     return s7_make_real(sc, glfwGetTime());
+#else 
+    return s7_make_real(sc, 0.0f);
+#endif
 }
 
 static s7_pointer __world_delta_time(s7_scheme *sc, s7_pointer args)
@@ -207,17 +215,19 @@ static s7_pointer __io_add_directory(s7_scheme* sc, s7_pointer args)
     return s7_nil(sc);
 }
 
-#include <glad/glad.h>
-
 static s7_pointer __gl_no_depth(s7_scheme* sc, s7_pointer args)
 {
+#ifndef HEADLESS
     glDisable(GL_DEPTH_TEST);
+#endif
     return s7_nil(sc);
 }
 
 static s7_pointer __gl_yes_depth(s7_scheme* sc, s7_pointer args)
 {
+#ifndef HEADLESS
     glEnable(GL_DEPTH_TEST);
+#endif
     return s7_nil(sc);
 }
 
@@ -236,8 +246,10 @@ static s7_pointer __gl_bind_texture(s7_scheme* sc, s7_pointer args)
     //    return(s7_wrong_type_arg_error(sc, "gl-bind-texture", 1, s7_cadr(args), "sampler name"));
     //const char* sampler_name = s7_string(s7_cadr(args));
 
+#ifndef HEADLESS
     glActiveTexture(GL_TEXTURE0 + texture_slot);
     glBindTexture(GL_TEXTURE_2D, texture_id);
+#endif
     return s7_nil(sc);
 }
 

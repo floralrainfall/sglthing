@@ -1,4 +1,5 @@
 #include "util.h"
+#include "netmgr.h"
 
 void yaal_update_player_action(int key_id, struct player_action action, struct network_client* client, struct network* network)
 {

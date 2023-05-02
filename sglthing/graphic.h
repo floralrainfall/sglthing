@@ -2,7 +2,9 @@
 #define GRAPHIC_H
 
 #include <cglm/cglm.h>
+#ifndef HEADLESS
 #include <glad/glad.h>
+#endif
 
 #include <signal.h>
 
@@ -12,6 +14,13 @@ struct vertex_normal
     vec3 normal;
 };
 
+#ifdef HEADLESS
+#define sglc(f)
+#define GL_VERTEX_SHADER 0
+#define GL_FRAGMENT_SHADER 0
+#define GL_GEOMETRY_SHADER 0 
+#define GL_FILL 0
+#else
 #define sglc(f) {\
     { f; };\
     int x = glGetError();\
@@ -22,6 +31,8 @@ struct vertex_normal
         exit(-1);\
     }\
 }
+#endif
+
 
 #define ASSIMP_TO_GLM(a,g)                                                                                                                                                                                            \
     g[0][0] = a.a1; g[0][1] = a.b1; g[0][2] = a.c1; g[0][3] = a.d1; \

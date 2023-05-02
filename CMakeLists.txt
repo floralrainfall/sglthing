@@ -1,18 +1,28 @@
 cmake_minimum_required(VERSION 3.4)
 
-add_subdirectory(glad)
+if(NOT HEADLESS)
+    add_subdirectory(glad)
+    set(GLAD_LIBRARY glad)
+endif()
 
 execute_process(COMMAND git rev-list --count HEAD
     OUTPUT_VARIABLE GIT_COMMIT_COUNT)
 
 set(ASSIMP_HUNTER_ENABLED FALSE)
 
-find_package(glfw3)
+if(NOT HEADLESS)
+    find_package(glfw3)    
+    set(GLFW_LIBRARY glfw)
+endif()
 find_package(cglm)
 find_package(assimp)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0 libavutil libavcodec libavformat openal zlib)
 pkg_check_modules(curl IMPORTED_TARGET libcurl)
+
+option(USE_ODE "Use ODE library" OFF)
+option(HEADLESS "Compile without windowing support" OFF)
+option(YAAL_COMPILE "Compile YaalOnline" ON)
 
 set(USE_ODE NO)
 set(ODE_ENABLED NO)
@@ -29,9 +39,12 @@ if(USE_ODE)
 
     set(ODE_ENABLED YES)
 endif()
-if(NOT glfw3_FOUND)
-    message(STATUS "glfw3 not found, using deps/glfw")   
-    add_subdirectory(deps/glfw)
+
+if(NOT HEADLESS)
+    if(NOT glfw3_FOUND)
+        message(STATUS "glfw3 not found, using deps/glfw")   
+        add_subdirectory(deps/glfw)
+    endif()
 endif()
 if(NOT assimp_FOUND)
     message(STATUS "assimp not found, using deps/assimp")   
@@ -44,6 +57,10 @@ endif()
 if(NOT curl_FOUND)
     message(STATUS "curl not found, using deps/curl")
     add_subdirectory(deps/curl)
+endif()
+
+if(HEADLESS)
+    message(STATUS "compiling headless build")
 endif()
 
 project(sglthing)
@@ -63,6 +80,8 @@ if(YAAL_COMPILE)
         yaal/chat.h
         yaal/map.c
         yaal/map.h
+        yaal/fx.c
+        yaal/fx.h
     )
     set_target_properties(Yaal PROPERTIES OUTPUT_NAME "thesglyaal")
 endif()
@@ -131,6 +150,9 @@ target_compile_definitions(sglthing PUBLIC SGLTHING_COMPILE S7_DEBUGGING)
 if(ODE_ENABLED)
     target_compile_definitions(sglthing PUBLIC ODE_ENABLED)
 endif()
+if(HEADLESS)
+    target_compile_definitions(sglthing PUBLIC HEADLESS)
+endif()
 
 configure_file(sglthing/_sglthing.h.in _sglthing.h @ONLY)
 
@@ -142,8 +164,8 @@ target_include_directories(sglthing PUBLIC
 )
 
 target_link_libraries(sglthing PUBLIC
-    glad
-    glfw
+    ${GLAD_LIBRARY}
+    ${GLFW_LIBRARY}
     cglm
     assimp
     m
@@ -158,13 +180,13 @@ target_compile_options(sglthing PUBLIC
     -g)
 
 target_link_libraries(thesglthing PUBLIC
-    glad
     sglthing
+    ${GLAD_LIBRARY}
 )
 
 if(YAAL_COMPILE)
     target_link_libraries(Yaal PUBLIC
-        glad
+        ${GLAD_LIBRARY}
         sglthing
     )
 endif()

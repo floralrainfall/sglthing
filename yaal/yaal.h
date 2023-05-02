@@ -11,11 +11,14 @@
 #include <sglthing/particles.h>
 #include <sglthing/light.h>
 #include <sglthing/io.h>
+#ifndef HEADLESS
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#endif
 #include <stdlib.h>
 #include <glib.h>
 #include "chat.h"
+#include "fx.h"
 
 #define MAP_SIZE_MAX_X 32
 #define MAP_SIZE_MAX_Y 16
@@ -35,6 +38,8 @@ enum action_id {
 
 enum object_id {
     OBJECT_BOMB,
+    OBJECT_DOOR,
+    OBJECT_TRANSPORT,
 };
 
 enum __attribute__((__packed__)) direction 
@@ -44,18 +49,6 @@ enum __attribute__((__packed__)) direction
     DIR_WEST,
     DIR_EAST,
     DIR_MAX,
-};
-
-enum yaal_packet_type
-{
-    YAAL_ENTER_LEVEL = 0x4a11,
-    YAAL_LEVEL_DATA,
-    YAAL_UPDATE_POSITION,
-    YAAL_UPDATE_PLAYERANIM,
-    YAAL_UPDATE_OBJECT,
-    YAAL_UPDATE_PLAYER_ACTION,
-    YAAL_UPDATE_COMBAT_MODE,
-    YAAL_PLAYER_ACTION,
 };
 
 enum __attribute__((__packed__)) yaal_light_type
@@ -94,6 +87,16 @@ struct map_object
     int object_tile_y;
 
     char object_name[64];
+
+    union object_data
+    {
+        struct transport_data
+        {
+            int level_id_to;
+            int tile_x;
+            int tile_y;
+        };
+    };
 };
 
 struct map_file_data
@@ -110,6 +113,7 @@ struct map_file_data
     int map_top_id;
     int map_left_id;
     int map_bottom_id;
+    bool map_pvp_enabled;
 
     int map_object_count;
     struct map_object map_objects[UCHAR_MAX];
@@ -125,66 +129,6 @@ struct player_action
     bool visible;
     bool combat_mode;
     bool action_aim;
-};
-
-struct xtra_packet_data
-{
-    union
-    {
-        struct
-        {
-            int level_id;
-            char level_name[64];
-        } yaal_level;
-        struct
-        {
-            int level_id;
-            int yaal_x;
-            struct map_tile_data data[MAP_SIZE_MAX_Y];
-        } yaal_level_data;
-        struct
-        {
-            int player_id;
-            vec3 delta_pos;
-            vec2 delta_angles;
-            float pitch;
-            bool urgent;
-            double lag;
-        } update_position;
-        struct 
-        {
-            int player_id;
-            int animation_id;
-        } update_playeranim;
-        struct
-        {
-            struct map_object object;
-        } map_object_create;
-        struct
-        {
-            struct map_object object;
-        } map_object_update;
-        struct
-        {
-            int object_ref_id;
-        } map_object_destroy;
-        struct
-        {
-            int hotbar_id;
-            struct player_action new_action_data;
-        } player_update_action;
-        struct
-        {
-            enum action_id action_id;
-            int player_id;
-            vec3 position;
-        } player_action;
-        struct
-        {
-            int player_id;
-            bool combat_mode;
-        } update_combat_mode;
-    } packet;
 };
 
 struct player {
@@ -207,6 +151,7 @@ struct player {
     int player_mana;
     int player_max_mana;
     int player_bombs;
+    int player_coins;
 
     float pitch;
 
@@ -221,9 +166,13 @@ struct player {
 struct yaal_state {
     int current_level_id;
     char level_name[64];
+    char rpg_message[256];
+    bool show_rpg_message;
 
     int player_id;
     struct player* current_player;
+
+    GArray* tmp_range_calculation;
 
     struct model* player_model;
     struct model* arrow_model;
@@ -252,7 +201,9 @@ struct yaal_state {
     int player_chat_off_tex;
     int player_menu_button_tex;
     int player_cancel_button_tex;
+    int player_ok_button_tex;
     int player_hotbar_bar_tex;
+    int player_coins_tex;
     int player_shader;
     int friends_tex;
     int select_particle_tex;
@@ -272,6 +223,7 @@ struct yaal_state {
     struct player_action player_actions[9];
     struct particle_system particles;
     struct chat_system* chat;
+    struct fx_manager fx_manager;
     struct map_tile_data map_data[MAP_SIZE_MAX_X][MAP_SIZE_MAX_Y];
 };
 

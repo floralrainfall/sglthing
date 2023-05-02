@@ -1,0 +1,7 @@
+--2023-05-01 21:52:38--  https://media.discordapp.net/attachments/1099111307380277331/1102774396696928336/Meshesdynamite1_diff.png?width=268
+Loaded CA certificate '/etc/ssl/certs/ca-certificates.crt'
+Resolving media.discordapp.net (media.discordapp.net)... 162.159.129.232, 162.159.130.232, 162.159.133.232, ...
+Connecting to media.discordapp.net (media.discordapp.net)|162.159.129.232|:443... connected.
+HTTP request sent, awaiting response... 400 Bad Request
+2023-05-01 21:52:38 ERROR 400: Bad Request.
+
