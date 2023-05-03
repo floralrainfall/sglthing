@@ -12,11 +12,13 @@
 #endif 
 #include "http.h"
 
-#define CR_PACKET_VERSION 103
+#define CR_PACKET_VERSION 200
 #define NO_DATAPACKETS_TICK 512
 
 #define MAGIC_NUMBER 0x7930793179327934
 #define DATA_PACKET_SIZE 256
+
+typedef uint64_t checksum_t;
 
 struct network_client {
     int socket;
@@ -83,18 +85,18 @@ struct network_packet {
     struct {
         enum { 
             PACKETTYPE_CLIENTINFO,       // C-->S
-            PACKETTYPE_DISCONNECT,       // C<->S
-            PACKETTYPE_PING,             // C<->S
             PACKETTYPE_SERVERINFO,       // C<--S
+            PACKETTYPE_PING,             // C<->S
+            PACKETTYPE_ACKNOWLEDGE,      // C<->S
+            PACKETTYPE_DISCONNECT,       // C<->S
 
             PACKETTYPE_PLAYER_ADD,       // C<--S
             PACKETTYPE_PLAYER_REMOVE,    // C<--S
-
-            PACKETTYPE_SCM_EVENT,        // C<->S
             PACKETTYPE_CHAT_MESSAGE,     // C<->S
-
+            
             PACKETTYPE_DATA,             // C<--S
             PACKETTYPE_DATA_REQUEST,     // C<->S
+            PACKETTYPE_SCM_EVENT,        // C<->S
 
             PACKETTYPE_DEBUGGER_QUIT,    // C-->S
             PACKETTYPE_DEBUGGER_KICK,    // C-->S
@@ -102,11 +104,18 @@ struct network_packet {
             PACKETTYPE_LAST_ID,
         } packet_type;
         int packet_version;
+        int packet_id;
+        int packet_checksum;
+        bool acknowledge;
+        int acknowledge_tries;
         float distributed_time;
         uint64_t magic_number;
         int network_frames;
     } meta;
     union {
+        struct {
+            int packet_id;
+        } acknowledge;
         struct {
             char client_name[64];
             char session_key[256];
@@ -208,6 +217,8 @@ struct network {
     GArray* server_clients;
     double next_tick;
     double client_default_tick;
+    GArray* packet_unacknowledged;
+    int packet_id;
 
     bool security;
 

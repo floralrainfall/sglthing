@@ -58,6 +58,7 @@ static void __sglthing_new_player(struct network* network, struct network_client
     struct player* new_player = (struct player*)malloc(sizeof(struct player));
     new_player->client = client;
     new_player->player_id = client->player_id;
+    new_player->level_id = -1;
 
     if(network->mode == NETWORKMODE_SERVER)
     {
@@ -371,6 +372,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 x_data2->packet.update_position.urgent = !collide;
                 x_data2->packet.update_position.lag = client->lag;
                 x_data2->packet.update_position.level_id = client_player->level_id;
+                upd_pak.meta.acknowledge = true;
                 network_transmit_packet_all(network, upd_pak);
             }
             else

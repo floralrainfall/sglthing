@@ -17,6 +17,14 @@
 #endif
 #include "sglthing.h"
 
+struct unacknowledged_packet
+{
+    struct network_packet* packet;
+    struct network_client* client;
+    double next_time;
+    int tries;
+};
+
 int last_connection_id = 0;
 #define ZERO(x) memset(&x,0,sizeof(x))
 
@@ -35,6 +43,8 @@ void network_init(struct network* network, struct script_system* script)
     network->shutdown_ready = false;
     network->shutdown_empty = false;
     network->players = g_hash_table_new(g_int_hash, g_int_equal);
+    network->packet_unacknowledged = g_array_new(true, true, sizeof(struct unacknowledged_packet));
+    network->packet_id = 0;
 }
 
 void network_start_download(struct network_downloader* network, char* ip, int port, char* rqname, char* pass)
@@ -233,6 +243,7 @@ void network_connect(struct network* network, char* ip, int port)
         ZERO(client_info);
         network->status = NETWORKSTATUS_CONNECTED;
         network->client.connected = true;
+        client_info.meta.acknowledge = true;
         client_info.meta.packet_type = PACKETTYPE_CLIENTINFO;
         client_info.packet.clientinfo.sglthing_revision = GIT_COMMIT_COUNT;
         strncpy(client_info.packet.clientinfo.client_name, config_string_get(&network->http_client.web_config, "user_username"),64);
@@ -326,6 +337,18 @@ int network_transmit_packet(struct network* network, struct network_client* clie
     packet.meta.packet_version = CR_PACKET_VERSION;
     packet.meta.magic_number = MAGIC_NUMBER;
     packet.meta.network_frames = network->network_frames;
+    if(packet.meta.acknowledge && packet.meta.acknowledge_tries == 0)
+    {
+        packet.meta.packet_id = network->packet_id++;
+        struct network_packet* tmp = (struct network_packet*)malloc(sizeof(struct network_packet));
+        memcpy(tmp,&packet,sizeof(struct network_packet));
+        struct unacknowledged_packet tmp2;
+        tmp2.packet = tmp;
+        tmp2.tries = 1;
+        tmp2.client = client;
+        tmp2.next_time = network->distributed_time + 1.f;
+        g_array_append_val(network->packet_unacknowledged, tmp2);
+    }
     if(!client->connected)
         return -1;
 #ifdef NETWORK_FAKE_DROP
@@ -370,12 +393,32 @@ static void network_manage_packet(struct network* network, struct network_client
     else if(in_packet.meta.packet_version != CR_PACKET_VERSION)
         return;
     bool passthru = true;
+    if(in_packet.meta.acknowledge)
+    {
+        struct network_packet ack;
+        ack.meta.packet_type = PACKETTYPE_ACKNOWLEDGE;
+        ack.meta.acknowledge = false;
+        ack.packet.acknowledge.packet_id = in_packet.meta.packet_id;
+        network_transmit_packet(network, client, ack);
+    }
     if(network->receive_packet_callback)
         passthru = network->receive_packet_callback(network, client, &in_packet);
     if(!passthru)
         return;
     switch(in_packet.meta.packet_type)
     {
+        case PACKETTYPE_ACKNOWLEDGE:
+            for(int i = 0; i < network->packet_unacknowledged->len; i++)
+            {
+                struct unacknowledged_packet pkt = g_array_index(network->packet_unacknowledged, struct unacknowledged_packet, i);
+                if(pkt.packet->meta.packet_id == in_packet.packet.acknowledge.packet_id)
+                {
+                    g_array_remove_index(network->packet_unacknowledged, i);
+                    free(pkt.packet);
+                    break;
+                }
+            }
+            break;
         case PACKETTYPE_DISCONNECT:
             if(network->mode == NETWORKMODE_CLIENT)
             {
@@ -457,6 +500,7 @@ static void network_manage_packet(struct network* network, struct network_client
                     ZERO(response);
 
                     response.meta.packet_type = PACKETTYPE_SERVERINFO;
+                    response.meta.acknowledge = true;
                     response.packet.serverinfo.player_id = client->player_id;
                     response.packet.serverinfo.sglthing_revision = GIT_COMMIT_COUNT;
                     response.packet.serverinfo.player_color_r = client->player_color_r;
@@ -468,7 +512,7 @@ static void network_manage_packet(struct network* network, struct network_client
                     strncpy(response.packet.serverinfo.server_name, network->server_name,64);
                     network_transmit_packet(network, client, response);                            
 
-                    response.meta.packet_type = PACKETTYPE_PLAYER_ADD;
+                    response.meta.packet_type = PACKETTYPE_PLAYER_ADD;                    
                     response.packet.player_add.player_id = client->player_id;
                     response.packet.player_add.admin = client->debugger;
                     response.packet.player_add.player_color_r = client->player_color_r;
@@ -730,6 +774,20 @@ void network_frame(struct network* network, float delta_time, double time)
 
     network->network_frames++;
     network->time = time;
+
+    for(int i = 0; i < network->packet_unacknowledged->len; i++)
+    {
+        struct unacknowledged_packet* pkt = &g_array_index(network->packet_unacknowledged, struct unacknowledged_packet, i);
+        if(pkt->tries >= 10)
+            continue;
+        if(network->distributed_time > pkt->next_time)
+        {
+            pkt->next_time = network->distributed_time + 1.f;
+            pkt->tries++;
+            pkt->packet->meta.acknowledge_tries = pkt->tries;
+            network_transmit_packet(network, pkt->client, *pkt->packet);
+        }
+    }
 
     if(network->mode == NETWORKMODE_SERVER)
     {

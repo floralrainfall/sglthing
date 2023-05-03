@@ -318,6 +318,8 @@ static void __sglthing_frame_ui(struct world* world)
 
     if(yaal_state.current_player)
     {
+        if(glm_vec3_distance2(yaal_state.current_player->player_position,yaal_state.current_player->old_position)>1.0f)
+            ui_draw_image(world->ui, world->gfx.screen_width/2, world->gfx.screen_height, 32, 16, yaal_state.player_lag_tex, 1.f);
         float player_hearts = yaal_state.current_player->player_health/2.f;
         int player_full_hearts = floorf(player_hearts);
         vec2 offset = {0.f, 16.f};
@@ -493,6 +495,7 @@ static void __sglthing_frame_ui(struct world* world)
 
     ui_draw_image(ui, world->gfx.screen_width - 256.f, world->gfx.screen_height, 256.f, 64.f, world->gfx.sgl_background_image, 0.1f);
 
+
     world->ui->persist = false;
 
     glm_vec4_copy(oldfg, world->ui->foreground_color);
@@ -647,6 +650,8 @@ void sglthing_init_api(struct world* world)
     yaal_state.player_coins_tex = get_texture("yaal/ui/coins.png");
     load_texture("yaal/ui/ok_button.png");
     yaal_state.player_ok_button_tex = get_texture("yaal/ui/ok_button.png");
+    load_texture("yaal/ui/lag.png");
+    yaal_state.player_lag_tex = get_texture("yaal/ui/lag.png");
 
     load_model("test/box.obj");
     load_model("yaal/models/player.fbx");

@@ -137,7 +137,11 @@ int main(int argc, char** argv)
     while(!should_close)
 #endif
     {
+#ifdef HEADLESS
         double frame_start = g_timer_elapsed(headless_timer, NULL);
+#else 
+        double frame_start = glfwGetTime();
+#endif
         world->time = frame_start;
         world->frames_in_second++;
         if(frame_start - world->last_time >= 1.0) {
@@ -162,7 +166,12 @@ int main(int argc, char** argv)
 
         glfwSwapBuffers(window); 
 #endif 
+
+#ifdef HEADLESS
         float frame_end = g_timer_elapsed(headless_timer, NULL);
+#else 
+        float frame_end = glfwGetTime();
+#endif
         world->delta_time = (frame_end - frame_start);
 #ifndef HEADLESS
         if(get_focus())

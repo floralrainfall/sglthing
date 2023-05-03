@@ -204,6 +204,7 @@ struct yaal_state {
     int player_ok_button_tex;
     int player_hotbar_bar_tex;
     int player_coins_tex;
+    int player_lag_tex;
     int player_shader;
     int friends_tex;
     int select_particle_tex;
