@@ -81,6 +81,7 @@ struct xtra_packet_data
         {
             enum action_id action_id;
             int player_id;
+            int level_id;
             vec3 position;
         } player_action;
         struct

@@ -1,13 +1,10 @@
 #include "netmgr.h"
 
-static void __work_action(struct network_packet* packet, struct network* network, struct network_client* client)
+static bool __work_action(struct network_packet* packet, struct network* network, struct network_client* client)
 {
     struct xtra_packet_data* x_data = (struct xtra_packet_data*)&packet->packet.data;
     struct player* player;
-    if(network->mode == NETWORKMODE_SERVER)
-        player = (struct player*)client->user_data;
-    else
-        player = yaal_state.current_player;
+    player = (struct player*)client->user_data;
     ASSERT(player);
     switch(x_data->packet.player_action.action_id)
     {
@@ -22,10 +19,7 @@ static void __work_action(struct network_packet* packet, struct network* network
             if(network->mode == NETWORKMODE_SERVER)
             {
                 if(player->player_bombs == 0)
-                {
-                    // dont have enough
-                    break;
-                }
+                    return false;
                 player->player_bombs--;
                 
                 BOMB_THROW_ACTION_UPDATE(player, client, network);            
@@ -45,11 +39,12 @@ static void __work_action(struct network_packet* packet, struct network* network
                         .speed = 1.f,
                     });
             }
-            break;
+            return true;
         default:
             printf("yaal: unknown action id %i\n", x_data->packet.player_action.action_id);
             break;
     }
+    return false;
 }
 
 static void __sglthing_new_player(struct network* network, struct network_client* client)
@@ -62,7 +57,7 @@ static void __sglthing_new_player(struct network* network, struct network_client
 
     if(network->mode == NETWORKMODE_SERVER)
     {
-        int intro_id = client->connection_id;
+        int intro_id = 0;
         new_player->level_id = intro_id;
         struct map_file_data* map = g_hash_table_lookup(server_state.maps, &intro_id);
         if(map)
@@ -389,6 +384,10 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                     {
                         glm_vec3_copy(x_data->packet.update_position.delta_pos, upd_player->old_position);
                         glm_vec3_copy(x_data->packet.update_position.delta_pos, upd_player->player_position);
+                        if(upd_player->level_id == yaal_state.current_level_id)
+                            upd_player->player_light.disable = false;                        
+                        else
+                            upd_player->player_light.disable = true;
                         //printf("yaal: updating player %i position (%f,%f,%f)\n", upd_client->player_id, upd_player->old_position[0], upd_player->old_position[1], upd_player->old_position[2]);
                         yaal_update_player_transform(upd_player);
                     }
@@ -445,19 +444,21 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 if(x_data->packet.player_update_action.hotbar_id > 9)
                     return false;
                 memcpy(&yaal_state.player_actions[x_data->packet.player_update_action.hotbar_id],&x_data->packet.player_update_action.new_action_data,sizeof(struct player_action));                
-
             }
             return false;
         case YAAL_PLAYER_ACTION:
             if(network->mode == NETWORKMODE_SERVER)
             {
                 x_data->packet.player_action.player_id = client->player_id;
-                __work_action(packet, network, client);
-                network_transmit_packet_all(network, *packet);            
+                x_data->packet.player_action.level_id = client_player->level_id;
+                if(__work_action(packet, network, client))
+                    network_transmit_packet_all(network, *packet);            
             }
             else
             {
-                __work_action(packet, network, client);
+                struct network_client* upd_client = g_hash_table_lookup(network->players, &x_data->packet.player_action.player_id);
+                if(x_data->packet.player_action.level_id == yaal_state.current_level_id)
+                    __work_action(packet, network, upd_client);
             }
             return false;
         case YAAL_RPG_MESSAGE:

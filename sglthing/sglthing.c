@@ -132,6 +132,7 @@ int main(int argc, char** argv)
     glm_vec4_copy(world->viewport, old_viewport);
     while(!glfwWindowShouldClose(window) && !should_close)
 #else
+    float next_dedi_announcement = world->time + 1.f;
     world->gfx.screen_width = 640;
     world->gfx.screen_height = 480;
     while(!should_close)
@@ -169,10 +170,19 @@ int main(int argc, char** argv)
 
 #ifdef HEADLESS
         float frame_end = g_timer_elapsed(headless_timer, NULL);
+
 #else 
         float frame_end = glfwGetTime();
 #endif
         world->delta_time = (frame_end - frame_start);
+#ifdef HEADLESS
+        if(world->time > next_dedi_announcement)
+        {
+            printf("sglthing: %fs up, %f frames/sec (%i), %i in universe\n", world->time, world->fps, world->frames, world->server.server_clients->len);
+            next_dedi_announcement = world->time + 1.f;
+        }
+#endif
+
 #ifndef HEADLESS
         if(get_focus())
             kbd_frame_end();    

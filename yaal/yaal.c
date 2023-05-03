@@ -288,7 +288,10 @@ static void __sglthing_frame_ui(struct world* world)
             snprintf(act_name, 64, "%i", action->action_count);
             ui_draw_text(world->ui, action_bar_base[0] + (64.f * i), action_bar_base[1], act_name, 0.9f);
             if(action->action_count == 0)
+            {
                 ui_draw_image(world->ui, action_bar_base[0] + (64.f * i), action_bar_base[1], 64.f, 64.f, yaal_state.player_action_disabled_tex, 0.9f);
+                press = false;
+            }
         }
         if(action->combat_mode && !yaal_state.current_player->combat_mode)
             continue;
@@ -466,6 +469,7 @@ static void __sglthing_frame_ui(struct world* world)
 
                 struct network_packet upd_pak;
                 upd_pak.meta.packet_type = PACKETTYPE_CHAT_MESSAGE;
+                upd_pak.meta.acknowledge = true;
                 strncpy(upd_pak.packet.chat_message.message,input_text,128);
                 network_transmit_packet(yaal_state.current_player->client->owner, &yaal_state.current_player->client->owner->client, upd_pak);
             }
