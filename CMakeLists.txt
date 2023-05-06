@@ -65,6 +65,7 @@ endif()
 
 project(sglthing)
 project(thesglthing)
+project(lua)
 
 set(YAAL_COMPILE yes)
 if(YAAL_COMPILE)
@@ -86,20 +87,20 @@ if(YAAL_COMPILE)
     set_target_properties(Yaal PROPERTIES OUTPUT_NAME "thesglyaal")
 endif()
 
-add_library(sglthing STATIC
-    sglthing/s7/s7.c
-    sglthing/s7/s7.h
-    sglthing/s7/script_networking.h
-    sglthing/s7/script_networking.c
-    sglthing/s7/script_functions.h
-    sglthing/s7/script_functions.c
-    sglthing/s7/transform.h
-    sglthing/s7/transform.c
-    sglthing/s7/netbundle.h
-    sglthing/s7/netbundle.c
-    sglthing/s7/vector.h
-    sglthing/s7/vector.c
+file(GLOB LUA_SRC_FILES 
+    lua/src/*.c
+    lua/src/*.h
+)
 
+add_library(lua STATIC
+    ${LUA_SRC_FILES}
+)
+
+target_include_directories(lua PUBLIC
+    lua/src
+)
+
+add_library(sglthing STATIC
     sglthing/primitives.h
     sglthing/primitives.c 
     sglthing/particles.h
@@ -154,7 +155,7 @@ if(HEADLESS)
     target_compile_definitions(sglthing PUBLIC HEADLESS)
 endif()
 
-configure_file(sglthing/_sglthing.h.in _sglthing.h @ONLY)
+configure_file(sglthing/_sglthing.h.in _sglthinSg.h @ONLY)
 
 target_include_directories(sglthing PUBLIC
     ${ODE_INCLUDE_DIR}
@@ -169,6 +170,7 @@ target_link_libraries(sglthing PUBLIC
     cglm
     assimp
     m
+    lua
     ${ZLIB_LIBRARIES} # from assimp
     PkgConfig::deps
     PkgConfig::curl

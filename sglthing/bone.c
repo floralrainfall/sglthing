@@ -159,7 +159,7 @@ int bone_get_translation_idx(struct bone* bone, float animation_time)
         if (animation_time < g_array_index(bone->key_translations, struct key_translate, i + 1).timestamp)
             return i;
     }
-    ASSERT(0);
+    ASSERT2(0);
 }
 
 int bone_get_rotation_idx(struct bone* bone, float animation_time)
@@ -169,7 +169,7 @@ int bone_get_rotation_idx(struct bone* bone, float animation_time)
         if (animation_time < g_array_index(bone->key_rotations, struct key_rotate, i + 1).timestamp)
             return i;
     }
-    ASSERT(0);
+    ASSERT2(0);
 }
 
 int bone_get_scale_idx(struct bone* bone, float animation_time)
@@ -179,5 +179,5 @@ int bone_get_scale_idx(struct bone* bone, float animation_time)
         if (animation_time < g_array_index(bone->key_scales, struct key_scale, i + 1).timestamp)
             return i;
     }
-    ASSERT(0);
+    ASSERT2(0);
 }

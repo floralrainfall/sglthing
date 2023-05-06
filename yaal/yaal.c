@@ -413,7 +413,7 @@ static void __sglthing_frame_ui(struct world* world)
         }
         else if(menu_button)
         {
-
+            yaal_state.player_menu_open = !yaal_state.player_menu_open;
         }
         else
         {
@@ -483,6 +483,16 @@ static void __sglthing_frame_ui(struct world* world)
             start_text_input();
         }
 #endif
+    }
+
+    if(yaal_state.player_menu_open)
+    {
+        ui_draw_panel(world->ui, 8.f, world->gfx.screen_height-100.f, world->gfx.screen_width-16.f, world->gfx.screen_height/2.f, 0.5f);
+        world->ui->current_panel->position_x += 1;
+        ui_draw_text(world->ui, 0.f, 16.f, "YaalOnline Menu", 0.3f);
+        if(ui_draw_button(world->ui, world->ui->current_panel->size_x-33.f, 0.f, 32.f, 16.f, yaal_state.player_exit_tex, 0.3f))
+            yaal_state.player_menu_open = false;
+        ui_end_panel(world->ui);
     }
 
     world->ui->persist = true;
@@ -656,6 +666,8 @@ void sglthing_init_api(struct world* world)
     yaal_state.player_ok_button_tex = get_texture("yaal/ui/ok_button.png");
     load_texture("yaal/ui/lag.png");
     yaal_state.player_lag_tex = get_texture("yaal/ui/lag.png");
+    load_texture("yaal/ui/exit.png");
+    yaal_state.player_exit_tex = get_texture("yaal/ui/exit.png");
 
     load_model("test/box.obj");
     load_model("yaal/models/player.fbx");

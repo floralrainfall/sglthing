@@ -9,9 +9,9 @@
 #include "ui.h"
 #include "primitives.h"
 #include "light.h"
-#include "script.h"
 #include "config.h"
 #include "net.h"
+#include "script.h"
 #include "snd.h"
 #include "mus.h"
 #ifndef HEADLESS

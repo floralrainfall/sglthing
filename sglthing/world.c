@@ -87,7 +87,7 @@ struct world* world_init(char** argv, int argc, void* p)
     world->gfx.chat_bar_image = get_texture("uiassets/text_input_bar.png");
 
     if(!network_download)
-        world->script = script_init("scripts/game.scm", world);
+        world->script = script_init("scripts/game.lua", world);
 
     world->gfx.shadow_pass = false;
     int ls_v = compile_shader("shaders/shadow_pass.vs",GL_VERTEX_SHADER);

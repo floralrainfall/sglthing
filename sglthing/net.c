@@ -12,7 +12,6 @@
 #ifndef HEADLESS
 #include <GLFW/glfw3.h>
 #endif
-#include "s7/script_networking.h"
 #include "io.h"
 #endif
 #include "sglthing.h"
@@ -27,11 +26,6 @@ struct unacknowledged_packet
 
 int last_connection_id = 0;
 #define ZERO(x) memset(&x,0,sizeof(x))
-
-static s7_scheme* network_get_s7_pointer(struct network* network)
-{
-    return (s7_scheme*)script_s7(network->script);
-}
 
 void network_init(struct network* network, struct script_system* script)
 {
@@ -255,9 +249,6 @@ void network_connect(struct network* network, char* ip, int port)
         client_info.packet.clientinfo.color_b = network->client.player_color_b;
         network_transmit_packet(network, &network->client, client_info);
 
-        if(network->script)
-            nets7_init_network(network_get_s7_pointer(network), network);
-
         network->next_tick = network->distributed_time + 0.01;
 #ifdef NETWORK_TCP
     }
@@ -312,9 +303,6 @@ void network_open(struct network* network, char* ip, int port)
     strncpy(network->server_name, "SGLThing game server", 64);
     strncpy(network->server_motd, "Server has not set a server_motd", 128);
     strncpy(network->debugger_pass, "debugger", 64);
-
-    if(network->script)
-        nets7_init_network(network_get_s7_pointer(network), network);
 
     printf("sglthing: server open on ip %s and port %i\n", ip, port);
 }
@@ -631,10 +619,9 @@ static void network_manage_packet(struct network* network, struct network_client
                 }
             }
             break;
-        case PACKETTYPE_SCM_EVENT:
+        case PACKETTYPE_LUA_DATA:
             // printf("sglthing: %s received event %i, data: '%s'\n", (network->mode == NETWORKMODE_SERVER) ? "server" : "client", in_packet.packet.scm_event.event_id, in_packet.packet.scm_event.event_data);
-            if(network->script)
-                nets7_receive_event(network_get_s7_pointer(network), network, client, &in_packet);
+
             break;
         case PACKETTYPE_CHAT_MESSAGE:
             if(network->mode == NETWORKMODE_SERVER)
@@ -701,8 +688,6 @@ void network_manage_socket(struct network* network, struct network_client* clien
     struct network_packet in_packet;
     struct sockaddr_in sockaddr;
     int sockaddr_len = sizeof(sockaddr);
-    if(network->script)
-        nets7_tick_network(network_get_s7_pointer(network), network, client);
 #ifdef NETWORK_TCP
     while(recv(client->socket, &in_packet, sizeof(struct network_packet), MSG_DONTWAIT) != -1)
 #else
@@ -909,7 +894,12 @@ void network_frame(struct network* network, float delta_time, double time)
 void network_disconnect_player(struct network* network, bool transmit_disconnect, char* reason, struct network_client* client)
 {
     if(network->mode == NETWORKMODE_SERVER)
-    {
+    {            
+        struct network_packet response;
+        ZERO(response);
+        response.meta.packet_type = PACKETTYPE_DISCONNECT;
+        strncpy(response.packet.disconnect.disconnect_reason, reason, 32);
+        network_transmit_packet(network, client, response);
         if(network->del_player_callback)
             network->del_player_callback(network, client);
         g_hash_table_remove(network->players, &client->player_id);
@@ -924,8 +914,6 @@ void network_disconnect_player(struct network* network, bool transmit_disconnect
         }
         if(client->authenticated && transmit_disconnect)
         {
-            struct network_packet response;
-            ZERO(response);
             response.meta.packet_type = PACKETTYPE_PLAYER_REMOVE;
             response.packet.player_remove.player_id = client->player_id;
             network_transmit_packet_all(network, response);

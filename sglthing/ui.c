@@ -12,12 +12,15 @@
 
 #define MAX_CHARACTERS_STRING 65535
 #define MAX_UI_ELEMENTS 512
+#define ADJUST_POSITION(ui) if(ui->current_panel) { position_x += ui->current_panel->position_x; position_y = ui->current_panel->position_y - position_y; }
 
 void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* text, float depth)
 {
     #ifndef HEADLESS
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return;
+
+    ADJUST_POSITION(ui);
 
     int txlen = strlen(text);
 
@@ -140,7 +143,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 
         offset[0] = -2.0f;
         offset[1] = -1.0f;
-        offset[2] = -0.2f;
+        offset[2] = -0.02f;
         
         glm_vec4_divs(ui->foreground_color, 2.f, foreground_color);
         sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
@@ -151,7 +154,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 
         offset[0] = 0.0f;
         offset[1] = 0.0f;
-        offset[2] = -0.1f;
+        offset[2] = -0.01f;
 
         sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
         sglc(glUniform3fv(glGetUniformLocation(ui->ui_program,"offset"), 1, offset));
@@ -188,9 +191,11 @@ bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, floa
     #ifndef HEADLESS
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return false;
-    #endif
-
+    #endif    
+    
     ui_draw_image(ui, position_x, position_y, size_x, size_y, image, depth);
+
+    ADJUST_POSITION(ui);
 
     if(mouse_state.mouse_button_l && !ui->debounce)
     {
@@ -211,12 +216,127 @@ bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, floa
     return false;
 }
 
+void ui_end_panel(struct ui_data* ui)
+{
+    if(ui->current_panel)
+    {
+        glm_vec4_copy(ui->current_panel->oldfg, ui->foreground_color);
+        glm_vec4_copy(ui->current_panel->oldbg, ui->background_color);
+        ui->current_panel = ui->current_panel->parent_panel;
+    }
+}
+
+void ui_draw_panel(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, float depth)
+{
+    #ifndef HEADLESS
+    if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
+        return false;
+    #endif
+
+    ADJUST_POSITION(ui);
+
+    struct ui_panel* new_panel = (struct ui_panel*)malloc(sizeof(struct ui_panel));    
+    new_panel->parent_panel = ui->current_panel;
+
+    ui->current_panel = new_panel;
+    ui->current_panel->position_x = position_x;
+    ui->current_panel->position_y = position_y;
+    ui->current_panel->size_x = size_x;
+    ui->current_panel->size_y = size_y;
+
+    glm_vec4_copy(ui->foreground_color, ui->current_panel->oldfg);
+    glm_vec4_copy(ui->background_color, ui->current_panel->oldbg);
+
+    ui->foreground_color[0] = 1.f;
+    ui->foreground_color[1] = 1.f;
+    ui->foreground_color[2] = 1.f;
+
+    ui->background_color[0] = 0.f;
+    ui->background_color[1] = 0.f;
+    ui->background_color[2] = 0.f;
+    ui->background_color[3] = 0.f;
+
+    vec2 points[6][2] = {0};
+    vec2 v_up_left    = {position_x,position_y};
+    vec2 v_up_right   = {position_x+size_x,position_y};
+    vec2 v_down_left  = {position_x,position_y-size_y};
+    vec2 v_down_right = {position_x+size_x,position_y-size_y};
+
+    // tri 1
+
+    points[0][0][0] = v_up_left[0];
+    points[0][0][1] = v_up_left[1];
+
+    points[1][0][0] = v_down_left[0];
+    points[1][0][1] = v_down_left[1];
+
+    points[2][0][0] = v_up_right[0];
+    points[2][0][1] = v_up_right[1];
+
+    // tri 2
+
+    points[3][0][0] = v_down_right[0];
+    points[3][0][1] = v_down_right[1];
+
+    points[4][0][0] = v_up_right[0];
+    points[4][0][1] = v_up_right[1];
+
+    points[5][0][0] = v_down_left[0];
+    points[5][0][1] = v_down_left[1];
+
+    vec2 uv_up_left    = {0.f,0.f};
+    vec2 uv_up_right   = {1.f,0.f};
+    vec2 uv_down_left  = {0.f,1.f};
+    vec2 uv_down_right = {1.f,1.f};
+
+    // tri 1
+
+    points[0][1][0] = uv_up_left[0];
+    points[0][1][1] = uv_up_left[1];
+
+    points[1][1][0] = uv_down_left[0];
+    points[1][1][1] = uv_down_left[1];
+
+    points[2][1][0] = uv_up_right[0];
+    points[2][1][1] = uv_up_right[1];
+
+    // tri 2
+
+    points[3][1][0] = uv_down_right[0];
+    points[3][1][1] = uv_down_right[1];
+
+    points[4][1][0] = uv_up_right[0];
+    points[4][1][1] = uv_up_right[1];
+
+    points[5][1][0] = uv_down_left[0];
+    points[5][1][1] = uv_down_left[1];
+
+    sglc(glBindVertexArray(ui->ui_vao));
+    sglc(glBindBuffer(GL_ARRAY_BUFFER, ui->ui_vbo));
+    sglc(glBufferSubData(GL_ARRAY_BUFFER, 0, 6*2*2*sizeof(float), points));
+    sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
+
+    sglc(glUseProgram(ui->ui_panel_program));
+    vec3 offset = {0.f, 0.f};
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_panel_program,"depth"), -depth));
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_panel_program,"time"), (float)glfwGetTime()));
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_panel_program,"waviness"), ui->waviness));
+    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_panel_program,"projection"), 1, GL_FALSE, ui->projection[0])); 
+    sglc(glUniform3fv(glGetUniformLocation(ui->ui_panel_program,"offset"), 1, offset));
+    //sglc(glUniform4fv(glGetUniformLocation(ui->ui_panel_program,"foreground_color"), 1, ui->current_panel->top_color));
+    //sglc(glUniform4fv(glGetUniformLocation(ui->ui_panel_program,"background_color"), 1, ui->current_panel->bottom_color));
+    sglc(glDrawArrays(GL_TRIANGLES, 0, 6));
+}
+
 void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, int image, float depth)
 {
     #ifndef HEADLESS
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return false;
     #endif
+    
+    ADJUST_POSITION(ui);
+    
     vec2 points[6][2] = {0};
     vec2 v_up_left    = {position_x,position_y};
     vec2 v_up_right   = {position_x+size_x,position_y};
@@ -297,13 +417,16 @@ void ui_init(struct ui_data* ui)
     int ui_frag = compile_shader("uiassets/shaders/ui.fs", GL_FRAGMENT_SHADER);
     ui->ui_program = link_program(ui_vertex, ui_frag);
 
-    int ui_i_vertex = compile_shader("uiassets/shaders/ui.vs", GL_VERTEX_SHADER);
     int ui_i_frag = compile_shader("uiassets/shaders/ui_picture.fs", GL_FRAGMENT_SHADER);
-    ui->ui_img_program = link_program(ui_i_vertex, ui_i_frag);
+    ui->ui_img_program = link_program(ui_vertex, ui_i_frag);
+
+    int ui_p_frag = compile_shader("uiassets/shaders/ui_panel.fs", GL_FRAGMENT_SHADER);
+    ui->ui_panel_program = link_program(ui_vertex, ui_p_frag);
 
     ui->default_font = ui_load_font("uiassets/font.png", 8, 16, 1, 256);
 
     ui->ui_font = ui->default_font;
+    ui->current_panel = 0;
 
     sglc(glGenVertexArrays(1,&ui->ui_vao));    
     sglc(glGenBuffers(1,&ui->ui_vbo));

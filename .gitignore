@@ -1,4 +1,5 @@
 build
+mingw_build
 .vscode
 resources/config_private.ini
 push.sh

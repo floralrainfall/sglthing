@@ -183,6 +183,7 @@ struct yaal_state {
     int map_graphics_tiles[MAP_TEXTURE_IDS];
     struct light_area* area;
     
+    bool player_menu_open;
     bool player_chat_mode;
     bool player_action_disable;
     bool player_action_debounce[9];
@@ -205,6 +206,7 @@ struct yaal_state {
     int player_hotbar_bar_tex;
     int player_coins_tex;
     int player_lag_tex;
+    int player_exit_tex;
     int player_shader;
     int friends_tex;
     int select_particle_tex;

@@ -10,7 +10,15 @@ void __sglthing_assert_failed();
         __sglthing_assert_failed();                                               \
         exit(-1);                                                                 \
     }
-
+#define ASSERT2(x) if(!(x)) {                                                     \
+        printf("sglthing: assert '%s' failed (%s:%i)\n", #x, __FILE__, __LINE__); \
+        __sglthing_assert_failed();                                               \
+        return;                                                                   \
+    }
+#define ASSERT2_S(x) if(!(x)) {                                                   \
+        __sglthing_assert_failed();                                               \
+        return;                                                                   \
+    }
 #define M_PIf 3.14159265359f
 #define M_PI_180f 0.01745329251f
 #define M_PI_2f 1.57079632679f

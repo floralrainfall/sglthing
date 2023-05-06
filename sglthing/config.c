@@ -14,12 +14,7 @@ void config_load(struct config_file* config, char* file)
     {
         config->key_file = g_key_file_new();
         GError* error = NULL; 
-        if(g_key_file_load_from_file(config->key_file, rscpath, 0, &error))
-        {
-
-        }
-        else
-        {
+        if(!g_key_file_load_from_file(config->key_file, rscpath, 0, &error)) {
             printf("sglthing: glib could not open file %s (%s)\n", rscpath, error->message);
         }
     }

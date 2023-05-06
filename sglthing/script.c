@@ -1,160 +1,154 @@
 #include "script.h"
 #include "io.h"
-#include "s7/s7.h"
 #include <stdlib.h>
 #include <string.h>
 #include "sglthing.h"
-#include "s7/script_functions.h"
-#include "s7/transform.h"
 #include "world.h"
 #include "ui.h"
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
 
-struct script_system
-{
-    s7_scheme* scheme;
-    struct transform player_transform;
-    struct world* world;
-    int player_transform_gc;
-    char script_name[64];
-    struct filesystem_archive* archive;
-
-    s7_pointer s7_transform_ptr;
-    int s7_transform_gc;
-    s7_pointer s7_world_ptr;
-    int s7_world_gc;
-    s7_pointer s7_uidata_ptr;
-    int s7_uidata_gc;
-
-    bool enabled;
-};
-
-struct script_system* script_init(char* file, void* world)
-{
-#ifdef S7_DEBUGGING
-    printf("sglthing: s7 is poisoned (S7_DEBUGGING)\n");
-#endif
-
-#ifdef S7_DISABLE
-    printf("sglthing: S7_DISABLE is defined\n");
-#else
-    struct world* _world = (struct world*)world;
-    char rsc_path[64] = {0};
-    char rsc_dir[64] = {0};
-    struct script_system* system = malloc(sizeof(struct script_system));
-    if(file_get_path(rsc_path,64,file)!=-1 && _world->enable_script)
-    {
-        char* last = strrchr(rsc_path, '/');
-        if(last != NULL)
-        {
-            int len = strlen(rsc_path) - strlen(last);
-            strncpy(rsc_dir, rsc_path, MIN(len,64));
-        }
-
-        printf("sglthing: starting script system on file %s (env: %s)\n", rsc_path, rsc_dir);
-        system->scheme = s7_init();
-        system->world = _world;
-        strncpy(system->script_name, rsc_path, 64);
-
-        s7_add_to_load_path(system->scheme, rsc_dir);
-        sgls7_add_functions(system->scheme);
-        
-        system->player_transform.px = 0.f;
-        system->player_transform.py = 0.f;
-        system->player_transform.pz = 0.f;
-        system->player_transform.rx = 0.f;
-        system->player_transform.ry = 0.f;
-        system->player_transform.rz = 0.f;
-        system->player_transform.rw = 0.f;
-        system->player_transform.sx = 0.f;
-        system->player_transform.sy = 0.f;
-        system->player_transform.sz = 0.f;
-
-        system->s7_transform_ptr = s7_make_c_object(system->scheme, sgls7_transform_type(), &system->player_transform);
-        system->s7_transform_gc = s7_gc_protect(system->scheme, system->s7_transform_ptr);
-        s7_define_variable(system->scheme, "game-camera", system->s7_transform_ptr);
-
-        s7_mark(system->s7_transform_ptr);
-
-        system->s7_uidata_ptr = s7_make_c_pointer(system->scheme, system->world->ui);
-        system->s7_uidata_gc = s7_gc_protect(system->scheme, system->s7_uidata_ptr);
-        s7_define_variable(system->scheme, "game-ui", system->s7_uidata_ptr);
-
-        s7_mark(system->s7_uidata_ptr);
-
-        system->s7_world_ptr = s7_make_c_pointer(system->scheme, system->world);
-        system->s7_world_gc = s7_gc_protect(system->scheme, system->s7_world_ptr);
-        s7_define_variable(system->scheme, "game-world", system->s7_world_ptr);
-
-        s7_mark(system->s7_world_ptr);
-
-        s7_pointer code = s7_load(system->scheme, rsc_path);
-        s7_pointer response;
-        s7_eval(system->scheme, code, s7_rootlet(system->scheme));
-
-        system->enabled = true;
-
-        return system;
+// https://www.lua.org/manual/5.3/manual.html
+static void *l_alloc (void *ud, void *ptr, size_t osize,
+                                        size_t nsize) {
+    (void)ud;  (void)osize;  /* not used */
+    if (nsize == 0) {
+        free(ptr);
+        return NULL;
     }
     else
-#endif
+        return realloc(ptr, nsize);
+}
+
+struct script_system* script_init(char* file, struct world* world)
+{
+    struct script_system* new_system = malloc(sizeof(struct script_system));
+    char path[255];
+    int f = file_get_path(path,255,file);
+    if(f != -1)
+    {
+        struct world* world;
+        new_system->enabled = true;
+        new_system->world = world;
+
+        new_system->lua = lua_newstate(l_alloc, new_system);
+        luaL_openlibs(new_system->lua);
+        luaL_dofile(new_system->lua, path); 
+    
+    }
+    else
     {
         printf("sglthing: script %s not found\n", file);
-        system->enabled = false;
-        return system;
+        new_system->enabled = false;
     }
+    return new_system;
+}
+
+static void __script_push_vec2(struct script_system* system, vec2 vec)
+{
+    lua_createtable(system->lua, 0, 2);
+
+    lua_pushstring(system->lua, "x");
+    lua_pushnumber(system->lua, vec[0]);
+    lua_settable(system->lua, -3);
+
+    lua_pushstring(system->lua, "y");
+    lua_pushnumber(system->lua, vec[1]);
+    lua_settable(system->lua, -3);
+}
+
+static void __script_push_vec3(struct script_system* system, vec3 vec)
+{
+    lua_createtable(system->lua, 0, 3);
+
+    lua_pushstring(system->lua, "x");
+    lua_pushnumber(system->lua, vec[0]);
+    lua_settable(system->lua, -3);
+
+    lua_pushstring(system->lua, "y");
+    lua_pushnumber(system->lua, vec[1]);
+    lua_settable(system->lua, -3);
+
+    lua_pushstring(system->lua, "z");
+    lua_pushnumber(system->lua, vec[2]);
+    lua_settable(system->lua, -3);
+}
+
+static void __script_push_vec4(struct script_system* system, vec4 vec)
+{
+    lua_createtable(system->lua, 0, 4);
+
+    lua_pushstring(system->lua, "x");
+    lua_pushnumber(system->lua, vec[0]);
+    lua_settable(system->lua, -3);
+
+    lua_pushstring(system->lua, "y");
+    lua_pushnumber(system->lua, vec[1]);
+    lua_settable(system->lua, -3);
+
+    lua_pushstring(system->lua, "z");
+    lua_pushnumber(system->lua, vec[2]);
+    lua_settable(system->lua, -3);
+
+    lua_pushstring(system->lua, "w");
+    lua_pushnumber(system->lua, vec[3]);
+    lua_settable(system->lua, -3);
+}
+
+
+static void __script_push_world(struct script_system* system)
+{
+    lua_createtable(system->lua, 0, 1);
+    lua_pushstring(system->lua, "camera");
+    lua_createtable(system->lua, 0, 2);
+    lua_pushstring(system->lua, "position");
+    __script_push_vec3(system, system->world->cam.position);
+    lua_settable(system->lua, -3);
+    lua_settable(system->lua, -3);
+
+    lua_createtable(system->lua, 0, 2);
+
+
+    lua_settable(system->lua, -3);
 }
 
 void script_frame(struct script_system* system)
 {
-    ASSERT(system);
+    ASSERT2_S(system);
     if(!system->enabled)
         return;
 
-    system->player_transform.px = system->world->cam.position[0];
-    system->player_transform.py = system->world->cam.position[1];
-    system->player_transform.pz = system->world->cam.position[2];
+    lua_getglobal(system->lua, "ScriptFrame");
+    __script_push_world(system);
+    if(lua_pcall(system->lua, 1, 0, 0) == 0)
+    {
 
-    system->player_transform.rx = system->world->cam.pitch;
-    system->player_transform.ry = system->world->cam.yaw;
-
-    s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame"), s7_nil(system->scheme));
-    
-    system->world->cam.position[0] = system->player_transform.px;
-    system->world->cam.position[1] = system->player_transform.py;
-    system->world->cam.position[2] = system->player_transform.pz;
-
-    system->world->cam.pitch = system->player_transform.rx;
-    system->world->cam.yaw = system->player_transform.ry;
+    }
 }
 
 void script_frame_render(struct script_system* system, bool xtra_pass)
 {
-    ASSERT(system);    
+    ASSERT2_S(system);    
     if(!system->enabled)
         return;
-        
 
-    s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame-render"), s7_cons(system->scheme, s7_make_boolean(system->scheme, xtra_pass), s7_nil(system->scheme)));
+    lua_getglobal(system->lua, "ScriptFrameRender");
+    if(lua_pcall(system->lua, 0, 0, 0) == 0)
+    {
+        
+    }
 }
 
 void script_frame_ui(struct script_system* system)
 {
-    ASSERT(system);    
+    ASSERT2_S(system);    
     if(!system->enabled)
         return;
 
-    char sfui_dbg[256];
-    snprintf(sfui_dbg,256,"s7 running script %s",system->script_name);
-    ui_draw_text(system->world->ui, system->world->viewport[2]/3.f, 0.f, sfui_dbg, 1.f);
-    s7_call(system->scheme, s7_name_to_value(system->scheme, "script-frame-ui"), s7_nil(system->scheme));
-}
-
-void* script_s7(struct script_system* system)
-{
-    return (void*)system->scheme;
-}
-
-bool script_enabled(struct script_system* system)
-{
-    return system->enabled;
+    lua_getglobal(system->lua, "ScriptFrameUI");
+    if(lua_pcall(system->lua, 0, 0, 0) == 0)
+    {
+        
+    }
 }

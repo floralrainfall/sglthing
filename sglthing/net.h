@@ -6,10 +6,6 @@
 #endif 
 #include <glib.h>
 #include <netinet/in.h>
-#ifdef SGLTHING_COMPILE
-#include "s7/netbundle.h"
-#include "script.h"
-#endif 
 #include "http.h"
 
 #define CR_PACKET_VERSION 200
@@ -96,7 +92,7 @@ struct network_packet {
             
             PACKETTYPE_DATA,             // C<--S
             PACKETTYPE_DATA_REQUEST,     // C<->S
-            PACKETTYPE_SCM_EVENT,        // C<->S
+            PACKETTYPE_LUA_DATA,         // C<->S
 
             PACKETTYPE_DEBUGGER_QUIT,    // C-->S
             PACKETTYPE_DEBUGGER_KICK,    // C-->S
@@ -164,9 +160,9 @@ struct network_packet {
             int player_id;
         } player_remove;
         struct {
-            int event_id;
-            char event_data[512];
-        } scm_event;
+            int type_id;
+            char lua_data[512];
+        } lua_data;
         struct {
             int player_id;
             char client_name[64];
