@@ -65,6 +65,12 @@ struct world* world_init(char** argv, int argc, void* p)
     for(int i = 2; i < argc; i += 2)
         g_key_file_set_value(world->config.key_file, "sglthing", argv[i-1], argv[i]);
 
+
+    int archives_length;
+    char** archives = g_key_file_get_string_list(world->config.key_file, "sglthing", "archives", &archives_length, NULL);
+    for(int i = 0; i < archives_length; i++)
+        fs_add_directory(archives[i]);
+
     char* net_mode = config_string_get(&world->config,"network_mode");
     if(net_mode && strcmp(net_mode,"server") == 0)
         g_key_file_set_value(world->config.key_file, "sglthing", "swap_interval", "0");
@@ -88,6 +94,7 @@ struct world* world_init(char** argv, int argc, void* p)
 
     if(!network_download)
         world->script = script_init("scripts/game.lua", world);
+    world->script->enabled = world->enable_script ? world->script->enabled : false;
 
     world->gfx.shadow_pass = false;
     int ls_v = compile_shader("shaders/shadow_pass.vs",GL_VERTEX_SHADER);

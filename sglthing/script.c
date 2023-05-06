@@ -9,6 +9,9 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
+#include "lua/l_functions.h"
+#include "lua/l_vector.h"
+
 // https://www.lua.org/manual/5.3/manual.html
 static void *l_alloc (void *ud, void *ptr, size_t osize,
                                         size_t nsize) {
@@ -28,14 +31,14 @@ struct script_system* script_init(char* file, struct world* world)
     int f = file_get_path(path,255,file);
     if(f != -1)
     {
-        struct world* world;
         new_system->enabled = true;
         new_system->world = world;
 
         new_system->lua = lua_newstate(l_alloc, new_system);
         luaL_openlibs(new_system->lua);
-        luaL_dofile(new_system->lua, path); 
+        l_functions_register(new_system->lua);
     
+        luaL_dofile(new_system->lua, path);
     }
     else
     {
@@ -45,74 +48,6 @@ struct script_system* script_init(char* file, struct world* world)
     return new_system;
 }
 
-static void __script_push_vec2(struct script_system* system, vec2 vec)
-{
-    lua_createtable(system->lua, 0, 2);
-
-    lua_pushstring(system->lua, "x");
-    lua_pushnumber(system->lua, vec[0]);
-    lua_settable(system->lua, -3);
-
-    lua_pushstring(system->lua, "y");
-    lua_pushnumber(system->lua, vec[1]);
-    lua_settable(system->lua, -3);
-}
-
-static void __script_push_vec3(struct script_system* system, vec3 vec)
-{
-    lua_createtable(system->lua, 0, 3);
-
-    lua_pushstring(system->lua, "x");
-    lua_pushnumber(system->lua, vec[0]);
-    lua_settable(system->lua, -3);
-
-    lua_pushstring(system->lua, "y");
-    lua_pushnumber(system->lua, vec[1]);
-    lua_settable(system->lua, -3);
-
-    lua_pushstring(system->lua, "z");
-    lua_pushnumber(system->lua, vec[2]);
-    lua_settable(system->lua, -3);
-}
-
-static void __script_push_vec4(struct script_system* system, vec4 vec)
-{
-    lua_createtable(system->lua, 0, 4);
-
-    lua_pushstring(system->lua, "x");
-    lua_pushnumber(system->lua, vec[0]);
-    lua_settable(system->lua, -3);
-
-    lua_pushstring(system->lua, "y");
-    lua_pushnumber(system->lua, vec[1]);
-    lua_settable(system->lua, -3);
-
-    lua_pushstring(system->lua, "z");
-    lua_pushnumber(system->lua, vec[2]);
-    lua_settable(system->lua, -3);
-
-    lua_pushstring(system->lua, "w");
-    lua_pushnumber(system->lua, vec[3]);
-    lua_settable(system->lua, -3);
-}
-
-
-static void __script_push_world(struct script_system* system)
-{
-    lua_createtable(system->lua, 0, 1);
-    lua_pushstring(system->lua, "camera");
-    lua_createtable(system->lua, 0, 2);
-    lua_pushstring(system->lua, "position");
-    __script_push_vec3(system, system->world->cam.position);
-    lua_settable(system->lua, -3);
-    lua_settable(system->lua, -3);
-
-    lua_createtable(system->lua, 0, 2);
-
-
-    lua_settable(system->lua, -3);
-}
-
 void script_frame(struct script_system* system)
 {
     ASSERT2_S(system);
@@ -120,10 +55,11 @@ void script_frame(struct script_system* system)
         return;
 
     lua_getglobal(system->lua, "ScriptFrame");
-    __script_push_world(system);
-    if(lua_pcall(system->lua, 1, 0, 0) == 0)
+    lua_pushlightuserdata(system->lua, system->world);
+    if(lua_pcall(system->lua, 1, 0, 0) != 0)
     {
-
+        printf("lua: error running ScriptFrame: %s\n",
+            lua_tostring(system->lua, -1));
     }
 }
 
@@ -134,9 +70,12 @@ void script_frame_render(struct script_system* system, bool xtra_pass)
         return;
 
     lua_getglobal(system->lua, "ScriptFrameRender");
-    if(lua_pcall(system->lua, 0, 0, 0) == 0)
+    lua_pushlightuserdata(system->lua, system->world);
+    lua_pushboolean(system->lua, xtra_pass);
+    if(lua_pcall(system->lua, 2, 0, 0) != 0)
     {
-        
+        printf("lua: error running ScriptFrameRender: %s\n",
+            lua_tostring(system->lua, -1));
     }
 }
 
@@ -147,8 +86,11 @@ void script_frame_ui(struct script_system* system)
         return;
 
     lua_getglobal(system->lua, "ScriptFrameUI");
-    if(lua_pcall(system->lua, 0, 0, 0) == 0)
+    lua_pushlightuserdata(system->lua, system->world);
+    lua_pushlightuserdata(system->lua, system->world->ui);
+    if(lua_pcall(system->lua, 2, 0, 0) != 0)
     {
-        
+        printf("lua: error running ScriptFrameUI: %s\n",
+            lua_tostring(system->lua, -1));
     }
 }

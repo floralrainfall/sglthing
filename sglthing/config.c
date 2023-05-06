@@ -9,8 +9,8 @@
 void config_load(struct config_file* config, char* file)
 {
     char rscpath[255];
-    file_get_path(&rscpath, 255, file);
-    if(rscpath)
+    int f = file_get_path(&rscpath, 255, file);
+    if(f != 0)
     {
         config->key_file = g_key_file_new();
         GError* error = NULL; 

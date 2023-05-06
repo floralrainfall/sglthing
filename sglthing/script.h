@@ -5,11 +5,11 @@
 
 struct script_system
 {
-    lua_State* lua;
-
     bool enabled;
 
     struct world* world;
+
+    lua_State* lua;
 };
 
 struct script_system* script_init(char* file, struct world* world);

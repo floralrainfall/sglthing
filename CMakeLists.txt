@@ -101,6 +101,10 @@ target_include_directories(lua PUBLIC
 )
 
 add_library(sglthing STATIC
+    sglthing/lua/l_functions.h
+    sglthing/lua/l_functions.c
+    sglthing/lua/l_vector.h
+    sglthing/lua/l_vector.c
     sglthing/primitives.h
     sglthing/primitives.c 
     sglthing/particles.h

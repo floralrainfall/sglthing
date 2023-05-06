@@ -82,9 +82,9 @@ int main(int argc, char** argv)
     printf("sglthing: headless\n");
     #endif
 
+    fs_add_directory(".");
     fs_add_directory("resources");
     fs_add_directory("../resources");
-    fs_add_directory("~/.sglthing");
     #ifdef __unix__
     fs_add_directory("/opt/sglthing");
     #endif

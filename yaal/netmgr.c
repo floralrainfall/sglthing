@@ -287,6 +287,9 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 yaal_state.map_downloaded_count = 0;
                 strncpy(yaal_state.level_name, x_data->packet.yaal_level.level_name, 64);
 
+                if(yaal_state.current_player)
+                    yaal_state.current_player->level_id = yaal_state.current_level_id;
+
 #define LEVEL_TRANSMISSION
 #ifdef LEVEL_TRANSMISSION
                 yaal_state.map_downloading = true;
