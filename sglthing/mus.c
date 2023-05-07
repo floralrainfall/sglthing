@@ -14,6 +14,7 @@ char mus_note_names[] = {
 
 void mus_init(struct musmgr* mgr, struct sndmgr* s_mgr)
 {
+#ifdef SOUND_ENABLED
     mgr->scratch_song = (struct mus_file*)malloc(sizeof(struct mus_file));
     mgr->scratch_song->speed = 1;
     strncpy(mgr->scratch_song->name, "scratch", 64);
@@ -31,10 +32,12 @@ void mus_init(struct musmgr* mgr, struct sndmgr* s_mgr)
     }
 
     mus_set_file(mgr, mgr->scratch_song);
+#endif
 }
 
 struct mus_file* load_mus_file(char* file_name)
 {
+#ifdef SOUND_ENABLED
     char dest_path[255];
     if(file_get_path(dest_path, 255, file_name) == -1)
     {
@@ -46,10 +49,12 @@ struct mus_file* load_mus_file(char* file_name)
     fread(file, 1, sizeof(struct mus_file), file_r);
     fclose(file_r);    
     printf("sglthing: loaded music '%s', copyright: '%s'\n", file->name, file->copyright);
+#endif
 }
 
 void mus_set_file(struct musmgr* mgr, struct mus_file* file)
 {
+#ifdef SOUND_ENABLED
     for(int i = 0; i < SAMPLES_PER_FILE; i++)
         if(file->sample_data[i].load == LOADED_SAMPLE_ID)
         {
@@ -67,10 +72,12 @@ void mus_set_file(struct musmgr* mgr, struct mus_file* file)
     mgr->current_pattern = 0;
     mgr->pattern_offset = 0;
     mgr->playing = true;
+#endif
 }
 
 void mus_tick(struct musmgr* mgr)
 {
+#ifdef SOUND_ENABLED
 #ifndef HEADLESS
     if(!mgr->world_ptr)
         return;
@@ -164,5 +171,6 @@ void mus_tick(struct musmgr* mgr)
 
         }
     }
+#endif
 #endif
 }

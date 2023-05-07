@@ -13,9 +13,13 @@ void yaal_update_player_action(int key_id, struct player_action action, struct n
 
 void yaal_update_player_transform(struct player* player)
 {
+    mat4 rotation_matrix;
     glm_mat4_identity(player->model_matrix);
+
     glm_translate(player->model_matrix, player->old_position);
     glm_translate_y(player->model_matrix, 0.0f);
+
+    glm_mat4_mul(player->model_matrix, rotation_matrix, player->model_matrix);
 
     glm_vec3_copy(player->player_position, player->player_light.position);
     player->player_light.position[1] = 1.5f;

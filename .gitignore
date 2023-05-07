@@ -1,5 +1,6 @@
 build
 mingw_build
+headless_build
 .vscode
 resources/config_private.ini
 push.sh

@@ -19,6 +19,7 @@ enum yaal_packet_type
     YAAL_UPDATE_PLAYERANIM,
     YAAL_UPDATE_PLAYER_ACTION,
     YAAL_UPDATE_COMBAT_MODE,
+    YAAL_UPDATE_STATS,
 
     YAAL_RPG_MESSAGE,
 
@@ -45,7 +46,7 @@ struct xtra_packet_data
             int player_id;
             int level_id;
             vec3 delta_pos;
-            vec2 delta_angles;
+            versor new_versor;
             float pitch;
             bool urgent;
             double lag;
@@ -55,6 +56,16 @@ struct xtra_packet_data
             int player_id;
             int animation_id;
         } update_playeranim;
+        struct
+        {
+            int player_id;
+            int player_health;
+            int player_max_health;
+            int player_mana;
+            int player_max_mana;
+            int player_bombs;
+            int player_coins;
+        } update_stats;
         struct
         {
             struct map_object object;
@@ -106,5 +117,7 @@ struct net_radius_detection
 
 void net_init(struct world* world);
 void net_players_in_radius(GArray* clients, float radius, vec3 position, int level_id, GArray* out);
+void net_upd_player(struct network* network, struct network_client* client);
+void net_player_hurt(struct network* network, struct network_client* client, int damage);
 
 #endif

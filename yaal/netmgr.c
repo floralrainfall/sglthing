@@ -1,5 +1,25 @@
 #include "netmgr.h"
 
+void net_upd_player(struct network* network, struct network_client* client)
+{
+    struct player* player;
+    player = (struct player*)client->user_data;
+    ASSERT(player);
+
+    struct network_packet upd_pak;
+    struct xtra_packet_data* x_data = (struct xtra_packet_data*)&upd_pak.packet.data;
+    upd_pak.meta.packet_type = YAAL_UPDATE_STATS;
+    x_data->packet.update_stats.player_bombs = player->player_bombs;
+    x_data->packet.update_stats.player_coins = player->player_coins;
+    x_data->packet.update_stats.player_health = player->player_health;
+    x_data->packet.update_stats.player_max_health = player->player_max_health;
+    x_data->packet.update_stats.player_mana = player->player_mana;
+    x_data->packet.update_stats.player_max_mana = player->player_max_mana;
+    upd_pak.meta.acknowledge = true;
+    strncpy(upd_pak.packet.chat_message.message,input_text,128);
+    network_transmit_packet(network, client, upd_pak);
+}
+
 static bool __work_action(struct network_packet* packet, struct network* network, struct network_client* client)
 {
     struct xtra_packet_data* x_data = (struct xtra_packet_data*)&packet->packet.data;
@@ -22,6 +42,7 @@ static bool __work_action(struct network_packet* packet, struct network* network
                     return false;
                 player->player_bombs--;
                 
+                net_upd_player(network, client);
                 BOMB_THROW_ACTION_UPDATE(player, client, network);            
             }
             else
@@ -54,6 +75,7 @@ static void __sglthing_new_player(struct network* network, struct network_client
     new_player->client = client;
     new_player->player_id = client->player_id;
     new_player->level_id = -1;
+    client->user_data = (void*)new_player;
 
     if(network->mode == NETWORKMODE_SERVER)
     {
@@ -123,20 +145,21 @@ static void __sglthing_new_player(struct network* network, struct network_client
 
     yaal_update_player_transform(new_player);
 
-    new_player->player_health = 6;
-    new_player->player_max_health = 6;
-    new_player->player_mana = 4;
-    new_player->player_max_mana = 4;
-    new_player->player_bombs = 10;
     new_player->combat_mode = false;
 
     // after init
     if(network->mode == NETWORKMODE_SERVER)
-    {        
-        BOMB_THROW_ACTION_UPDATE(new_player, client, network);     
+    {         
+        new_player->player_health = 6;
+        new_player->player_max_health = 6;
+        new_player->player_mana = 4;
+        new_player->player_max_mana = 4;
+        new_player->player_bombs = 10;
+        new_player->player_coins = 0;
+   
+        BOMB_THROW_ACTION_UPDATE(new_player, client, network);            
+        net_upd_player(network, client);
     }
-
-    client->user_data = (void*)new_player;
 }
 
 static void __sglthing_del_player(struct network* network, struct network_client* client)
@@ -168,7 +191,8 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 if(yaal_state.current_player)
                 {
                     float dist = glm_vec3_distance(yaal_state.current_player->player_position, yaal_state.current_player->old_position);
-                    if(dist > 0.00001f)
+                    float dist_a = glm_vec3_distance(yaal_state.aiming_arrow_position, yaal_state.last_aim_position);
+                    if(dist > 0.00001f || dist_a > 1.f)
                     {
                         //printf("yaal: [%s] tx position %f\n", (network->mode == NETWORKMODE_SERVER)?"server":"client", dist);
                         struct network_packet upd_pak;
@@ -179,6 +203,8 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                         glm_vec3_sub(yaal_state.current_player->player_position, yaal_state.current_player->old_position, delta);
                         glm_vec3_copy(delta, x_data2->packet.update_position.delta_pos);
                         glm_vec3_copy(yaal_state.current_player->player_position, yaal_state.current_player->old_position);
+                        glm_vec3_copy(yaal_state.aiming_arrow_position, yaal_state.last_aim_position);
+                        glm_quat_copy(yaal_state.current_player->rotation_versor, x_data2->packet.update_position.new_versor);
                         network_transmit_packet(network, client, upd_pak);
                         yaal_update_player_transform(yaal_state.current_player);
                     }
@@ -370,6 +396,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 x_data2->packet.update_position.urgent = !collide;
                 x_data2->packet.update_position.lag = client->lag;
                 x_data2->packet.update_position.level_id = client_player->level_id;
+                glm_quat_copy(x_data->packet.update_position.new_versor, x_data2->packet.update_position.new_versor);
                 upd_pak.meta.acknowledge = true;
                 network_transmit_packet_all(network, upd_pak);
             }
@@ -383,6 +410,8 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                     //    printf("yaal: updating client that is not user\n");
                     struct player* upd_player = (struct player*)upd_client->user_data;
                     upd_player->level_id = x_data->packet.update_position.level_id;
+                    if(upd_player->player_id != yaal_state.player_id)
+                        glm_quat_copy(x_data->packet.update_position.new_versor, upd_player->rotation_versor);
                     if(upd_player->player_id != yaal_state.player_id || (glm_vec3_distance(x_data->packet.update_position.delta_pos, upd_player->old_position) > 1.f || !x_data->packet.update_position.urgent))
                     {
                         glm_vec3_copy(x_data->packet.update_position.delta_pos, upd_player->old_position);
@@ -481,6 +510,24 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 chat_new_message(yaal_state.chat, in_msg);
             }
             return true;
+        case YAAL_UPDATE_STATS:
+            if(network->mode == NETWORKMODE_CLIENT && yaal_state.current_player) 
+            {
+                if(yaal_state.current_player->player_health != x_data->packet.update_stats.player_health)
+                {
+                    yaal_state.player_heart_end = network->time+3.5f;
+                    yaal_state.player_heart_amount = x_data->packet.update_stats.player_health - yaal_state.current_player->player_health;
+                }
+                yaal_state.current_player->player_bombs = x_data->packet.update_stats.player_bombs;
+                yaal_state.current_player->player_coins = x_data->packet.update_stats.player_coins;
+                yaal_state.current_player->player_health = x_data->packet.update_stats.player_health;
+                yaal_state.current_player->player_max_health = x_data->packet.update_stats.player_max_health;
+                yaal_state.current_player->player_mana = x_data->packet.update_stats.player_mana;
+                yaal_state.current_player->player_max_mana = x_data->packet.update_stats.player_max_mana;
+
+
+            }
+            return false;
         default: // unknown packet, for system
             // printf("yaal: [%s] unknown packet %i\n", (network->mode == NETWORKMODE_SERVER)?"server":"client", packet->meta.packet_type);
             return true;
@@ -522,4 +569,16 @@ void net_players_in_radius(GArray* clients, float radius, vec3 position, int lev
             }
         }
     }
+}
+
+void net_player_hurt(struct network* network, struct network_client* client, int damage)
+{
+    struct player* player = (struct player*)client->user_data;
+    player->player_health -= damage;
+    if(player->player_health <= 0)
+    {
+        // death
+        player->player_health = 0;
+    }
+    net_upd_player(network, client);
 }

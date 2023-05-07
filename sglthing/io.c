@@ -20,7 +20,6 @@ int file_get_path(char* dest, int n, char* resource_path)
         char path[256];
         snprintf(path,256,"%s/%s",archives[i].directory,resource_path);
         FILE* test = fopen(path, "r");
-        printf("test path %s\n", path);
         if(test)
         {
             fclose(test);

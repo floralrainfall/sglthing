@@ -10,19 +10,35 @@ execute_process(COMMAND git rev-list --count HEAD
 
 set(ASSIMP_HUNTER_ENABLED FALSE)
 
+option(USE_ODE "Use ODE library" OFF)
+option(USE_PKGCONFIG "Use PkgConfig to find packages" ON)
+option(HEADLESS "Compile without windowing support" OFF)
+option(YAAL_COMPILE "Compile YaalOnline" ON)
+option(SOUND_ENABLE "Enable sound" ON)
+
 if(NOT HEADLESS)
     find_package(glfw3)    
     set(GLFW_LIBRARY glfw)
 endif()
-find_package(cglm)
-find_package(assimp)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(deps REQUIRED IMPORTED_TARGET glib-2.0 libavutil libavcodec libavformat openal zlib)
-pkg_check_modules(curl IMPORTED_TARGET libcurl)
-
-option(USE_ODE "Use ODE library" OFF)
-option(HEADLESS "Compile without windowing support" OFF)
-option(YAAL_COMPILE "Compile YaalOnline" ON)
+if(USE_PKGCONFIG)
+    if(PKG_CONFIG_EXECUTABLE)
+        set(RESET_PKG_CONFIG_VALUE ${PKG_CONFIG_EXECUTABLE})
+        message(WARNING "PKG_CONFIG_EXECUTABLE being saved " ${PKG_CONFIG_EXECUTABLE})
+    endif()
+    find_package(PkgConfig)
+    if(RESET_PKG_CONFIG_VALUE)
+        set(PKG_CONFIG_EXECUTABLE ${RESET_PKG_CONFIG_VALUE})
+    endif()
+    pkg_check_modules(glib REQUIRED IMPORTED_TARGET glib-2.0)
+    pkg_check_modules(zlib REQUIRED IMPORTED_TARGET zlib)
+    pkg_check_modules(assimp REQUIRED IMPORTED_TARGET assimp)
+    pkg_check_modules(cglm REQUIRED IMPORTED_TARGET cglm)
+    pkg_check_modules(libcurl REQUIRED IMPORTED_TARGET libcurl)
+    set(PKGCONFIG_LIBRARIES 
+        PkgConfig::glib PkgConfig::zlib PkgConfig::assimp PkgConfig::cglm PkgConfig::libcurl)
+else()
+    message(WARNING "you probably wont be able to use glib or zlib")
+endif()
 
 set(USE_ODE NO)
 set(ODE_ENABLED NO)
@@ -42,23 +58,31 @@ endif()
 
 if(NOT HEADLESS)
     if(NOT glfw3_FOUND)
-        message(STATUS "glfw3 not found, using deps/glfw")   
+        message(WARNING "glfw3 not found, using deps/glfw")   
         add_subdirectory(deps/glfw)
     endif()
+
+    if(SOUND_ENABLED)
+        pkg_check_modules(deps REQUIRED IMPORTED_TARGET libavutil libavcodec libavformat openal)
+    endif()
+endif()
+
+if(NOT zlib_FOUND)
+    message(WARNING "zlib not found, using deps/zlib")
+    add_subdirectory(deps/zlib)
 endif()
 if(NOT assimp_FOUND)
-    message(STATUS "assimp not found, using deps/assimp")   
+    message(WARNING "assimp not found, using deps/assimp")   
     add_subdirectory(deps/assimp)
 endif()
 if(NOT cglm_FOUND)
-    message(STATUS "cglm not found, using deps/cglm")
+    message(WARNING "cglm not found, using deps/cglm")
     add_subdirectory(deps/cglm)
 endif()
 if(NOT curl_FOUND)
-    message(STATUS "curl not found, using deps/curl")
+    message(WARNING "curl not found, using deps/curl")
     add_subdirectory(deps/curl)
 endif()
-
 if(HEADLESS)
     message(STATUS "compiling headless build")
 endif()
@@ -158,8 +182,11 @@ endif()
 if(HEADLESS)
     target_compile_definitions(sglthing PUBLIC HEADLESS)
 endif()
+if(SOUND_ENABLED)
+    target_compile_definitions(sglthing PUBLIC SOUND_ENABLED)
+endif()
 
-configure_file(sglthing/_sglthing.h.in _sglthinSg.h @ONLY)
+configure_file(sglthing/_sglthing.h.in _sglthing.h @ONLY)
 
 target_include_directories(sglthing PUBLIC
     ${ODE_INCLUDE_DIR}
@@ -176,10 +203,9 @@ target_link_libraries(sglthing PUBLIC
     m
     lua
     ${ZLIB_LIBRARIES} # from assimp
-    PkgConfig::deps
-    PkgConfig::curl
     ${CURL_LIBRARIES}
     ${ODE_LIBRARY}
+    ${PKGCONFIG_LIBRARIES}
 )
 
 target_compile_options(sglthing PUBLIC

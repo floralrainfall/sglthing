@@ -47,6 +47,8 @@ void map_render(struct world* world, struct map_tile_data map[MAP_SIZE_MAX_X][MA
                 if(angle < world->cam.fov * M_PI_180f)
                     continue;
                 mat4 model_matrix;
+                mat4 rotation_matrix;
+                glm_euler((vec3){0.f,glm_rad(map_tile->direction*90.f),0.f}, rotation_matrix);
                 glm_mat4_identity(model_matrix);
                 glm_translate(model_matrix, map_pos);
                 switch(map_tile->map_tile_type)
@@ -61,6 +63,7 @@ void map_render(struct world* world, struct map_tile_data map[MAP_SIZE_MAX_X][MA
                 default:
                     break;
                 }
+                glm_mat4_mul(model_matrix, rotation_matrix, model_matrix);
                 
                 /*if(yaal_state.current_player)
                     if(map_x == yaal_state.current_player->map_tile_x && map_y == yaal_state.current_player->map_tile_y)

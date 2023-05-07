@@ -20,6 +20,7 @@ struct fx
     float max_time;
     float progress;
     float speed;
+    int level_id;
     bool alive;
 };
 

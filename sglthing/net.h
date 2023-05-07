@@ -5,7 +5,7 @@
 #include "script.h"
 #endif 
 #include <glib.h>
-#include <netinet/in.h>
+#include "sockets.h"
 #include "http.h"
 
 #define CR_PACKET_VERSION 200
@@ -216,6 +216,7 @@ struct network {
     GArray* packet_unacknowledged;
     int packet_id;
 
+    bool server_open;
     bool security;
 
     bool shutdown_empty;

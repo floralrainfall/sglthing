@@ -153,7 +153,7 @@ struct player {
     int player_bombs;
     int player_coins;
 
-    float pitch;
+    versor rotation_versor;
 
     bool combat_mode;
 
@@ -173,6 +173,8 @@ struct yaal_state {
     struct player* current_player;
 
     GArray* tmp_range_calculation;
+    float player_heart_end;
+    int player_heart_amount;
 
     struct model* player_model;
     struct model* arrow_model;
@@ -208,12 +210,14 @@ struct yaal_state {
     int player_coins_tex;
     int player_lag_tex;
     int player_exit_tex;
+    int player_yes_tex;
     int player_shader;
     int friends_tex;
     int select_particle_tex;
     int object_shader;
     int current_aiming_action;
     vec3 aiming_arrow_position;
+    vec3 last_aim_position;
 
     int last_player_list_id;
 

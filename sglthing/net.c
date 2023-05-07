@@ -2,11 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <zlib.h>
 #ifdef SGLTHING_COMPILE
 #ifndef HEADLESS
@@ -15,6 +10,12 @@
 #include "io.h"
 #endif
 #include "sglthing.h"
+
+#ifdef __WIN32
+#define MSG_DONTWAIT 0 // not supported on Winsock
+#define MSG_NOSIGNAL 0 // not supported on Winsock
+#define SOCK_NONBLOCK 0 // not supported on Winsock
+#endif
 
 struct unacknowledged_packet
 {
@@ -39,6 +40,7 @@ void network_init(struct network* network, struct script_system* script)
     network->players = g_hash_table_new(g_int_hash, g_int_equal);
     network->packet_unacknowledged = g_array_new(true, true, sizeof(struct unacknowledged_packet));
     network->packet_id = 0;
+    network->server_open = true;
 }
 
 void network_start_download(struct network_downloader* network, char* ip, int port, char* rqname, char* pass)
@@ -713,21 +715,28 @@ void network_manage_socket(struct network* network, struct network_client* clien
 
             if(sender == NULL)
             {
-                printf("sglthing: server: new udp connection\n");
-                struct network_client new_client;
-                new_client.sockaddr = sockaddr;
-                new_client.authenticated = false;
-                new_client.player_id = -1;
-                new_client.connection_id = last_connection_id++;
-                new_client.connected = true;
-                new_client.last_ping_time = network->distributed_time;
-                new_client.ping_time_interval = 5.0;
-                new_client.dl_data = NULL;
-                new_client.owner = network;                    
-                new_client.user_data = 0;
-                g_array_append_val(network->server_clients, new_client);
-                sender = &g_array_index(network->server_clients, struct network_client, new_client.connection_id);
-                printf("sglthing: server: udp connection sockaddr: %x:%i (%p)\n", new_client.sockaddr.sin_addr.s_addr, new_client.sockaddr.sin_port, sender);
+                if(network->server_open)
+                {
+                    printf("sglthing: server: new udp connection\n");
+                    struct network_client new_client;
+                    new_client.sockaddr = sockaddr;
+                    new_client.authenticated = false;
+                    new_client.player_id = -1;
+                    new_client.connection_id = last_connection_id++;
+                    new_client.connected = true;
+                    new_client.last_ping_time = network->distributed_time;
+                    new_client.ping_time_interval = 5.0;
+                    new_client.dl_data = NULL;
+                    new_client.owner = network;                    
+                    new_client.user_data = 0;
+                    g_array_append_val(network->server_clients, new_client);
+                    sender = &g_array_index(network->server_clients, struct network_client, new_client.connection_id);
+                    printf("sglthing: server: udp connection sockaddr: %x:%i (%p)\n", new_client.sockaddr.sin_addr.s_addr, new_client.sockaddr.sin_port, sender);
+                }
+                else
+                {
+                    printf("sglthing: not accepting because server is closed");
+                }
             }
 
             network_manage_packet(network, sender, in_packet);

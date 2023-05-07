@@ -9,13 +9,16 @@
 #include <cglm/cglm.h>
 
 struct sndmgr {
+#ifdef SOUND_ENABLED
     ALCdevice* device;
     ALCcontext* context;
     ALuint global_source;
+#endif
 };
 
 #define MAX_BUFFER_COUNT 8
 struct snd {
+#ifdef SOUND_ENABLED
     char name[64];
     AVFormatContext* format_context;
     AVCodec *codec;
@@ -23,6 +26,7 @@ struct snd {
     AVCodecContext* codec_context;
     int audio_stream_index;
     ALuint al_buffers[MAX_BUFFER_COUNT];
+#endif
 };  
 
 void snd_init(struct sndmgr* mgr);

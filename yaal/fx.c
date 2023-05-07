@@ -2,6 +2,7 @@
 #include "yaal.h"
 #include "util.h"
 #include <sglthing/sglthing.h>
+#include "netmgr.h"
 
 void init_fx(struct fx_manager* manager, int shader, struct particle_system* system)
 {
@@ -46,7 +47,20 @@ void render_fx(struct world* world, struct fx_manager* manager)
                         .start[2] = fx->target[2],
                         .speed = 1.f,
                         .type = FX_EXPLOSION,
+                        .level_id = fx->level_id,
                     });
+                    if(world->server.status == NETWORKSTATUS_CONNECTED)
+                    {
+                        GArray* detections = NEW_RADIUS;
+                        net_players_in_radius(world->server.server_clients, 32.f, fx->target, fx->level_id, detections);
+                        for(int i = 0; i < detections->len; i++)
+                        {
+                            struct net_radius_detection detection = g_array_index(detections, struct net_radius_detection, i);
+
+                            net_player_hurt(&world->server, detection.client, roundf(5.f/detection.distance));
+                        }
+                        g_array_free(detections, true);
+                    }
                     break;
                 default:
                     break;

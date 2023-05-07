@@ -8,6 +8,7 @@ int snd_count = 0;
 
 void snd_init(struct sndmgr* mgr)
 {
+#ifdef SOUND_ENABLED
     mgr->device = alcOpenDevice(NULL);
     ASSERT(mgr->device);
     mgr->context = alcCreateContext(mgr->device, NULL);
@@ -20,18 +21,22 @@ void snd_init(struct sndmgr* mgr)
     alSource3f(mgr->global_source, AL_POSITION, 0, 0, 0);
     alSource3f(mgr->global_source, AL_VELOCITY, 0, 0, 0);
     alSourcei(mgr->global_source, AL_LOOPING, AL_FALSE);
+#endif
 }
 
 void snd_meta_view(struct sndmgr* mgr, vec3 p, vec3 v, vec3 u, vec3 l)
 {
+#ifdef SOUND_ENABLED
     alListener3f(AL_POSITION, p[0], p[1], p[2]);
     alListener3f(AL_VELOCITY, v[0], v[1], v[2]);
     vec3 orient[2] = {{l[0], l[1], l[2]}, {u[0], u[1], u[2]}};
     alListenerfv(AL_ORIENTATION, orient);
+#endif
 }
 
 struct snd* get_snd(char* file_name)
 {
+#ifdef SOUND_ENABLED
     struct snd* snd = NULL;
     for(int i = 0; i < snd_count; i++)
     {
@@ -42,10 +47,14 @@ struct snd* get_snd(char* file_name)
         }
     }
     return snd;
+#else
+    return 0;
+#endif
 }
 
 void load_snd(char* file_name)
 {
+#ifdef SOUND_ENABLED
     struct snd* o_snd = get_snd(file_name);
     if(o_snd)
         return;
@@ -132,10 +141,12 @@ void load_snd(char* file_name)
 
     av_packet_free(&packet);
     av_packet_free(&frame);
+#endif
 }
 
 void play_snd(struct sndmgr* mgr, int source, char* file_name, float delta_time)
 {
+#ifdef SOUND_ENABLED
     struct snd* snd = get_snd(file_name);
     ASSERT(snd);
     ALint buf_processed;
@@ -152,4 +163,5 @@ void play_snd(struct sndmgr* mgr, int source, char* file_name, float delta_time)
     {
         alSourcePlay(source);
     }
+#endif
 }

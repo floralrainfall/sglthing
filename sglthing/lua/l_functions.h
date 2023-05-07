@@ -5,5 +5,6 @@
 void l_functions_register(lua_State* l);
 struct world* l_get_world(lua_State* l, int i);
 struct ui_data* l_get_ui_data(lua_State* l, int i);
+struct model* l_get_model(lua_State* l, int i);
 
 #endif

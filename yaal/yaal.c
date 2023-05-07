@@ -91,7 +91,7 @@ static void __sglthing_frame(struct world* world)
                 world->cam.yaw = 45.f;
                 world->cam.pitch = -45.f;
             }
-
+            
             vec3 pot_move, new_vec;
             pot_move[0] = -get_input("x_axis") * world->delta_time * 3.f;
             pot_move[1] = 0.f;
@@ -145,6 +145,17 @@ static void __player_render(gpointer key, gpointer value, gpointer user)
             mat4 render_matrix;
             glm_mat4_copy(player->model_matrix, render_matrix);
             glm_scale(render_matrix, (vec3){0.01f,0.01f,0.01f});
+            if(player == yaal_state.current_player)
+            {
+                vec3 direction;
+                glm_vec3_sub(player->old_position, yaal_state.aiming_arrow_position,  direction);
+                glm_quat_for(direction, (vec3){0.f,1.f,0.f}, player->rotation_versor);
+                glm_quat_rotate(render_matrix, player->rotation_versor, render_matrix);     
+            }
+            else
+            {
+                glm_quat_rotate(render_matrix, player->rotation_versor, render_matrix);    
+            }
             sglc(glUseProgram(yaal_state.player_shader));
             sglc(glUniform4f(glGetUniformLocation(yaal_state.player_shader,"color"), client->player_color_r, client->player_color_g, client->player_color_b, 1.0));
             animator_set_bone_uniform_matrices(&player->animator, world->gfx.shadow_pass?world->gfx.lighting_shader:yaal_state.player_shader);
@@ -283,6 +294,7 @@ static void __sglthing_frame_ui(struct world* world)
             ui_draw_image(world->ui, action_bar_base[0] + (64.f * i), action_bar_base[1], 64.f, 64.f, yaal_state.player_action_disabled_tex, 0.9f);
             ui_draw_image(world->ui, action_bar_base[0] + (64.f * i) + 32.f, action_bar_base[1] - 32.f, 32.f, 32.f, yaal_state.player_combat_mode_tex, 0.8f);
         }
+        bool disable = false;
         if(action->action_count != -1)
         {
             snprintf(act_name, 64, "%i", action->action_count);
@@ -290,13 +302,13 @@ static void __sglthing_frame_ui(struct world* world)
             if(action->action_count == 0)
             {
                 ui_draw_image(world->ui, action_bar_base[0] + (64.f * i), action_bar_base[1], 64.f, 64.f, yaal_state.player_action_disabled_tex, 0.9f);
-                press = false;
+                disable = true;
             }
         }
         if(action->combat_mode && !yaal_state.current_player->combat_mode)
             continue;
 #ifndef HEADLESS
-        if(press || keys_down[GLFW_KEY_1 + i])
+        if((press || keys_down[GLFW_KEY_1 + i]) && !disable)
             if(!yaal_state.player_action_debounce[i])
             {
                 yaal_state.player_action_debounce[i] = true;
@@ -337,12 +349,14 @@ static void __sglthing_frame_ui(struct world* world)
             ui_draw_image(world->ui, offset[0], offset[1], 16.f, 16.f, yaal_state.player_heart_full_tex, 1.f);
             offset[0] += 16.f;
         }
+        int less_heart = 0;
         if(player_hearts - player_full_hearts > 0)
         {
             ui_draw_image(world->ui, offset[0], offset[1], 16.f, 16.f, yaal_state.player_heart_half_tex, 1.f);
             offset[0] += 16.f;
+            less_heart = 1;
         }
-        int player_empty_hearts = yaal_state.current_player->player_max_health/2 - player_full_hearts;
+        int player_empty_hearts = yaal_state.current_player->player_max_health/2 - player_full_hearts - less_heart;
         for(int i = 0; i < player_empty_hearts; i++)
         {
             ui_draw_image(world->ui, offset[0], offset[1], 16.f, 16.f, yaal_state.player_heart_none_tex, 1.f);
@@ -351,6 +365,29 @@ static void __sglthing_frame_ui(struct world* world)
         char player_stat_info[255];
         snprintf(player_stat_info, 255, "%02i/%02iHP", yaal_state.current_player->player_health, yaal_state.current_player->player_max_health);
         ui_draw_text(world->ui, offset[0], offset[1]-16.f, player_stat_info, 1.f);
+        float player_heart_timer = yaal_state.player_heart_end - world->time;
+        if(player_heart_timer > 0)
+        {
+            float abs_timer = fabsf(player_heart_timer);
+            if(yaal_state.player_heart_amount > 0)
+            {
+                world->ui->foreground_color[0] = 0.016f;
+                world->ui->foreground_color[1] = 0.475f;
+                world->ui->foreground_color[2] = 0.039f;
+            }
+            else
+            {
+                world->ui->foreground_color[0] = 0.502f;
+                world->ui->foreground_color[1] = 0.0f;
+                world->ui->foreground_color[2] = 0.0f;
+            }
+            char chg[8];
+            snprintf(chg,8,"%i",yaal_state.player_heart_amount);
+            float yoff = sinf(abs_timer)*16.f;
+            float xoff = cosf(abs_timer*10.0)*2.f;
+            ui_draw_text(world->ui, 4.f+xoff+(strlen(chg)*8.f), 125.f+yoff, chg, 0.7f);
+            glm_vec4_copy(oldfg, world->ui->foreground_color);
+        }
         offset[0] += 16.f;
         offset[0] += strlen(player_stat_info) * 8.f;
         float player_manas = yaal_state.current_player->player_mana/2.f;
@@ -413,7 +450,7 @@ static void __sglthing_frame_ui(struct world* world)
         }
         else if(menu_button)
         {
-            yaal_state.player_menu_open = !yaal_state.player_menu_open;
+            yaal_state.player_menu_open = true;
         }
         else
         {
@@ -492,6 +529,32 @@ static void __sglthing_frame_ui(struct world* world)
         ui_draw_text(world->ui, 0.f, 16.f, "YaalOnline Menu", 0.3f);
         if(ui_draw_button(world->ui, world->ui->current_panel->size_x-33.f, 0.f, 32.f, 16.f, yaal_state.player_exit_tex, 0.3f))
             yaal_state.player_menu_open = false;
+        int options = 0;
+
+#define PLAYER_MENU_OPTION(n,v) \
+        ui_draw_text(world->ui, 0.f, 48.f+(options*16.f), n, 0.3f); \
+        if(ui_draw_button(world->ui, strlen(n)*8.f+8.f, 48.f+(options*16.f)-16.f, 32.f, 16.f, v ? yaal_state.player_yes_tex : yaal_state.player_exit_tex, 0.3f)) \
+        { \
+          v = !v;\
+        } \
+        options++;
+
+#define PLAYER_MENU_TXT(n) \
+        ui_draw_text(world->ui, 0.f, 48.f+(options*16.f), n, 0.3f); \
+        options++;
+
+        PLAYER_MENU_TXT("YAAL OPTIONS");
+        options++;
+
+        if(world->server.status == NETWORKSTATUS_CONNECTED)
+        {
+            PLAYER_MENU_TXT("SERVER OPTIONS");
+            options++;
+            PLAYER_MENU_OPTION("Shutdown if empty", world->server.shutdown_empty);
+            PLAYER_MENU_OPTION("Secure", world->server.security);
+            PLAYER_MENU_OPTION("Open", world->server.server_open);
+        }
+
         ui_end_panel(world->ui);
     }
 
@@ -668,6 +731,8 @@ void sglthing_init_api(struct world* world)
     yaal_state.player_lag_tex = get_texture("yaal/ui/lag.png");
     load_texture("yaal/ui/exit.png");
     yaal_state.player_exit_tex = get_texture("yaal/ui/exit.png");
+    load_texture("yaal/ui/yes.png");
+    yaal_state.player_yes_tex = get_texture("yaal/ui/yes.png");
 
     load_model("test/box.obj");
     load_model("yaal/models/player.fbx");
@@ -704,4 +769,7 @@ void sglthing_init_api(struct world* world)
 
     init_fx(&yaal_state.fx_manager, yaal_state.object_shader, &yaal_state.particles);
     yaal_state.show_rpg_message = false;
+
+    yaal_state.player_heart_end = 0.f;
+    yaal_state.player_heart_amount = 0;
 }
