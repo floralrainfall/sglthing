@@ -11,25 +11,27 @@ void init_fx(struct fx_manager* manager, int shader, struct particle_system* sys
     manager->system = system;
     load_model("yaal/models/bomb.obj");
     manager->bomb = get_model("yaal/models/bomb.obj");
+    manager->server_fx = false;
 }
 
 void add_fx(struct fx_manager* manager, struct fx fx)
 {
     fx.time = 0.f;
     fx.alive = true;
+    fx.progress = 0.f;
     g_array_append_val(manager->fx_active, fx);
 }
 
-void render_fx(struct world* world, struct fx_manager* manager)
+void tick_fx(struct world* world, struct fx_manager* manager)
 {
     for(int i = 0; i < manager->fx_active->len; i++)
     {
         struct fx *fx = &g_array_index(manager->fx_active, struct fx, i);
         
-        fx->time += world->delta_time * fx->speed;
+        if(fx->time == 0)
+            fx->alive = true;
 
-        if(fx->alive == false)
-            continue;
+        fx->time += world->delta_time * fx->speed;
 
         if(fx->time > fx->max_time)
         {
@@ -49,7 +51,7 @@ void render_fx(struct world* world, struct fx_manager* manager)
                         .type = FX_EXPLOSION,
                         .level_id = fx->level_id,
                     });
-                    if(world->server.status == NETWORKSTATUS_CONNECTED)
+                    if(manager->server_fx)
                     {
                         GArray* detections = NEW_RADIUS;
                         net_players_in_radius(world->server.server_clients, 32.f, fx->target, fx->level_id, detections);
@@ -57,7 +59,7 @@ void render_fx(struct world* world, struct fx_manager* manager)
                         {
                             struct net_radius_detection detection = g_array_index(detections, struct net_radius_detection, i);
 
-                            net_player_hurt(&world->server, detection.client, roundf(5.f/detection.distance));
+                            net_player_hurt(&world->server, detection.client, roundf(5.f/detection.distance), REASON_BOMB, fx->source_player_id);
                         }
                         g_array_free(detections, true);
                     }
@@ -66,7 +68,27 @@ void render_fx(struct world* world, struct fx_manager* manager)
                     break;
             }
         }
-        else
+    }
+
+    int old_len = manager->fx_active->len;
+    for(int i = 0; i < old_len; i++)
+    {
+        struct fx* fx = &g_array_index(manager->fx_active, struct fx, 0);
+        if(!fx->alive)
+        {
+            g_array_remove_index(manager->fx_active, 0);
+        }
+    }
+}
+
+void render_fx(struct world* world, struct fx_manager* manager)
+{
+    if(world->gfx.shadow_pass)
+        return;
+    for(int i = 0; i < manager->fx_active->len; i++)
+    {
+        struct fx *fx = &g_array_index(manager->fx_active, struct fx, i);
+        if(fx->alive)
         {
             mat4 fx_mat;
             glm_mat4_identity(fx_mat);
@@ -130,19 +152,65 @@ void render_fx(struct world* world, struct fx_manager* manager)
                     }
                     break;
                 default:
-                    fx->alive = false;        
                     break;
             }
         }
     }
+}
 
-    int old_len = manager->fx_active->len;
-    for(int i = 0; i < old_len; i++)
+void render_ui_fx(struct world* world, struct fx_manager* manager)
+{
+    vec4 oldfg, oldbg;
+    glm_vec4_copy(world->ui->foreground_color, oldfg);
+    glm_vec4_copy(world->ui->background_color, oldbg);
+    mat4 m, mvp;
+    vec3 dm;
+    glm_mat4_identity(m);
+    glm_mat4_mul(world->vp, m, mvp);
+    for(int i = 0; i < manager->fx_active->len; i++)
     {
-        struct fx* fx = &g_array_index(manager->fx_active, struct fx, 0);
-        if(!fx->alive)
+        struct fx *fx = &g_array_index(manager->fx_active, struct fx, i);
+        if(fx->alive)
         {
-            g_array_remove_index(manager->fx_active, 0);
+            fx->progress = fx->time / fx->max_time;   
+            vec3 dest_pos;
+            glm_vec3_mix(fx->start, fx->target, fx->progress, dest_pos);
+            glm_project(dest_pos, mvp, world->viewport, dest_pos);
+            vec2 fx_position;
+            fx_position[0] = dest_pos[0];
+            fx_position[1] = dest_pos[1];
+
+            switch(fx->type)
+            {
+                case FX_HEAL_DAMAGE:
+                    world->ui->background_color[3] = 0.f;
+
+                    //world->ui->foreground_color[0] = fx->alt ? 0.016f : 0.502f;
+                    //world->ui->foreground_color[1] = fx->alt ? 0.475f : 0.0f;
+                    //world->ui->foreground_color[2] = fx->alt ? 0.039f : 0.0f;
+
+                    float player_hearts = fx->amt/2.f;
+                    int player_full_hearts = floorf(player_hearts);
+                    vec2 offset = {fx_position[0], fx_position[1]+16.f};
+                    for(int i = 0; i < player_full_hearts; i++)
+                    {
+                        ui_draw_image(world->ui, offset[0], offset[1], 16.f, 16.f, yaal_state.player_heart_full_tex, 1.f);
+                        offset[0] += 16.f;
+                    }
+                    int less_heart = 0;
+                    if(player_hearts - player_full_hearts > 0)
+                    {
+                        ui_draw_image(world->ui, offset[0], offset[1], 16.f, 16.f, yaal_state.player_heart_half_tex, 1.f);
+                        offset[0] += 16.f;
+                        less_heart = 1;
+                    }
+                    break;
+                default:
+                    ui_draw_image(world->ui, fx_position[0], fx_position[1], 10, 10, yaal_state.player_heart_full_tex, 1.f);
+                    break;
+            }
         }
     }
+    glm_vec4_copy(oldfg, world->ui->foreground_color);
+    glm_vec4_copy(oldbg, world->ui->background_color);
 }

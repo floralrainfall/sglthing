@@ -34,6 +34,7 @@ enum action_id {
     ACTION_SERVER_MENU,
     ACTION_BOMB_THROW,
     ACTION_BOMB_DROP,
+    ACTION_HEAL
 };
 
 enum object_id {
@@ -55,6 +56,18 @@ enum __attribute__((__packed__)) yaal_light_type
 {
     LIGHT_NONE,
     LIGHT_OBJ4_LAMP,
+};
+
+enum skill_level_type
+{
+    SKILL_SWORD,
+    SKILL_DEMOLITIONS,
+    SKILL_SURVIVAL,
+    SKILL_AGILITY,
+    SKILL_SNEAK,
+    SKILL_PERCEPTION,
+    SKILL_INTELLIGENCE,
+    __SKILL_MAX
 };
 
 struct map_tile_data
@@ -161,6 +174,8 @@ struct player {
     mat4 ghost_matrix;
 
     struct light player_light;
+
+    int skill_level[__SKILL_MAX];
 };
 
 struct yaal_state {
@@ -168,6 +183,13 @@ struct yaal_state {
     char level_name[64];
     char rpg_message[256];
     bool show_rpg_message;
+
+    enum
+    {
+        YAAL_STATE_MENU,
+        YAAL_STATE_MAP,
+        YAAL_STATE_GAME,
+    } mode;
 
     int player_id;
     struct player* current_player;
@@ -178,12 +200,16 @@ struct yaal_state {
 
     struct model* player_model;
     struct model* arrow_model;
+    struct model* menu_yaal_model;
     struct light arrow_light;
-    struct animation player_animations[ANIMATIONS_TO_LOAD];
+
+    struct ui_font* damage_font;
 
     struct model* map_tiles[MAP_GRAPHICS_IDS];
     int map_graphics_tiles[MAP_TEXTURE_IDS];
     struct light_area* area;
+
+    int skill_icons[__SKILL_MAX];
     
     bool player_first_person;
     bool player_menu_open;
@@ -205,6 +231,7 @@ struct yaal_state {
     int player_chat_off_tex;
     int player_menu_button_tex;
     int player_cancel_button_tex;
+    int player_play_button_tex;
     int player_ok_button_tex;
     int player_hotbar_bar_tex;
     int player_coins_tex;
@@ -223,6 +250,8 @@ struct yaal_state {
 
     GHashTable* map_objects;
     GHashTable* maps;
+
+    struct animation player_animations[ANIMATIONS_TO_LOAD];
 
     int map_downloaded_count;
     bool map_downloaded[MAP_SIZE_MAX_X];

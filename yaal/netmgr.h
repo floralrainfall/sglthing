@@ -4,12 +4,14 @@
 #include <sglthing/world.h>
 #include "yaal.h"
 #include "util.h"
+#include "fx.h"
 
 enum yaal_packet_type
 {
     YAAL_ENTER_LEVEL = 0x4a11,
     YAAL_LEVEL_DATA,
 
+    YAAL_CREATE_FX,
     YAAL_CREATE_OBJECT,
     YAAL_UPDATE_OBJECT,
     YAAL_REMOVE_OBJECT,
@@ -21,9 +23,17 @@ enum yaal_packet_type
     YAAL_UPDATE_COMBAT_MODE,
     YAAL_UPDATE_STATS,
 
+    YAAL_PLAYER_KILL,
+
     YAAL_RPG_MESSAGE,
 
     YAAL_PLAYER_ACTION,
+};
+
+enum player_death_reason
+{
+    REASON_BOMB,
+    REASON_UNKNOWN,
 };
 
 struct xtra_packet_data
@@ -104,6 +114,16 @@ struct xtra_packet_data
         {
             char text[256];
         } rpg_message;
+        struct
+        {
+            struct fx new_fx;
+        } create_fx;
+        struct
+        {
+            int reason_id;
+            int player_id;
+            int player_id_killer;
+        } player_kill;
     } packet;
 };
 
@@ -118,6 +138,8 @@ struct net_radius_detection
 void net_init(struct world* world);
 void net_players_in_radius(GArray* clients, float radius, vec3 position, int level_id, GArray* out);
 void net_upd_player(struct network* network, struct network_client* client);
-void net_player_hurt(struct network* network, struct network_client* client, int damage);
+void net_player_hurt(struct network* network, struct network_client* client, int damage, int reason, int inflictor);
+void net_send_fx(struct network* network, struct network_client* client, struct fx fx);
+void net_player_kill(struct network* network, struct network_client* client, char* reason);
 
 #endif

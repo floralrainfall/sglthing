@@ -14,6 +14,7 @@
 #include "io.h"
 #include "config.h"
 #include "sglthing.h"
+#include "stb_image.h"
 
 #ifndef SGLTHING_COMPILE
 #error "sglthing/sglthing.c should be compiled with SGLTHING_COMPILE"
@@ -127,6 +128,29 @@ int main(int argc, char** argv)
     sglthing_init_api(world);
 
 #ifndef HEADLESS
+    GLFWimage images[2];
+    char icon_path[255];
+    int f = file_get_path(icon_path, 255, "icon.png"); 
+    if(f != -1)
+    {
+        images[1].pixels = stbi_load(icon_path, &images[1].width, &images[1].height, 0, 4);
+        f = file_get_path(icon_path, 255, "icon_large.png"); 
+        if(f != -1)
+        {
+            images[0].pixels = stbi_load(icon_path, &images[0].width, &images[0].height, 0, 4);
+            glfwSetWindowIcon(window, 2, images); 
+        }
+        else
+        {
+            printf("sglthing: couldn't find icon_large.png\n");
+        }
+        stbi_image_free(images[0].pixels);
+    }
+    else
+    {
+        printf("sglthing: couldn't find icon.png\n");
+    }
+
     vec4 old_viewport;
     glfwGetFramebufferSize(window, &world->gfx.screen_width, &world->gfx.screen_height);
     glm_vec4_copy(world->viewport, old_viewport);

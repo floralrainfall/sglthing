@@ -1,5 +1,18 @@
 #include "netmgr.h"
 
+void net_send_fx(struct network* network, struct network_client* client, struct fx fx)
+{
+    struct player* player;
+    player = (struct player*)client->user_data;
+    ASSERT(player);
+
+    struct network_packet upd_pak;
+    struct xtra_packet_data* x_data = (struct xtra_packet_data*)&upd_pak.packet.data;
+    upd_pak.meta.packet_type = YAAL_CREATE_FX;
+    x_data->packet.create_fx.new_fx = fx;
+    network_transmit_packet(network, client, upd_pak);
+}
+
 void net_upd_player(struct network* network, struct network_client* client)
 {
     struct player* player;
@@ -16,7 +29,6 @@ void net_upd_player(struct network* network, struct network_client* client)
     x_data->packet.update_stats.player_mana = player->player_mana;
     x_data->packet.update_stats.player_max_mana = player->player_max_mana;
     upd_pak.meta.acknowledge = true;
-    strncpy(upd_pak.packet.chat_message.message,input_text,128);
     network_transmit_packet(network, client, upd_pak);
 }
 
@@ -35,6 +47,9 @@ static bool __work_action(struct network_packet* packet, struct network* network
         case ACTION_SERVER_MENU:
             break;
         case ACTION_BOMB_DROP:
+            x_data->packet.player_action.position[0] = player->player_position[0];
+            x_data->packet.player_action.position[1] = player->player_position[1];
+            x_data->packet.player_action.position[2] = player->player_position[2];
         case ACTION_BOMB_THROW:
             if(network->mode == NETWORKMODE_SERVER)
             {
@@ -44,6 +59,18 @@ static bool __work_action(struct network_packet* packet, struct network* network
                 
                 net_upd_player(network, client);
                 BOMB_THROW_ACTION_UPDATE(player, client, network);            
+                add_fx(&server_state.fx_manager, (struct fx){
+                    .start[0] = player->player_position[0],
+                    .start[1] = player->player_position[1],
+                    .start[2] = player->player_position[2],
+                    .target[0] = x_data->packet.player_action.position[0],
+                    .target[1] = x_data->packet.player_action.position[1],
+                    .target[2] = x_data->packet.player_action.position[2],
+                    .type = FX_BOMB_THROW,
+                    .max_time = 1.5f,
+                    .speed = 1.f,
+                    .level_id = x_data->packet.player_action.level_id,
+                });
             }
             else
             {
@@ -56,11 +83,18 @@ static bool __work_action(struct network_packet* packet, struct network* network
                         .target[1] = x_data->packet.player_action.position[1],
                         .target[2] = x_data->packet.player_action.position[2],
                         .type = FX_BOMB_THROW,
-                        .max_time = 3.f,
+                        .max_time = 1.5f,
                         .speed = 1.f,
+                        .level_id = x_data->packet.player_action.level_id,
                     });
             }
             return true;
+        case ACTION_HEAL:
+            if(network->mode == NETWORKMODE_SERVER)
+            {
+                net_player_hurt(network, client, -1, REASON_UNKNOWN, client->player_id);
+            }
+            break;
         default:
             printf("yaal: unknown action id %i\n", x_data->packet.player_action.action_id);
             break;
@@ -95,6 +129,7 @@ static void __sglthing_new_player(struct network* network, struct network_client
             printf("yaal: no map id 0\n");        
         yaal_update_player_action(8, (struct player_action){.action_name = "Exit", .action_desc = "LMAO", .action_id = ACTION_EXIT, .action_picture_id = 1, .visible = true, .action_count = -1, .combat_mode = false}, client, network);
         yaal_update_player_action(7, (struct player_action){.action_name = "Menu", .action_desc = "LMAO", .action_id = ACTION_SERVER_MENU, .action_picture_id = 4, .visible = true, .action_count = -1, .combat_mode = false}, client, network);
+        yaal_update_player_action(3, (struct player_action){.action_name = "Heal", .action_desc = "Yo", .action_id = ACTION_HEAL, .action_picture_id = 1, .visible = true, .action_count = -1, .combat_mode = false}, client, network);
     }
     else
     {
@@ -524,9 +559,11 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 yaal_state.current_player->player_max_health = x_data->packet.update_stats.player_max_health;
                 yaal_state.current_player->player_mana = x_data->packet.update_stats.player_mana;
                 yaal_state.current_player->player_max_mana = x_data->packet.update_stats.player_max_mana;
-
-
             }
+            return false;
+        case YAAL_CREATE_FX:
+            if(network->mode == NETWORKMODE_CLIENT)
+                add_fx(&yaal_state.fx_manager, x_data->packet.create_fx.new_fx);
             return false;
         default: // unknown packet, for system
             // printf("yaal: [%s] unknown packet %i\n", (network->mode == NETWORKMODE_SERVER)?"server":"client", packet->meta.packet_type);
@@ -571,14 +608,39 @@ void net_players_in_radius(GArray* clients, float radius, vec3 position, int lev
     }
 }
 
-void net_player_hurt(struct network* network, struct network_client* client, int damage)
+void net_player_hurt(struct network* network, struct network_client* client, int damage, int reason, int inflictor)
 {
     struct player* player = (struct player*)client->user_data;
     player->player_health -= damage;
-    if(player->player_health <= 0)
+    if(player->player_health < 0)
     {
         // death
         player->player_health = 0;
     }
+    if(player->player_health > player->player_max_health)
+        player->player_health = player->player_max_health;
+    float scatter = 5.0f;
+    struct fx new_fx = {
+        .max_time = 3.5f,
+        .start[0] = player->player_position[0],
+        .start[1] = player->player_position[1]+2.f,
+        .start[2] = player->player_position[2],
+        .target[0] = player->player_position[0]+g_random_double_range(-scatter,scatter),
+        .target[1] = player->player_position[1]+24.f,
+        .target[2] = player->player_position[2]+g_random_double_range(-scatter,scatter),
+        .type = FX_HEAL_DAMAGE,
+        .alt = damage < 0,
+        .level_id = player->level_id,
+        .speed = 1.f,
+        .amt = damage,
+    };
+    snprintf(new_fx.tx,8,"%i",-damage);
+
+    for(int i = 0; i < network->server_clients->len; i++)
+    {
+        struct network_client* client = &g_array_index(network->server_clients, struct network_client, i);
+        net_send_fx(network, client, new_fx);
+    }
+
     net_upd_player(network, client);
 }
