@@ -28,6 +28,22 @@ struct unacknowledged_packet
 int last_connection_id = 0;
 #define ZERO(x) memset(&x,0,sizeof(x))
 
+static int __db_fill_player(void* data, int argc, char** argv, char** col_name)
+{
+    for(int i = 0; i < argc; i++)
+    {
+        printf("%s = %s\n", col_name[i], argv[i] ? argv[i] : "NULL");
+    }
+}
+
+struct db_player db_player_info(struct network* network, int web_player_id)
+{
+    char sql[128];
+    snprintf(sql,128,"SELECT * FROM USERS WHERE user_id=%i",web_player_id);
+    char* err;
+    int rc = sqlite3_exec(network->database, sql, __db_fill_player, NULL, &err);
+}
+
 void network_init(struct network* network, struct script_system* script)
 {
     network->mode = NETWORKMODE_UNKNOWN;
@@ -306,6 +322,11 @@ void network_open(struct network* network, char* ip, int port)
     strncpy(network->server_motd, "Server has not set a server_motd", 128);
     strncpy(network->debugger_pass, "debugger", 64);
 
+    int rc = sqlite3_open("sglthing.db",&network->database);
+    if(rc){
+        printf("sglthing: cant open sqlite db (%s)\n", sqlite3_errmsg(network->database));
+    }
+
     printf("sglthing: server open on ip %s and port %i\n", ip, port);
 }
 
@@ -443,7 +464,7 @@ static void network_manage_packet(struct network* network, struct network_client
                 if(strlen(network->server_pass) == 0 || strncmp(in_packet.packet.clientinfo.server_pass, network->server_pass, 64) == 0)
                 {
                     client->verified = true;
-                    if(!http_check_sessionkey(&network->http_client,in_packet.packet.clientinfo.session_key))
+                    if(!http_check_sessionkey(&network->http_client, in_packet.packet.clientinfo.session_key))
                     {
                         printf("sglthing: client '%s' failed key\n", in_packet.packet.clientinfo.client_name);
                         if(network->security)
@@ -453,6 +474,9 @@ static void network_manage_packet(struct network* network, struct network_client
                         client->player_color_r = 0.0;
                         client->player_color_g = 1.0;
                         client->player_color_b = 1.0;
+
+                        client->web_player_id = http_get_userid(&network->http_client, in_packet.packet.clientinfo.session_key);
+                        client->db = db_player_info(network, client->web_player_id);
                     }
                     else
                     {
@@ -960,6 +984,7 @@ void network_close(struct network* network)
             network_disconnect_player(network,true,"Server shutting down",v);
             g_array_remove_index(network->server_clients, 0);
         }
+        sqlite3_close(network->database);
     }
     else
     {

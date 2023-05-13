@@ -126,3 +126,15 @@ bool http_check_sessionkey(struct http_client* client, char* key)
     printf("sglthing: check = %s\n", result);
     return (strcmp(result,"1")==0);
 }
+
+int http_get_userid(struct http_client* client, char* key)
+{
+    if(!client->login)
+        return false;
+    char url[256];
+    snprintf(url, 256, "auth/check?sessionkey=%s", key);
+    char* result = http_get(client, url);
+    if(!result)
+        return false;
+    return atoi(result);
+}

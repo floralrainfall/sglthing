@@ -7,6 +7,7 @@
 #include <glib.h>
 #include "sockets.h"
 #include "http.h"
+#include <sqlite3.h> 
 
 #define CR_PACKET_VERSION 200
 #define NO_DATAPACKETS_TICK 512
@@ -16,10 +17,16 @@
 
 typedef uint64_t checksum_t;
 
+struct db_player
+{
+    
+};
+
 struct network_client {
     int socket;
     char client_name[64];
     int player_id;
+    int web_player_id;
     int connection_id;
     int client_version;
     double last_ping_time;
@@ -43,6 +50,8 @@ struct network_client {
     int dl_successes;
     struct network* owner;
     void* user_data;
+
+    struct db_player db;
 };
 
 struct network_downloader {
@@ -233,6 +242,8 @@ struct network {
     int packet_time;
 
     struct world* world;
+
+    sqlite3 *database;    
 };
 
 void network_init(struct network* network, struct script_system* script);

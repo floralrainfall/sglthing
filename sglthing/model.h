@@ -57,5 +57,7 @@ struct model
 };
 
 void model_find_bone_info(struct mesh* mesh, char* name, struct model_bone_info* info_out);
+int model_vao();
+void model_bind_vbos(struct mesh* mesh);
 
 #endif

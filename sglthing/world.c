@@ -281,9 +281,6 @@ struct world* world_init(char** argv, int argc, void* p)
     }
 
     snd_init(&world->s_mgr);
-    mus_init(&world->m_mgr, &world->s_mgr);
-    world->m_mgr.world_ptr = (void*)world;
-    world->m_mgr.dbgmgr = config_number_get(&world->config,"config_mode") == 1.0;
 
     world->world_frame_user = NULL;
     world->world_frame_ui_user = NULL;
@@ -505,6 +502,7 @@ void world_frame(struct world* world)
         sglc(glUniform1f(glGetUniformLocation(world->gfx.hdr_blur2_shader,"exposure"), 1.0f));
         sglc(glUniform1f(glGetUniformLocation(world->gfx.hdr_blur2_shader,"time"), glfwGetTime()));
         sglc(glUniform1f(glGetUniformLocation(world->gfx.hdr_blur2_shader,"lsd"), world->cam.lsd));
+        sglc(glUniform4fv(glGetUniformLocation(world->gfx.hdr_blur2_shader,"viewport"), 1, world->viewport));
         sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
         sglc(glDrawArrays(GL_POINTS, 0, 1));
     #endif
@@ -637,8 +635,6 @@ void world_frame(struct world* world)
     ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, sglthing_v_name, 15.f);
     world->ui->persist = false;
 
-    mus_tick(&world->m_mgr);
-
     if(world->client.status == NETWORKSTATUS_DISCONNECTED && world->server.status == NETWORKSTATUS_DISCONNECTED && (config_number_get(&world->config, "shutdown_empty") == 1.0))
     {
         printf("sglthing: server empty/offline or client disconnected\n");
@@ -756,12 +752,11 @@ void world_draw_model(struct world* world, struct model* model, int shader_progr
                 glUniform1i(glGetUniformLocation(shader_program,tx_name), j+2);
             }
         }
-        if(mesh_sel->vertex_array != last_vertex_array)
-        {
-            last_vertex_array = mesh_sel->vertex_array;
-            sglc(glBindVertexArray(mesh_sel->vertex_array));
-        }
-        //glBindVertexBuffer(0, mesh_sel->vertex_buffer, 0, 3 * sizeof(float));
+        model_bind_vbos(mesh_sel);
+        sglc(glBindVertexArray(mesh_sel->vertex_array));
+        //sglc(glBindBuffer(GL_ARRAY_BUFFER, mesh_sel->vertex_buffer));
+        //sglc(glVertexArrayVertexBuffer(mesh_sel->vertex_array, 0, mesh_sel->vertex_buffer, 0, sizeof(struct model_vertex)));
+        sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh_sel->element_buffer));
         sglc(glDrawElements(GL_TRIANGLES, mesh_sel->element_count, GL_UNSIGNED_INT, 0));
         world->render_count++;
 

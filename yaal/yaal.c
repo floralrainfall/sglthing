@@ -108,6 +108,9 @@ static void __sglthing_frame(struct world* world)
             }
 
 
+            world->gfx.sun_direction[0] = -0.5f;
+            world->gfx.sun_direction[1] = 0.5f;
+            world->gfx.sun_direction[2] = 0.5f;
 
             world->gfx.clear_color[0] = 0.000f;
             world->gfx.clear_color[1] = 0.000f;
@@ -119,13 +122,18 @@ static void __sglthing_frame(struct world* world)
         }
         else if(yaal_state.mode == YAAL_STATE_MENU)
         {
-            world->gfx.clear_color[0] = 0.529f;
-            world->gfx.clear_color[1] = 0.808f;
-            world->gfx.clear_color[2] = 0.922f;
+            world->gfx.clear_color[0] = 0.375f;
+            world->gfx.clear_color[1] = 0.649f;
+            world->gfx.clear_color[2] = 0.932f;
 
             world->gfx.fog_color[0] = world->gfx.clear_color[0];
             world->gfx.fog_color[1] = world->gfx.clear_color[1];
             world->gfx.fog_color[2] = world->gfx.clear_color[2];
+
+
+            world->gfx.sun_direction[0] = -0.2f;
+            world->gfx.sun_direction[1] = 0.9f;
+            world->gfx.sun_direction[2] = 0.4f;
         }
     }
 
@@ -256,7 +264,7 @@ static void __sglthing_frame_render(struct world* world)
         glm_translate(logo_matrix, position);
         versor rotation;
         vec3 direction;
-        glm_vec3_sub(position, (vec3){-mouse_position[0],  -mouse_position[1], mouse_position[0]},  direction);
+        glm_vec3_sub(position, (vec3){sinf(world->time)*4.f,sinf(world->time),cosf(world->time)*4.f},  direction);
         glm_quat_for(direction, (vec3){0.f,1.f,0.f}, rotation);
         glm_quat_rotate(logo_matrix, rotation, logo_matrix);
         world_draw_model(world, yaal_state.menu_yaal_model, yaal_state.object_shader, logo_matrix, true);
@@ -267,6 +275,14 @@ static void __sglthing_frame_render(struct world* world)
         glm_translate(ground_matrix,(vec3){0.f,-2.f,0.f});
 
         world_draw_model(world, yaal_state.map_tiles[1], yaal_state.object_shader, ground_matrix, true);
+
+        mat4 city_matrix, city_rotation_matrix;
+        glm_mat4_identity(city_matrix);
+        glm_translate(city_matrix,(vec3){30.f,-1.f,1.f});
+        glm_euler((vec3){0.f,2.5f,0.f},city_rotation_matrix);
+        glm_mat4_mul(city_matrix, city_rotation_matrix, city_matrix);
+
+        world_draw_model(world, yaal_state.menu_city_model, yaal_state.object_shader, city_matrix, true);
     }
 }
 
@@ -838,6 +854,8 @@ void sglthing_init_api(struct world* world)
     yaal_state.arrow_model = get_model("yaal/models/arrow.obj");
     load_model("yaal/models/yaalonline.obj");
     yaal_state.menu_yaal_model = get_model("yaal/models/yaalonline.obj");
+    load_model("yaal/models/city.obj");
+    yaal_state.menu_city_model = get_model("yaal/models/city.obj");
     yaal_state.arrow_light.constant = 1.f;
     yaal_state.arrow_light.linear = 0.14f;
     yaal_state.arrow_light.quadratic = 0.07f;
@@ -877,4 +895,7 @@ void sglthing_init_api(struct world* world)
     yaal_state.damage_font = ui_load_font("uiassets/font3.png",32,32,16,8);
 
     yaal_state.mode = YAAL_STATE_MENU;
+
+    load_snd("yaal/snd/hello.wav");
+    play_snd("yaal/snd/hello.wav");
 }

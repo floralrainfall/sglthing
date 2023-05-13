@@ -87,23 +87,26 @@ vec3 calc_point_light(light i, vec3 normal, vec3 frag_pos, vec3 view_dir)
 
 #define MAX_LIGHTS 32
 uniform light lights[MAX_LIGHTS];
+uniform vec3 ambient = vec3(30.0/255.0,26.0/255.0,117.0/255.0);
+uniform vec3 diffuse = vec3(227.0/255.0,168.0/255.0,87.0/255.0);
+uniform vec3 specular = vec3(255.0/255.0,204.0/255.0,51.0/255.0); 
 
 vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_light, vec4 f_pos_light_far)
 {
         // ambient lighting
-    vec3 ambient = 0.25 * vec3(30.0/255.0,26.0/255.0,117.0/255.0);
+    vec3 ambient = 0.25 * ambient;
 
     // calculate diffuse lighting
     vec3 norm = normalize(normal);
     vec3 light_dir = normalize((frag_pos + sun_direction * 100.0) - frag_pos);
     float diff = max(dot(norm, light_dir),0.1);
-    vec3 diffuse = diff * vec3(227.0/255.0,168.0/255.0,87.0/255.0);
+    vec3 diffuse = diff * diffuse;
 
     // calculate specular lighting
     vec3 view_dir = normalize(camera_position - frag_pos);
     vec3 reflect_dir = reflect(-light_dir, norm);  
     float spec = pow(max(dot(view_dir, reflect_dir), 0.0), 4);
-    vec3 specular = 0.5 * spec * vec3(255.0/255.0,204.0/255.0,51.0/255.0);  
+    vec3 specular = 0.5 * spec * specular;
 
     // calculate shadow lighting
     float shadow = shadow_calculate(camera_position, 0.05, 0.0002, depth_map, frag_pos, f_pos_light, normal, (sun_direction*50.0));   

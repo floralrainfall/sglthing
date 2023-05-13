@@ -201,6 +201,7 @@ struct yaal_state {
     struct model* player_model;
     struct model* arrow_model;
     struct model* menu_yaal_model;
+    struct model* menu_city_model;
     struct light arrow_light;
 
     struct ui_font* damage_font;
@@ -262,6 +263,8 @@ struct yaal_state {
     struct chat_system* chat;
     struct fx_manager fx_manager;
     struct map_tile_data map_data[MAP_SIZE_MAX_X][MAP_SIZE_MAX_Y];
+
+    
 };
 
 extern struct yaal_state yaal_state;

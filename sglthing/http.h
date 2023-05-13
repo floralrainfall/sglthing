@@ -26,5 +26,6 @@ char* http_get(struct http_client* client, char* url);
 char* http_post(struct http_client* client, char* url, char* postdata);
 
 bool http_check_sessionkey(struct http_client* client, char* key);
+int http_get_userid(struct http_client* client, char* key);
 
 #endif

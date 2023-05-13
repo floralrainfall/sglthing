@@ -14,9 +14,9 @@ option(USE_ODE "Use ODE library" OFF)
 option(USE_PKGCONFIG "Use PkgConfig to find packages" ON)
 option(HEADLESS "Compile without windowing support" OFF)
 option(YAAL_COMPILE "Compile YaalOnline" ON)
-option(SOUND_ENABLE "Enable sound" ON)
 
 if(NOT HEADLESS)
+    option(SOUND_ENABLED "Enable sound" ON)
     find_package(glfw3)    
     set(GLFW_LIBRARY glfw)
 endif()
@@ -34,8 +34,9 @@ if(USE_PKGCONFIG)
     pkg_check_modules(assimp REQUIRED IMPORTED_TARGET assimp)
     pkg_check_modules(cglm REQUIRED IMPORTED_TARGET cglm)
     pkg_check_modules(libcurl REQUIRED IMPORTED_TARGET libcurl)
+    pkg_check_modules(sqlite REQUIRED IMPORTED_TARGET sqlite3)
     set(PKGCONFIG_LIBRARIES 
-        PkgConfig::glib PkgConfig::zlib PkgConfig::assimp PkgConfig::cglm PkgConfig::libcurl)
+        PkgConfig::glib PkgConfig::zlib PkgConfig::assimp PkgConfig::cglm PkgConfig::libcurl PkgConfig::sqlite)
 else()
     message(WARNING "you probably wont be able to use glib or zlib")
 endif()
@@ -63,7 +64,10 @@ if(NOT HEADLESS)
     endif()
 
     if(SOUND_ENABLED)
-        pkg_check_modules(deps REQUIRED IMPORTED_TARGET libavutil libavcodec libavformat openal)
+        pkg_check_modules(sound_deps REQUIRED IMPORTED_TARGET 
+            portaudio-2.0 sndfile
+        )
+        set(PKGCONFIG_LIBRARIES ${PKGCONFIG_LIBRARIES} PkgConfig::sound_deps)
     endif()
 endif()
 
@@ -129,6 +133,7 @@ add_library(sglthing STATIC
     sglthing/lua/l_functions.c
     sglthing/lua/l_vector.h
     sglthing/lua/l_vector.c
+
     sglthing/primitives.h
     sglthing/primitives.c 
     sglthing/particles.h
@@ -163,8 +168,6 @@ add_library(sglthing STATIC
     sglthing/net.c 
     sglthing/snd.h
     sglthing/snd.c 
-    sglthing/mus.h
-    sglthing/mus.c 
     sglthing/ui.h
     sglthing/ui.c 
     sglthing/io.h

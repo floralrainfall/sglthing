@@ -224,51 +224,6 @@ static void model_parse_mesh(struct model_vertex* vtx_array, int* vtx_count, uns
     // printf("parsed mesh with %i vertices %i faces... \n", mesh->mNumVertices, mesh->mNumFaces);
 }
 
-// FIXME: only until recently i had figured out that vertex array switching is an expensive operation
-int create_model_vao(struct model_vertex* vtx_array, int vtx_count, int* idx_array, int idx_count, int* vertex_buffer, int* element_buffer)
-{
-    #ifndef HEADLESS
-    int vertex_array;
-
-    sglc(glGenVertexArrays(1, &vertex_array));
-    sglc(glGenBuffers(1, vertex_buffer));
-    sglc(glGenBuffers(1, element_buffer));
-
-    sglc(glBindVertexArray(vertex_array));
-
-    sglc(glBindBuffer(GL_ARRAY_BUFFER, *vertex_buffer));
-    sglc(glBufferData(GL_ARRAY_BUFFER, vtx_count * sizeof(struct model_vertex), &vtx_array[0], GL_STATIC_DRAW));
-
-    sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *element_buffer));
-    sglc(glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx_count * sizeof(unsigned int), &idx_array[0], GL_STATIC_DRAW));
-    
-    // vec3: position
-    sglc(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)0));
-    sglc(glEnableVertexAttribArray(0));
-    // vec3: normal
-    sglc(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, normal)));
-    sglc(glEnableVertexAttribArray(1));
-    // vec4: color
-    sglc(glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, color)));
-    sglc(glEnableVertexAttribArray(2));
-    // vec2: uv
-    sglc(glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, tex_coords)));
-    sglc(glEnableVertexAttribArray(3));
-    // ivec4: bone_ids
-    sglc(glVertexAttribIPointer(4, 4, GL_INT, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, bone_ids)));
-    sglc(glEnableVertexAttribArray(4));
-    // vec4: weights
-    sglc(glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, weights)));
-    sglc(glEnableVertexAttribArray(5));
-
-    sglc(glBindVertexArray(0));
-
-    return vertex_array;
-    #else  
-    return 0;
-    #endif
-}
-
 static void model_parse_node(struct model* model, struct aiNode* node, const struct aiScene* scene)
 {
     for(int i = 0; i < node->mNumMeshes; i++)
@@ -282,17 +237,32 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
         model_parse_mesh(vtx_array, &vtx_count, idx_array, &idx_count, mesh, scene);
 
         int element_buffer, vertex_buffer;
-        model->meshes[model->mesh_count].element_buffer = element_buffer;
-        model->meshes[model->mesh_count].vertex_buffer = vertex_buffer;
         model->meshes[model->mesh_count].element_count = idx_count;
         model->meshes[model->mesh_count].vtx_data = vtx_array;
         model->meshes[model->mesh_count].vtx_data_count = vtx_count;
         model->meshes[model->mesh_count].path = model->path;
         model->meshes[model->mesh_count].model_parent = model;
         model_load_textures(&model->meshes[model->mesh_count], mesh, scene);
-        model_extract_bone_weights(&model->meshes[model->mesh_count], vtx_array, mesh, scene);
-        int new_mesh = create_model_vao(vtx_array, vtx_count, idx_array, idx_count, &vertex_buffer, &element_buffer);
-        model->meshes[model->mesh_count].vertex_array = new_mesh;
+        model_extract_bone_weights(&model->meshes[model->mesh_count], vtx_array, mesh, scene);    
+        
+        sglc(glGenBuffers(1, &vertex_buffer));
+        sglc(glGenBuffers(1, &element_buffer));
+
+        model->meshes[model->mesh_count].vertex_array = model_vao();
+
+        sglc(glBindVertexArray(model->meshes[model->mesh_count].vertex_array));
+
+        sglc(glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer));
+        sglc(glBufferData(GL_ARRAY_BUFFER, vtx_count * sizeof(struct model_vertex), &vtx_array[0], GL_STATIC_DRAW));
+
+        sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer));
+        sglc(glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx_count * sizeof(unsigned int), &idx_array[0], GL_STATIC_DRAW));
+
+        //int new_mesh = create_model_vao(vtx_array, vtx_count, idx_array, idx_count, &vertex_buffer, &element_buffer);
+
+        model->meshes[model->mesh_count].vertex_buffer = vertex_buffer;
+        model->meshes[model->mesh_count].element_buffer = element_buffer;
+
         model->mesh_count++;
 
         free(idx_array);
@@ -337,4 +307,55 @@ struct model* get_model(char* file)
             return &models[i];
     }
     return 0;
+}
+
+static int vertex_array = 0;
+
+static void model_vao_pointers()
+{
+    // vec3: position
+    sglc(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)0));
+    sglc(glEnableVertexAttribArray(0));
+    // vec3: normal
+    sglc(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, normal)));
+    sglc(glEnableVertexAttribArray(1));
+    // vec4: color
+    sglc(glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, color)));
+    sglc(glEnableVertexAttribArray(2));
+    // vec2: uv
+    sglc(glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, tex_coords)));
+    sglc(glEnableVertexAttribArray(3));
+    // ivec4: bone_ids
+    sglc(glVertexAttribIPointer(4, 4, GL_INT, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, bone_ids)));
+    sglc(glEnableVertexAttribArray(4));
+    // vec4: weights
+    sglc(glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(struct model_vertex), (void*)offsetof(struct model_vertex, weights)));
+    sglc(glEnableVertexAttribArray(5));
+}
+
+int model_vao()
+{
+    if(vertex_array)
+        return vertex_array;
+
+    sglc(glGenVertexArrays(1, &vertex_array));
+    sglc(glBindVertexArray(vertex_array));
+
+    model_vao_pointers();
+
+    sglc(glBindVertexArray(0));
+
+    return vertex_array;
+}
+
+void model_bind_vbos(struct mesh* mesh)
+{
+    if(!vertex_array)
+        vertex_array = model_vao();
+
+    sglc(glBindVertexArray(mesh->vertex_array));
+    sglc(glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffer));
+    sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->element_buffer));
+
+    model_vao_pointers();
 }

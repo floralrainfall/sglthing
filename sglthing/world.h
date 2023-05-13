@@ -13,7 +13,6 @@
 #include "net.h"
 #include "script.h"
 #include "snd.h"
-#include "mus.h"
 #ifndef HEADLESS
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -124,7 +123,6 @@ struct world {
     struct config_file config_private;
 
     struct sndmgr s_mgr;
-    struct musmgr m_mgr;
 
     void (*world_frame_user)(struct world* world);
     void (*world_frame_render_user)(struct world* world);
