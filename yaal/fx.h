@@ -16,6 +16,7 @@ struct fx
     enum fxtypes type;
     int level_id;
     bool alive;
+    bool dead;
     char tx[8];
     bool alt;
     int amt;
@@ -26,6 +27,7 @@ struct fx
     vec3 target;
     vec3 start;
     int source_player_id;
+    struct snd* snd;
 };
 
 struct fx_manager

@@ -13,7 +13,7 @@ set(ASSIMP_HUNTER_ENABLED FALSE)
 option(USE_ODE "Use ODE library" OFF)
 option(USE_PKGCONFIG "Use PkgConfig to find packages" ON)
 option(HEADLESS "Compile without windowing support" OFF)
-option(YAAL_COMPILE "Compile YaalOnline" ON)
+option(GAMES_COMPILE "Compile the games" ON)
 
 if(NOT HEADLESS)
     option(SOUND_ENABLED "Enable sound" ON)
@@ -95,8 +95,18 @@ project(sglthing)
 project(thesglthing)
 project(lua)
 
-set(YAAL_COMPILE yes)
-if(YAAL_COMPILE)
+if(GAMES_COMPILE)
+    project(RDM2)
+    add_executable(RDM2
+        sglrdm2/rdm_net.c
+        sglrdm2/rdm_net.h
+        sglrdm2/weapons.c
+        sglrdm2/weapons.h
+        sglrdm2/rdm2.c
+        sglrdm2/rdm2.h
+        sglrdm2/map.c
+        sglrdm2/map.h
+    )
     project(Yaal)
     add_executable(Yaal
         yaal/netmgr.c
@@ -219,8 +229,12 @@ target_link_libraries(thesglthing PUBLIC
     ${GLAD_LIBRARY}
 )
 
-if(YAAL_COMPILE)
+if(GAMES_COMPILE)
     target_link_libraries(Yaal PUBLIC
+        ${GLAD_LIBRARY}
+        sglthing
+    )
+    target_link_libraries(RDM2 PUBLIC
         ${GLAD_LIBRARY}
         sglthing
     )

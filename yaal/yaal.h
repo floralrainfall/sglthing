@@ -127,6 +127,7 @@ struct map_file_data
     int map_left_id;
     int map_bottom_id;
     bool map_pvp_enabled;
+    int map_song_id;
 
     int map_object_count;
     struct map_object map_objects[UCHAR_MAX];
@@ -252,6 +253,9 @@ struct yaal_state {
     GHashTable* map_objects;
     GHashTable* maps;
 
+    int current_map_song_id;
+    struct snd* current_song;
+
     struct animation player_animations[ANIMATIONS_TO_LOAD];
 
     int map_downloaded_count;
@@ -263,8 +267,6 @@ struct yaal_state {
     struct chat_system* chat;
     struct fx_manager fx_manager;
     struct map_tile_data map_data[MAP_SIZE_MAX_X][MAP_SIZE_MAX_Y];
-
-    
 };
 
 extern struct yaal_state yaal_state;

@@ -19,7 +19,10 @@ typedef uint64_t checksum_t;
 
 struct db_player
 {
+    bool found;
     
+    int id;
+    int web_id;
 };
 
 struct network_client {
@@ -51,6 +54,7 @@ struct network_client {
     struct network* owner;
     void* user_data;
 
+    struct http_user user;
     struct db_player db;
 };
 
@@ -147,6 +151,7 @@ struct network_packet {
             char server_motd[128];
             int sglthing_revision;
             int player_id;
+            bool verified;
 
             float player_color_r;
             float player_color_g;
@@ -159,11 +164,14 @@ struct network_packet {
             char client_name[64];
             bool observer;
             bool admin;
+            bool verified;
             int player_id;
 
             float player_color_r;
             float player_color_g;
             float player_color_b;
+
+            struct http_user user_data;
         } player_add;
         struct {
             int player_id;

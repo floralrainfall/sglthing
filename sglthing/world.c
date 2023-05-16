@@ -57,6 +57,7 @@ struct world* world_init(char** argv, int argc, void* p)
     world->cam.fov = 45.f;
     world->cam.yaw = 0.f;
     world->cam.lsd = 0.f;
+    world->gfx.enable_sun = true;
 
     world->frames = 0;
     world->fps = 0.0;
@@ -425,32 +426,38 @@ void world_frame(struct world* world)
     world_draw_model(world, world->gfx.sky_ball, world->sky_shader, sky_matrix, false);
     world_draw_primitive(world, world->cloud_shader, GL_FILL, PRIMITIVE_PLANE, cloud_matrix, (vec4){1.f,1.f,1.f,1.f});*/
 
-    vec3 sun_direction_camera;
-    mat4 light_projection, light_projection_far;
-    mat4 light_view, light_view_far;
+    if(world->gfx.enable_sun)
+    {
+        vec3 sun_direction_camera;
+        mat4 light_projection, light_projection_far;
+        mat4 light_view, light_view_far;
 
-    glm_ortho(-25.f, 25.f, -25.f, 25.f, 1.0f, 100.0f,light_projection);
-    glm_ortho(-75.f, 75.f, -75.f, 75.f, 1.0f, 200.0f,light_projection_far);
+        glm_ortho(-25.f, 25.f, -25.f, 25.f, 1.0f, 100.0f,light_projection);
+        glm_ortho(-75.f, 75.f, -75.f, 75.f, 1.0f, 200.0f,light_projection_far);
 
-    sun_direction_camera[0] = world->gfx.sun_direction[0]*50.f + world->gfx.sun_position[0];
-    sun_direction_camera[1] = world->gfx.sun_direction[1]*50.f + world->gfx.sun_position[1];
-    sun_direction_camera[2] = world->gfx.sun_direction[2]*50.f + world->gfx.sun_position[2];
-    glm_lookat(sun_direction_camera, world->gfx.sun_position,(vec3){0.f,1.f,0.f},light_view);
+        sun_direction_camera[0] = world->gfx.sun_direction[0]*50.f + world->gfx.sun_position[0];
+        sun_direction_camera[1] = world->gfx.sun_direction[1]*50.f + world->gfx.sun_position[1];
+        sun_direction_camera[2] = world->gfx.sun_direction[2]*50.f + world->gfx.sun_position[2];
+        glm_lookat(sun_direction_camera, world->gfx.sun_position,(vec3){0.f,1.f,0.f},light_view);
 
-    sun_direction_camera[0] = world->gfx.sun_direction[0]*100.f + world->gfx.sun_position[0];
-    sun_direction_camera[1] = world->gfx.sun_direction[1]*100.f + world->gfx.sun_position[1];
-    sun_direction_camera[2] = world->gfx.sun_direction[2]*100.f + world->gfx.sun_position[2];
-    glm_lookat(sun_direction_camera, world->gfx.sun_position,(vec3){0.f,1.f,0.f},light_view_far);
+        sun_direction_camera[0] = world->gfx.sun_direction[0]*100.f + world->gfx.sun_position[0];
+        sun_direction_camera[1] = world->gfx.sun_direction[1]*100.f + world->gfx.sun_position[1];
+        sun_direction_camera[2] = world->gfx.sun_direction[2]*100.f + world->gfx.sun_position[2];
+        glm_lookat(sun_direction_camera, world->gfx.sun_position,(vec3){0.f,1.f,0.f},light_view_far);
 
-    glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
-    glm_mat4_mul(light_projection_far, light_view_far, world->gfx.light_space_matrix_far);
+        glm_mat4_mul(light_projection, light_view, world->gfx.light_space_matrix);
+        glm_mat4_mul(light_projection_far, light_view_far, world->gfx.light_space_matrix_far);
+    }
 
     if(world->client.status == NETWORKSTATUS_CONNECTED && !world->assets_downloading)
     {
-        world->gfx.current_map = 0;
-        world_frame_light_pass(world,15.f,world->gfx.depth_map_fbo,SHADOW_WIDTH,SHADOW_HEIGHT);
-        world->gfx.current_map = 1;
-        world_frame_light_pass(world,50.f,world->gfx.depth_map_fbo_far,SHADOW_WIDTH,SHADOW_HEIGHT);
+        if(world->gfx.enable_sun)
+        {
+            world->gfx.current_map = 0;
+            world_frame_light_pass(world,15.f,world->gfx.depth_map_fbo,SHADOW_WIDTH,SHADOW_HEIGHT);
+            world->gfx.current_map = 1;
+            world_frame_light_pass(world,50.f,world->gfx.depth_map_fbo_far,SHADOW_WIDTH,SHADOW_HEIGHT);
+        }
 
     #ifdef FBO_ENABLED
         sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));

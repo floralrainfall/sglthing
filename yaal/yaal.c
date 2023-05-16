@@ -289,6 +289,7 @@ static void __sglthing_frame_render(struct world* world)
 static void __sglthing_frame_ui(struct world* world)
 {
     struct ui_data* ui = world->ui;
+    vec4 oldfg, oldbg;
 
     switch(yaal_state.mode)
     {
@@ -298,6 +299,7 @@ static void __sglthing_frame_ui(struct world* world)
                 if(ui_draw_button(world->ui, world->gfx.screen_width-80, 8.f, 64.f, 32.f, yaal_state.player_play_button_tex, 1.f))
                 {
                     yaal_state.mode = YAAL_STATE_GAME;
+                    yaal_update_song();
                 }
 
                 ui_draw_text(world->ui, 8.f, 16.f, "Welcome to YaalOnline", 1.f);
@@ -308,10 +310,30 @@ static void __sglthing_frame_ui(struct world* world)
                 ui_draw_text(world->ui, 8.f, 48.f, world->client.server_motd, 1.f);
                 if(ui_draw_button(world->ui, world->gfx.screen_width-80.f, -8.f, 64.f, 8.f, yaal_state.player_menu_button_tex, 1.f))
                 {
-                    yaal_state.player_menu_open = true;
+                    yaal_state.player_menu_open = true;                    
                 }
             }
             ui_end_panel(world->ui);
+            
+            glm_vec4_copy(world->ui->foreground_color, oldfg);
+            glm_vec4_copy(world->ui->background_color, oldbg);
+
+            world->ui->background_color[0] = 0.f;
+            world->ui->background_color[1] = 0.f;
+            world->ui->background_color[2] = 0.f;
+            world->ui->background_color[3] = 0.f;
+
+            world->ui->foreground_color[0] = 1.f;
+            world->ui->foreground_color[1] = 1.f;
+            world->ui->foreground_color[2] = 0.f;
+            world->ui->foreground_color[3] = 1.f;
+
+            if(yaal_state.current_player && yaal_state.current_player->client->verified)
+                ui_draw_text(world->ui, 0.f, world->gfx.screen_height-48.f, "Register to https://sgl.endoh.ca\nand/or put your credentials in config_private.ini!\nData persistence is only for SGLSite members.", 1.f);
+            
+            glm_vec4_copy(oldfg, world->ui->foreground_color);
+            glm_vec4_copy(oldbg, world->ui->background_color);
+            
             break; 
         case YAAL_STATE_GAME:
             char txinfo[256];
@@ -340,7 +362,6 @@ static void __sglthing_frame_ui(struct world* world)
                 chat_render(world, yaal_state.chat);
         #endif
 
-            vec4 oldfg, oldbg;
             glm_vec4_copy(world->ui->foreground_color, oldfg);
             glm_vec4_copy(world->ui->background_color, oldbg);
 
@@ -651,10 +672,8 @@ static void __sglthing_frame_ui(struct world* world)
 
             if(yaal_state.map_downloading)
             {
-                for(int i = 0; i < MAP_SIZE_MAX_X; i++)
-                    ui_draw_text(ui, (fmodf(i,world->viewport[2] / 16.f)*8.f), 32.f, yaal_state.map_downloaded[i]?"D":"?", 1.f);
                 snprintf(txinfo,256,"%f%% done (%i received, %i max)", ((float)yaal_state.map_downloaded_count/MAP_SIZE_MAX_X)*100.f, yaal_state.map_downloaded_count, MAP_SIZE_MAX_X);
-                ui_draw_text(ui, 8.f+8.f*MAP_SIZE_MAX_X, 32.f, txinfo, 1.f);
+                ui_draw_text(ui, strlen(txinfo)*8.f/2.f, sinf(world->gfx.screen_height)*world->gfx.screen_height/2.f, txinfo, 1.f);
             }
 
             break;
@@ -662,7 +681,7 @@ static void __sglthing_frame_ui(struct world* world)
 
     if(yaal_state.player_menu_open)
     {
-        ui_draw_panel(world->ui, 8.f, world->gfx.screen_height-100.f, world->gfx.screen_width-16.f, world->gfx.screen_height/2.f, 0.5f);
+        ui_draw_panel(world->ui, 8.f, world->gfx.screen_height-100.f, world->gfx.screen_width-16.f, world->gfx.screen_height-200.f, 0.5f);
         world->ui->current_panel->position_x += 1;
         ui_draw_text(world->ui, 0.f, 16.f, "YaalOnline Menu", 0.3f);
         if(ui_draw_button(world->ui, world->ui->current_panel->size_x-33.f, 0.f, 32.f, 16.f, yaal_state.player_exit_tex, 0.3f))
@@ -896,6 +915,11 @@ void sglthing_init_api(struct world* world)
 
     yaal_state.mode = YAAL_STATE_MENU;
 
-    load_snd("yaal/snd/hello.wav");
-    play_snd("yaal/snd/hello.wav");
+    load_snd("yaal/snd/notification.wav");
+    load_snd("yaal/snd/alt_notification.wav");
+    load_snd("yaal/snd/bomb_throw.wav");
+
+    load_snd("yaal/snd/mus/theme_0.mp3");
+    yaal_state.current_song = NULL;
+    yaal_update_song();
 }

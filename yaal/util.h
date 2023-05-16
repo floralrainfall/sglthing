@@ -13,5 +13,6 @@ void yaal_update_player_action(int key_id, struct player_action action, struct n
 
 // client
 void yaal_update_player_transform(struct player* player);
+void yaal_update_song();
 
 #endif

@@ -21,11 +21,18 @@ struct http_client
     struct config_file web_config;
 };
 
+struct http_user
+{
+    bool found;
+
+    int user_id; 
+};
+
 void http_create(struct http_client* client, char* http_base);
 char* http_get(struct http_client* client, char* url);
 char* http_post(struct http_client* client, char* url, char* postdata);
 
 bool http_check_sessionkey(struct http_client* client, char* key);
-int http_get_userid(struct http_client* client, char* key);
+struct http_user http_get_userdata(struct http_client* client, char* key);
 
 #endif

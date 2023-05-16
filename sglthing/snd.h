@@ -9,7 +9,8 @@
 
 struct sndmgr {
 #ifdef SOUND_ENABLED
-
+    bool mute;
+    GArray* sounds_loaded;
 #endif
 };
 
@@ -17,6 +18,7 @@ struct sndmgr {
 struct snd {
 #ifdef SOUND_ENABLED
     char name[64];
+    int id;
 
     SF_INFO libsndfile_info;
     SNDFILE* file;
@@ -24,12 +26,22 @@ struct snd {
 
     int position;
     bool loop;
+    bool stop;
+
+    float multiplier;
+
+    bool sound_3d;    
+    vec3 sound_position;
+    vec3* camera_position;
 #endif
 };  
 
 void snd_init(struct sndmgr* mgr);
+void snd_deinit(struct sndmgr* mgr);
 struct snd* get_snd(char* file_name);
-void load_snd(char* file_name);
-void play_snd(char* file_name);
+struct snd* load_snd(char* file_name);
+struct snd* play_snd(char* file_name);
+void resume_snd(struct snd* snd);
+void stop_snd(struct snd* snd);
 
 #endif

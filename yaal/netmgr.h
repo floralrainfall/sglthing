@@ -43,6 +43,7 @@ struct xtra_packet_data
         struct
         {
             int level_id;
+            int song_id;
             char level_name[64];
         } yaal_level;
         struct

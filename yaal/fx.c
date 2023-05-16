@@ -19,6 +19,17 @@ void add_fx(struct fx_manager* manager, struct fx fx)
     fx.time = 0.f;
     fx.alive = true;
     fx.progress = 0.f;
+    fx.dead = false;
+
+    switch(fx.type)
+    {
+        case FX_BOMB_THROW:
+            fx.snd = play_snd("yaal/snd/bomb_throw.wav");
+            fx.snd->sound_3d = true;
+            fx.snd->camera_position = &yaal_state.current_player->player_position;
+            break;
+    }
+
     g_array_append_val(manager->fx_active, fx);
 }
 
@@ -36,36 +47,46 @@ void tick_fx(struct world* world, struct fx_manager* manager)
         if(fx->time > fx->max_time)
         {
             fx->alive = false;        
-            switch(fx->type)
+            if(!fx->dead)
             {
-                case FX_BOMB_THROW:
-                    add_fx(manager, (struct fx){
-                        .max_time = 2.0f,
-                        .target[0] = fx->target[0],
-                        .target[1] = fx->target[1],
-                        .target[2] = fx->target[2],
-                        .start[0] = fx->target[0],
-                        .start[1] = fx->target[1],
-                        .start[2] = fx->target[2],
-                        .speed = 1.f,
-                        .type = FX_EXPLOSION,
-                        .level_id = fx->level_id,
-                    });
-                    if(manager->server_fx)
-                    {
-                        GArray* detections = NEW_RADIUS;
-                        net_players_in_radius(world->server.server_clients, 32.f, fx->target, fx->level_id, detections);
-                        for(int i = 0; i < detections->len; i++)
+                switch(fx->type)
+                {
+                    case FX_BOMB_THROW:
+                        add_fx(manager, (struct fx){
+                            .max_time = 2.0f,
+                            .target[0] = fx->target[0],
+                            .target[1] = fx->target[1],
+                            .target[2] = fx->target[2],
+                            .start[0] = fx->target[0],
+                            .start[1] = fx->target[1],
+                            .start[2] = fx->target[2],
+                            .speed = 1.f,
+                            .type = FX_EXPLOSION,
+                            .level_id = fx->level_id,
+                        });
+                        if(manager->server_fx)
                         {
-                            struct net_radius_detection detection = g_array_index(detections, struct net_radius_detection, i);
+                            GArray* detections = NEW_RADIUS;
+                            net_players_in_radius(world->server.server_clients, 32.f, fx->target, fx->level_id, detections);
+                            for(int i = 0; i < detections->len; i++)
+                            {
+                                struct net_radius_detection detection = g_array_index(detections, struct net_radius_detection, i);
 
-                            net_player_hurt(&world->server, detection.client, roundf(5.f/detection.distance), REASON_BOMB, fx->source_player_id);
+                                net_player_hurt(&world->server, detection.client, roundf(5.f/detection.distance), REASON_BOMB, fx->source_player_id);
+                            }
+                            g_array_free(detections, true);
                         }
-                        g_array_free(detections, true);
-                    }
-                    break;
-                default:
-                    break;
+                        break;
+                    default:
+                        break;
+                }
+                if(fx->snd)
+                {
+                    stop_snd(fx->snd);
+                    free(fx->snd);
+                    fx->snd = 0;
+                }
+                fx->dead = true;
             }
         }
     }
@@ -96,6 +117,9 @@ void render_fx(struct world* world, struct fx_manager* manager)
             vec3 dest_pos;
             glm_vec3_mix(fx->start, fx->target, fx->progress, dest_pos);
             glm_translate(fx_mat, dest_pos);
+
+            if(fx->snd)
+                glm_vec3_copy(dest_pos, fx->snd->sound_position);
 
             switch(fx->type)
             {

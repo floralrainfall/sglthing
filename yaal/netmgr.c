@@ -32,6 +32,27 @@ void net_upd_player(struct network* network, struct network_client* client)
     network_transmit_packet(network, client, upd_pak);
 }
 
+void net_send_player_lvl(struct network* network, struct network_client* client, int level_id)
+{
+    struct player* player;
+    player = (struct player*)client->user_data;
+    ASSERT(player);
+    struct map_file_data* map = g_hash_table_lookup(server_state.maps, &level_id);
+    if(map)
+    {
+        player->level_id = level_id;
+        struct network_packet upd_pak;
+        struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
+        upd_pak.meta.packet_type = YAAL_ENTER_LEVEL;
+        x_data2->packet.yaal_level.level_id = map->level_id;
+        x_data2->packet.yaal_level.song_id = 1;
+        strncpy(x_data2->packet.yaal_level.level_name,map->level_name,64);
+        network_transmit_packet(network, client, upd_pak);
+    }
+    else
+        printf("yaal: no map id 0\n");        
+}
+
 static bool __work_action(struct network_packet* packet, struct network* network, struct network_client* client)
 {
     struct xtra_packet_data* x_data = (struct xtra_packet_data*)&packet->packet.data;
@@ -114,19 +135,7 @@ static void __sglthing_new_player(struct network* network, struct network_client
     if(network->mode == NETWORKMODE_SERVER)
     {
         int intro_id = 0;
-        new_player->level_id = intro_id;
-        struct map_file_data* map = g_hash_table_lookup(server_state.maps, &intro_id);
-        if(map)
-        {
-            struct network_packet upd_pak;
-            struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
-            upd_pak.meta.packet_type = YAAL_ENTER_LEVEL;
-            x_data2->packet.yaal_level.level_id = map->level_id;
-            strncpy(x_data2->packet.yaal_level.level_name,map->level_name,64);
-            network_transmit_packet(network, client, upd_pak);
-        }
-        else
-            printf("yaal: no map id 0\n");        
+        net_send_player_lvl(network, client, intro_id);
         yaal_update_player_action(8, (struct player_action){.action_name = "Exit", .action_desc = "LMAO", .action_id = ACTION_EXIT, .action_picture_id = 1, .visible = true, .action_count = -1, .combat_mode = false}, client, network);
         yaal_update_player_action(7, (struct player_action){.action_name = "Menu", .action_desc = "LMAO", .action_id = ACTION_SERVER_MENU, .action_picture_id = 4, .visible = true, .action_count = -1, .combat_mode = false}, client, network);
         yaal_update_player_action(3, (struct player_action){.action_name = "Heal", .action_desc = "Yo", .action_id = ACTION_HEAL, .action_picture_id = 1, .visible = true, .action_count = -1, .combat_mode = false}, client, network);
@@ -279,6 +288,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                         yaal_state.map_downloading = true;
                         break;
                     }
+                    // play_snd("yaal/snd/alt_notification.wav");
                 }
                 for(int i = 0; i < MAP_SIZE_MAX_Y; i++)
                 {
@@ -347,6 +357,17 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 yaal_state.current_level_id = x_data->packet.yaal_level.level_id;
                 yaal_state.map_downloaded_count = 0;
                 strncpy(yaal_state.level_name, x_data->packet.yaal_level.level_name, 64);
+
+                if(x_data->packet.yaal_level.song_id != -1)
+                {
+                    printf("yaal: playing theme %i\n", x_data->packet.yaal_level.song_id);
+                    char song_fname[128];
+                    snprintf(song_fname,128,"yaal/snd/mus/theme_%i.mp3",x_data->packet.yaal_level.song_id);                
+                    load_snd(song_fname)->loop = true;
+                    yaal_state.current_map_song_id = x_data->packet.yaal_level.song_id;
+                    if(yaal_state.mode == YAAL_STATE_GAME)
+                        yaal_update_song();
+                }
 
                 if(yaal_state.current_player)
                     yaal_state.current_player->level_id = yaal_state.current_level_id;

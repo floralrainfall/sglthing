@@ -30,18 +30,47 @@ int last_connection_id = 0;
 
 static int __db_fill_player(void* data, int argc, char** argv, char** col_name)
 {
+    struct db_player* player = (struct db_player*)data;
+
     for(int i = 0; i < argc; i++)
     {
-        printf("%s = %s\n", col_name[i], argv[i] ? argv[i] : "NULL");
+        if(strcmp(col_name[i],"id")==0)
+        {
+            player->id = atoi(argv[i]);
+        }
+        else if(strcmp(col_name[i],"user_id")==0)
+        {
+            player->web_id = atoi(argv[i]);
+        }
     }
+
+    if(argc == 0)
+        player->found = false;
+    else
+        player->found = true;
+
+    return 0;
 }
 
 struct db_player db_player_info(struct network* network, int web_player_id)
 {
+    struct db_player db_info;
+    db_info.found = false;
+
     char sql[128];
     snprintf(sql,128,"SELECT * FROM USERS WHERE user_id=%i",web_player_id);
+    printf("sglthing: executing sql stmt `%s`\n", sql);
     char* err;
-    int rc = sqlite3_exec(network->database, sql, __db_fill_player, NULL, &err);
+    int rc = sqlite3_exec(network->database, sql, __db_fill_player, &db_info, &err);
+    if(rc)
+    {
+        printf("sglthing: sql error `%s`\n", err);
+    }
+
+    if(!db_info.found)
+        printf("sglthing: could not find db info for id %i\n", web_player_id);
+
+    return db_info;
 }
 
 void network_init(struct network* network, struct script_system* script)
@@ -318,9 +347,6 @@ void network_open(struct network* network, char* ip, int port)
     network->network_frames = 0;
     network->shutdown_ready = false;
     network->client_default_tick = 0.01;
-    strncpy(network->server_name, "SGLThing game server", 64);
-    strncpy(network->server_motd, "Server has not set a server_motd", 128);
-    strncpy(network->debugger_pass, "debugger", 64);
 
     int rc = sqlite3_open("sglthing.db",&network->database);
     if(rc){
@@ -475,11 +501,30 @@ static void network_manage_packet(struct network* network, struct network_client
                         client->player_color_g = 1.0;
                         client->player_color_b = 1.0;
 
-                        client->web_player_id = http_get_userid(&network->http_client, in_packet.packet.clientinfo.session_key);
-                        client->db = db_player_info(network, client->web_player_id);
+                        //client->web_player_id = http_get_userid(&network->http_client, in_packet.packet.clientinfo.session_key);
                     }
                     else
                     {
+                        client->user = http_get_userdata(&network->http_client, in_packet.packet.clientinfo.session_key);
+                        if(client->user.found)
+                        {
+                            printf("sglthing: was able to get web userdata, id = %i\n", client->user.user_id);
+                        }
+
+                        client->db = db_player_info(network, client->user.user_id);
+                        if(!client->db.found)
+                        {
+                            char sql[128];
+                            snprintf(sql,128,"INSERT INTO USERS (user_id) VALUES (%i)", client->user.user_id);
+                            printf("sglthing: executing sql stmt `%s`\n", sql);
+                            char* err;
+                            int rc = sqlite3_exec(network->database, sql, NULL, NULL, &err);
+                            if(rc)
+                                printf("sglthing: sql error `%s`\n", err);
+                            else
+                                client->db = db_player_info(network, client->user.user_id); // try again
+                        }
+
                         char url[256];
                         snprintf(url,256,"auth/key_owner?sessionkey=%s",in_packet.packet.clientinfo.session_key);
                         char* username = http_get(&network->http_client,url);
@@ -492,6 +537,7 @@ static void network_manage_packet(struct network* network, struct network_client
                         client->player_color_r = in_packet.packet.clientinfo.color_r;
                         client->player_color_g = in_packet.packet.clientinfo.color_g;
                         client->player_color_b = in_packet.packet.clientinfo.color_b;
+                        client->verified = true;
                     }
 
                     if(!in_packet.packet.clientinfo.observer && strlen(network->debugger_pass) && strncmp(in_packet.packet.clientinfo.debugger_pass, network->debugger_pass, 64) == 0)
@@ -521,6 +567,7 @@ static void network_manage_packet(struct network* network, struct network_client
                     response.packet.serverinfo.player_color_g = client->player_color_g;
                     response.packet.serverinfo.player_color_b = client->player_color_b;
                     response.packet.serverinfo.player_count = 0;
+                    response.packet.serverinfo.verified = client->verified;
                     memcpy(response.packet.serverinfo.session_key, network->http_client.sessionkey, 256);
                     strncpy(response.packet.serverinfo.server_motd, network->server_motd,128);
                     strncpy(response.packet.serverinfo.server_name, network->server_name,64);
@@ -532,6 +579,8 @@ static void network_manage_packet(struct network* network, struct network_client
                     response.packet.player_add.player_color_r = client->player_color_r;
                     response.packet.player_add.player_color_g = client->player_color_g;
                     response.packet.player_add.player_color_b = client->player_color_b;
+                    response.packet.player_add.user_data = client->user;
+                    response.packet.player_add.verified = client->verified;
                     strncpy(response.packet.player_add.client_name, in_packet.packet.clientinfo.client_name, 64);
                     network_transmit_packet_all(network, response);
 
@@ -575,6 +624,7 @@ static void network_manage_packet(struct network* network, struct network_client
                 strncpy(network->server_motd, in_packet.packet.serverinfo.server_name, 128);
                 network->client.client_version = in_packet.packet.serverinfo.sglthing_revision;
                 network->client.authenticated = true;
+                network->client.verified = in_packet.packet.serverinfo.verified;
 
                 for(int i = 0; i < in_packet.packet.serverinfo.player_count; i++)
                 {
@@ -615,6 +665,8 @@ static void network_manage_packet(struct network* network, struct network_client
                 new_client->player_color_g = in_packet.packet.player_add.player_color_g;
                 new_client->player_color_b = in_packet.packet.player_add.player_color_b;
                 new_client->player_id = in_packet.packet.player_add.player_id;
+                new_client->user = in_packet.packet.player_add.user_data;
+                new_client->verified = in_packet.packet.player_add.verified;
                 new_client->owner = network;                    
                 new_client->user_data = 0;
 

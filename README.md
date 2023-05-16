@@ -9,11 +9,17 @@ Estimated Requirements
 
 ## Requirements/Libraries
 
-- ODE, Open Dynamics Engine
 - Assimp
 - OpenGL 3.2 Core
 - GLFW
-- GLib
+- GLib-2.0
+- libcurl
+- cglm
+- zlib
+- sqlite
+- libsndfile (for sound)
+- PortAudio-2.0 (for sound)
+- ODE, Open Dynamics Engine (for optional physics)
 
 SGLThing requires a configuration file in the resources directory named `config_private.ini`. In the file should be your sgl.endoh.ca username, and password.
 

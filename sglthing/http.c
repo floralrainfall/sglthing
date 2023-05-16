@@ -127,14 +127,39 @@ bool http_check_sessionkey(struct http_client* client, char* key)
     return (strcmp(result,"1")==0);
 }
 
-int http_get_userid(struct http_client* client, char* key)
+struct http_user http_get_userdata(struct http_client* client, char* key)
 {
+    struct http_user user;
     if(!client->login)
-        return false;
+    {
+        user.found = false;
+        return user;
+    }
     char url[256];
-    snprintf(url, 256, "auth/check?sessionkey=%s", key);
+    snprintf(url, 256, "auth/user_data?sessionkey=%s", key);
     char* result = http_get(client, url);
     if(!result)
-        return false;
-    return atoi(result);
+    {
+        user.found = false;
+        return user;
+    }
+
+    user.found = true;
+    char* token;
+    token = strtok(result, ",");
+    enum { TOKEN_USER_ID, TOKEN_REGISTRATION_DATE, TOKEN_STOP } token_id = 0;
+    while(token != NULL) {
+        switch(token_id)
+        {
+            case TOKEN_USER_ID:
+                user.user_id = atoi(token);
+                break;
+            case TOKEN_STOP:
+                break;
+        }
+        token = strtok(NULL, ",");
+        token_id++;
+    }
+    
+    return user;
 }

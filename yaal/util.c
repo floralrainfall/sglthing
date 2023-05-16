@@ -24,3 +24,37 @@ void yaal_update_player_transform(struct player* player)
     glm_vec3_copy(player->player_position, player->player_light.position);
     player->player_light.position[1] = 1.5f;
 }
+
+void yaal_update_song()
+{
+    char song_fname[128];
+    snprintf(song_fname,128,"yaal/snd/mus/theme_%i.mp3",yaal_state.current_map_song_id);                
+    if(yaal_state.current_song)
+        if(strcmp(song_fname,yaal_state.current_song->name)==0)
+            return;
+    switch(yaal_state.mode)
+    {
+        case YAAL_STATE_MENU:
+        case YAAL_STATE_MAP:
+            if(yaal_state.current_song)
+            {
+                stop_snd(yaal_state.current_song);
+                free(yaal_state.current_song);
+            }
+            yaal_state.current_song = play_snd("yaal/snd/mus/theme_0.mp3");
+            break;
+        case YAAL_STATE_GAME:
+            if(yaal_state.current_song)
+            {
+                stop_snd(yaal_state.current_song);
+                free(yaal_state.current_song);
+            }
+            yaal_state.current_song = play_snd(song_fname);
+            break;
+    }
+    if(yaal_state.current_song)
+    {
+        yaal_state.current_song->multiplier = 0.1f;
+        yaal_state.current_song->loop = true;
+    }
+}

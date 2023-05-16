@@ -16,7 +16,7 @@ uniform vec4 viewport;
 #define FXAA_REDUCE_MUL   (1.0/FXAA_SPAN_MAX)
 #define FXAA_REDUCE_MIN   (1.0/128.0)
 #define FXAA_SUBPIX_SHIFT (1.0/4.0)
-
+#ifdef ENABLE_FXAA
 vec3 FxaaPixelShader( vec4 uv, sampler2D tex, vec2 rcpFrame) {
     
     vec3 rgbNW = textureLod(tex, uv.zw, 0.0).xyz;
@@ -61,6 +61,12 @@ vec3 FxaaPixelShader( vec4 uv, sampler2D tex, vec2 rcpFrame) {
     
     return rgbB; 
 }
+#else
+vec3 FxaaPixelShader(vec4 uv, sampler2D tex, vec2 rcpFrame)
+{
+    return texture(tex, uv.xy).rgb;
+}
+#endif
 
 vec3 hsv2rgb(vec3 c)
 {
