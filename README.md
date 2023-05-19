@@ -1,7 +1,7 @@
 # SGLThing
 
 Estimated Requirements
-- atleast 255MB of RAM
+- atleast 1GB of RAM
 - a graphics card capable of OpenGL 3.2 core
 - a computer
 

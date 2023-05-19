@@ -24,9 +24,12 @@ void add_fx(struct fx_manager* manager, struct fx fx)
     switch(fx.type)
     {
         case FX_BOMB_THROW:
-            fx.snd = play_snd("yaal/snd/bomb_throw.wav");
-            fx.snd->sound_3d = true;
-            fx.snd->camera_position = &yaal_state.current_player->player_position;
+            if(!manager->server_fx)
+            {
+                fx.snd = play_snd("yaal/snd/bomb_throw.wav");
+                fx.snd->sound_3d = true;
+                fx.snd->camera_position = &yaal_state.current_player->player_position;
+            }
             break;
     }
 

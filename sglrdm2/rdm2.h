@@ -3,13 +3,17 @@
 
 #include <sglthing/world.h>
 #include "rdm_net.h"
+#include "map.h"
 
 void sglthing_init_api(struct world* world);
 
 struct rdm2_state
 {
     struct rdm_player* local_player;
+    struct map_manager* map_manager;
     int local_player_id;
+
+    int object_shader;
 };
 
 extern struct rdm2_state client_state;

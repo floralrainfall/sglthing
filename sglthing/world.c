@@ -352,16 +352,29 @@ void world_frame(struct world* world)
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
     if(world->client.status == NETWORKSTATUS_CONNECTED)
     {
+        unsigned int attachments[1] = { GL_COLOR_ATTACHMENT1 };
+        sglc(glDrawBuffers(1, attachments));  
+        sglc(glClearColor(0.0f,0.0f,0.0f,1.0f));
+        sglc(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
+
+        unsigned int attachments_2[1] = { GL_COLOR_ATTACHMENT0 };
+        sglc(glDrawBuffers(1, attachments_2));  
         sglc(glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]));
+        sglc(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
     }
     else
     {
         sglc(glClearColor(0.2f,0.2f,0.2f,1.0f));
+        sglc(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
     }
-    sglc(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
+
+    unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    sglc(glDrawBuffers(2, attachments));  
+
     sglc(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));  
     sglc(glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO));
     sglc(glEnable(GL_DEPTH_TEST));
+
 #else
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 #endif
@@ -667,7 +680,7 @@ void world_frame(struct world* world)
     world->ui->ui_elements = 0;
 }
 
-static void __easy_uniforms(struct world* world, int shader_program, mat4 model_matrix)
+void world_uniforms(struct world* world, int shader_program, mat4 model_matrix)
 {
 #ifndef HEADLESS
     // camera
@@ -714,7 +727,7 @@ void world_draw(struct world* world, int count, int vertex_array, int shader_pro
         shader_program = world->gfx.lighting_shader;
     ASSERT(shader_program != 0);
     sglc(glUseProgram(shader_program));
-    __easy_uniforms(world, shader_program, model_matrix);
+    world_uniforms(world, shader_program, model_matrix);
     sglc(glBindVertexArray(vertex_array));
     sglc(glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, 0));
     world->render_count++;
@@ -735,7 +748,7 @@ void world_draw_model(struct world* world, struct model* model, int shader_progr
     {
         sglc(glUseProgram(shader_program));
 
-        __easy_uniforms(world, shader_program, model_matrix);
+        world_uniforms(world, shader_program, model_matrix);
         if(world->render_area && !world->gfx.shadow_pass)
             light_area_set_uniforms(world->render_area, shader_program);
         struct mesh* mesh_sel = &model->meshes[i];
@@ -778,7 +791,7 @@ void world_draw_primitive(struct world* world, int shader, int fill, enum primit
 {
 #ifndef HEADLESS
     sglc(glUseProgram(shader));
-    __easy_uniforms(world, shader, model_matrix);
+    world_uniforms(world, shader, model_matrix);
     glUniform4fv(glGetUniformLocation(shader,"color"), 1, color);
     glGetError();
     sglc(glBindVertexArray(world->primitives.debug_arrays));

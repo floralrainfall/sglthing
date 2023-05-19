@@ -33,10 +33,12 @@ struct snd* get_snd(char* file_name)
 #endif
 }
 
+#define EAR_DISTANCE 30
 #ifdef SOUND_ENABLED
 static int snd_callback(void* input, void* output, unsigned long frame_count, const PaStreamCallbackTimeInfo* pa_time, PaStreamCallbackFlags status, void* user)
 {
     struct snd* snd = (struct snd*)user;
+    while(snd->lock);
 
     float *cursor;
     float *out = (float*)output;
@@ -44,6 +46,30 @@ static int snd_callback(void* input, void* output, unsigned long frame_count, co
     int rd = 0;
 
     cursor = out;
+
+    float multiplier = snd->multiplier;
+    float attenuation_l = 1.0;
+    float attenuation_r = 1.0;
+    
+    vec3 camera_position;
+    if(snd->sound_3d)
+    {
+        camera_position[0] = *(snd->camera_position)[0];
+        camera_position[1] = 10.f;
+        camera_position[2] = *(snd->camera_position)[1];
+
+        vec3 l_ear_offset = {EAR_DISTANCE,0.f,0.f};
+        vec3 r_ear_offset = {-EAR_DISTANCE,0.f,0.f};
+
+        vec3 ear_position;
+        glm_vec3_add(camera_position, l_ear_offset, ear_position);
+        float distance_l = glm_vec3_distance(ear_position, snd->sound_position);
+        glm_vec3_add(camera_position, r_ear_offset, ear_position);
+        float distance_r = glm_vec3_distance(ear_position, snd->sound_position);
+        attenuation_l = multiplier/distance_l;
+        attenuation_r = multiplier/distance_r;
+        printf("%i (%p) %0.2f %0.2f %0.2f %0.2f %f %f %f %f %f %f\n", snd->id, snd, attenuation_l, attenuation_r, distance_l, distance_r, snd->sound_position[0], snd->sound_position[1], snd->sound_position[2], camera_position[0], camera_position[1], camera_position[2]);
+    }
 
     bool stop = snd->stop;
     while(sz > 0)
@@ -63,31 +89,6 @@ static int snd_callback(void* input, void* output, unsigned long frame_count, co
         }
 
         sf_readf_float(snd->file, cursor, rd);
-
-        float multiplier = snd->multiplier;
-        float attenuation_l = 1.0;
-        float attenuation_r = 1.0;
-
-#define EAR_DISTANCE 3
-
-        if(snd->sound_3d)
-        {
-            vec3 camera_position;
-            vec3 l_ear_offset = {EAR_DISTANCE,0.f,0.f};
-            vec3 r_ear_offset = {-EAR_DISTANCE,0.f,0.f};
-            camera_position[0] = *(snd->camera_position)[0];
-            camera_position[1] = 10.f;
-            camera_position[2] = *(snd->camera_position)[1];
-
-            vec3 ear_position;
-            glm_vec3_add(camera_position, l_ear_offset, ear_position);
-            float distance_l = glm_vec3_distance(ear_position, snd->sound_position);
-            glm_vec3_add(camera_position, r_ear_offset, ear_position);
-            float distance_r = glm_vec3_distance(ear_position, snd->sound_position);
-            attenuation_l = 1.f/powf(distance_l/10.f,2.f);
-            attenuation_r = 1.f/powf(distance_r/10.f,2.f);
-            printf("%i %0.2f %0.2f %0.2f %0.2f %f %f %f %f %f %f\n", snd->id, attenuation_l, attenuation_r, distance_l, distance_r, snd->sound_position[0], snd->sound_position[1], snd->sound_position[2], camera_position[0], camera_position[1], camera_position[2]);
-        }
 
         bool stereo = (snd->libsndfile_info.channels == 2);
         int frame_rd_count = stereo ? sz*2 : sz;
@@ -154,6 +155,7 @@ struct snd*  play_snd(char* file_name)
     struct snd* new_snd = malloc(sizeof(struct snd));
     memcpy(new_snd, snd, sizeof(struct snd));
 
+    new_snd->lock = false;
     new_snd->stop = false;
     new_snd->position = 0;
     PaStreamParameters stream_param;

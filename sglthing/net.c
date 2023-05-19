@@ -42,6 +42,10 @@ static int __db_fill_player(void* data, int argc, char** argv, char** col_name)
         {
             player->web_id = atoi(argv[i]);
         }
+        else if(strcmp(col_name[i],"first_logon_time")==0)
+        {
+            player->login_time = atoi(argv[i]);
+        }
     }
 
     if(argc == 0)
@@ -515,7 +519,7 @@ static void network_manage_packet(struct network* network, struct network_client
                         if(!client->db.found)
                         {
                             char sql[128];
-                            snprintf(sql,128,"INSERT INTO USERS (user_id) VALUES (%i)", client->user.user_id);
+                            snprintf(sql,128,"INSERT INTO USERS (user_id, first_logon_time) VALUES (%i, %lu)", client->user.user_id, (unsigned long)time(NULL));
                             printf("sglthing: executing sql stmt `%s`\n", sql);
                             char* err;
                             int rc = sqlite3_exec(network->database, sql, NULL, NULL, &err);

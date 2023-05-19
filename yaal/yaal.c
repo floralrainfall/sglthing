@@ -328,7 +328,7 @@ static void __sglthing_frame_ui(struct world* world)
             world->ui->foreground_color[2] = 0.f;
             world->ui->foreground_color[3] = 1.f;
 
-            if(yaal_state.current_player && yaal_state.current_player->client->verified)
+            if(yaal_state.current_player && !yaal_state.current_player->client->verified)
                 ui_draw_text(world->ui, 0.f, world->gfx.screen_height-48.f, "Register to https://sgl.endoh.ca\nand/or put your credentials in config_private.ini!\nData persistence is only for SGLSite members.", 1.f);
             
             glm_vec4_copy(oldfg, world->ui->foreground_color);

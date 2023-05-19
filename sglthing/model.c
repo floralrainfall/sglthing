@@ -358,4 +358,7 @@ void model_bind_vbos(struct mesh* mesh)
     sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->element_buffer));
 
     model_vao_pointers();
+
+    sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 }

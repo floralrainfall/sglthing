@@ -12,9 +12,9 @@ struct config_file
 
 void config_load(struct config_file* config, char* file);
 
-[[deprecated("Use GKeyFile rather then config_string_get")]]
+//[[deprecated("Use GKeyFile rather then config_string_get")]]
 char* config_string_get(struct config_file* config, char* name);
-[[deprecated("Use GKeyFile rather then config_number_get")]]
+//[[deprecated("Use GKeyFile rather then config_number_get")]]
 float config_number_get(struct config_file* config, char* name);
 
 #endif

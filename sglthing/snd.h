@@ -27,6 +27,7 @@ struct snd {
     int position;
     bool loop;
     bool stop;
+    bool lock;
 
     float multiplier;
 

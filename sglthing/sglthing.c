@@ -65,7 +65,7 @@ int main(int argc, char** argv)
         return -1;
     glfwSetErrorCallback(glerror);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SAMPLES, 4);
     window = glfwCreateWindow(640,480,v_name,NULL,NULL);

@@ -27,8 +27,12 @@ void __sglthing_assert_failed();
     a[c] = x; \
     c++;
 
+#ifndef MIN
 #define MIN(a,b) (((a)<(b))?(a):(b))
+#endif
+#ifndef MAX
 #define MAX(a,b) (((a)>(b))?(a):(b))
+#endif
 #define STRUCT_SUB_SZ(t,x) sizeof(*((t *)0)->x);
 
 #endif

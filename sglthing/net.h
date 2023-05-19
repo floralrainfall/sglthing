@@ -23,6 +23,7 @@ struct db_player
     
     int id;
     int web_id;
+    time_t login_time;
 };
 
 struct network_client {

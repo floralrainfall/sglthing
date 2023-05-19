@@ -154,6 +154,7 @@ enum primitive_type
     PRIMITIVE_PLANE,
 };
 void world_draw_primitive(struct world* world, int shader, int fill, enum primitive_type type, mat4 model_matrix, vec4 color);
+void world_uniforms(struct world* world, int shader_program, mat4 model_matrix);
 void world_updres(struct world* world);
 
 #endif

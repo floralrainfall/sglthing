@@ -1,27 +1,28 @@
 #ifndef MAP_H
 #define MAP_H
 
-#define MAP_MAX_TILES_Y 32
-#define MAP_MAX_TILES_X 32
+#define MAP_CHUNK_SIZE 8
+
+#define MAP_MAX_TILES_Y 8
+#define MAP_MAX_TILES_X 8
+
+#define MAP_STORAGE_SIZE 3
 
 #include <cglm/cglm.h>
+#include <sglthing/world.h>
+#include <sglthing/model.h>
 
-struct map_data
+struct map_manager
 {
-    int map_tile_id;
-    int map_tile_path;
+    int map_x; // in center
+    int map_y;
+    
+    struct model* cube;
+    int cube_program;
+    int cube_texture;
 };
 
-struct map_row
-{
-    struct map_data map_column[MAP_MAX_TILES_Y];
-};
-
-struct map
-{
-    struct map_row map_rows[MAP_MAX_TILES_X];
-};
-
-void map_generate(struct map* map);
+void map_init(struct map_manager* map);
+void map_render_chunks(struct world* world, struct map_manager* map);
 
 #endif

@@ -1,5 +1,3 @@
-#define PI 3.1415926538
-
 layout (location = 0) out vec4 FragColor;
 layout (location = 1) out vec4 BrightColor;  
 
@@ -8,16 +6,18 @@ uniform float time;
 uniform float fog_maxdist;
 uniform float fog_mindist;
 uniform vec4 fog_color;
-uniform vec4 color;
+uniform vec4 color = vec4(1,1,1,1);
 uniform int banding_effect;
 
 in vec3 f_pos;
 in vec3 f_normal;
 in vec4 f_color;
 in vec2 f_uv;
+in float f_affine;
 in vec4 f_pos_light;
 in vec4 f_pos_light_far;
-in float f_affine;
+
+uniform sampler2D diffuse0;
 
 void main()
 {   
@@ -25,12 +25,11 @@ void main()
 
     // affine thing
     vec2 affine_tex_coords = f_uv / f_affine;
-
-    vec4 out_color = color;
+    vec4 out_color = f_color;
 
     // lighting
-
     out_color *= vec4(lighting,1.0);
+    out_color *= color;
 
     // color banding effect
     vec4 out_color_raw = out_color;
@@ -54,8 +53,5 @@ void main()
     FragColor = vec4(out_color.xyz, min(out_color.w,fog_factor));
 
     float brightness = dot(FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-    if(brightness > 0.1)
-        BrightColor = vec4(FragColor.rgb, 1.0);
-    else
-        BrightColor = vec4(0.0, 0.0, 0.0, 1.0);
+    BrightColor = vec4(FragColor.rgb * max(brightness-0.5,0.0), 1.0);
 }
