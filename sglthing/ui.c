@@ -9,6 +9,7 @@
 #include "shader.h"
 #include "texture.h"
 #include "keyboard.h"
+#include "io.h"
 
 #define MAX_CHARACTERS_STRING 65535
 #define MAX_UI_ELEMENTS 512
@@ -423,6 +424,9 @@ void ui_init(struct ui_data* ui)
     int ui_p_frag = compile_shader("uiassets/shaders/ui_panel.fs", GL_FRAGMENT_SHADER);
     ui->ui_panel_program = link_program(ui_vertex, ui_p_frag);
 
+    int ui_ttf_vertex = compile_shader("uiassets/shaders/ui_font2.vs", GL_VERTEX_SHADER);
+    ui->ui_ttf_program = link_program(ui_ttf_vertex, ui_frag);
+
     ui->default_font = ui_load_font("uiassets/font.png", 8, 16, 1, 256);
 
     ui->ui_font = ui->default_font;
@@ -458,6 +462,21 @@ void ui_init(struct ui_data* ui)
     ui->silliness = 0.f;
     ui->silliness_speed = 5.f;
     ui->ui_size = 0;
+    
+    if (FT_Init_FreeType(&ui->ui_freetype))
+        printf("sglthing: couldnt init freetype\n");
+    else
+    {
+        glGenVertexArrays(1, &ui->ui_ttf_vao);
+        glGenBuffers(1, &ui->ui_ttf_vbo);
+        glBindVertexArray(ui->ui_ttf_vao);
+        glBindBuffer(GL_ARRAY_BUFFER, ui->ui_ttf_vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+    }
 
     ui->shadow = true;
 }
@@ -509,4 +528,110 @@ struct ui_font* ui_load_font(char* file, float cx, float cy, float cw, float ch)
         return new_font;
     }
     return NULL;
+}
+
+void ui_font2_render(struct ui_data* ui, struct ui_font2* font)
+{
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    for(unsigned char c; c < MAX_FONT_GLYPHS; c++)
+    {
+        if(FT_Load_Char(font->face, c, FT_LOAD_RENDER))
+        {
+            printf("sglthing: cant load glyph %i\n", c);
+            continue;
+        }
+        
+        struct ui_font2_chara* chara = &font->characters[c];
+        glGenTextures(1, &chara->texture);
+        glBindTexture(GL_TEXTURE_2D, chara->texture);
+        glTexImage2D(GL_TEXTURE_2D,
+            0, GL_RED,
+            font->face->glyph->bitmap.width,
+            font->face->glyph->bitmap.rows,
+            0, GL_RED,
+            GL_UNSIGNED_BYTE,
+            font->face->glyph->bitmap.buffer
+        );
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        
+        glm_vec2_copy((vec2){font->face->glyph->bitmap.width, font->face->glyph->bitmap.rows}, chara->size);
+        glm_vec2_copy((vec2){font->face->glyph->bitmap_left, font->face->glyph->bitmap_top}, chara->bearing);
+        chara->advance = font->face->glyph->advance.x;
+    }
+}
+
+struct ui_font2* ui_load_font2(struct ui_data* ui, char* file, int font_w, int font_h)
+{
+    char path[256];
+    if(file_get_path(path, 256, file) != -1)
+    {
+        FT_Face font_face;
+        if(FT_New_Face(ui->ui_freetype, path, 0, &font_face))
+        {
+            printf("sglthing: failed to load font %s\n",file);
+            return NULL;
+        }
+
+        struct ui_font2* font = (struct ui_font2*)malloc(sizeof(struct ui_font2));
+        font->face = font_face;
+        FT_Set_Pixel_Sizes(font->face, font_w, font_h);  
+        
+        ui_font2_render(ui, font);
+
+        printf("sglthing: loaded font %s\n", file);
+
+        return font;
+    }
+    else
+        printf("sglthing: couldn't find font file %s\n",file);
+    return NULL;
+}
+
+void ui_font2_text(struct ui_data* ui, float position_x, float position_y, struct ui_font2* font, char* text, float depth)
+{
+    glUseProgram(ui->ui_ttf_program);
+
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"time"), (float)glfwGetTime()));
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"waviness"), ui->waviness));
+    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_program,"projection"), 1, GL_FALSE, ui->projection[0]));      
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
+    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
+    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(ui->ui_ttf_vao);
+
+    for(int i = 0; i < strlen(text); i++)
+    {
+        char c = text[i];
+        struct ui_font2_chara* chara = &font->characters[c];
+
+        float xpos = position_x + chara->bearing[0];
+        float ypos = position_y - (chara->size[1] - chara->bearing[1]);
+        float w = chara->size[0];
+        float h = chara->size[1];
+
+        float vertices[6][4] = {
+            { xpos,     ypos + h,   0.0f, 0.0f },            
+            { xpos,     ypos,       0.0f, 1.0f },
+            { xpos + w, ypos,       1.0f, 1.0f },
+
+            { xpos,     ypos + h,   0.0f, 0.0f },
+            { xpos + w, ypos,       1.0f, 1.0f },
+            { xpos + w, ypos + h,   1.0f, 0.0f }           
+        };
+
+        glBindTexture(GL_TEXTURE_2D, chara->texture);
+        glBindBuffer(GL_ARRAY_BUFFER, ui->ui_ttf_vbo);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); 
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        position_x += (chara->advance >> 6);
+    }
+    
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }

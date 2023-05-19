@@ -57,6 +57,7 @@ struct world* world_init(char** argv, int argc, void* p)
     world->cam.fov = 45.f;
     world->cam.yaw = 0.f;
     world->cam.lsd = 0.f;
+    world->cam.lock = true;
     world->gfx.enable_sun = true;
 
     world->frames = 0;
@@ -154,6 +155,18 @@ struct world* world_init(char** argv, int argc, void* p)
     world->gfx.sun_direction[0] = -0.5f;
     world->gfx.sun_direction[1] = 0.5f;
     world->gfx.sun_direction[2] = 0.5f;
+
+    world->gfx.ambient[0] = 30.f/255.f;
+    world->gfx.ambient[1] = 26.f/255.f;
+    world->gfx.ambient[2] = 117.f/255.f;
+
+    world->gfx.diffuse[0] = 227.f/255.f;
+    world->gfx.diffuse[1] = 168.f/255.f;
+    world->gfx.diffuse[2] = 87.f/255.f;
+
+    world->gfx.specular[0] = 255.f/255.f;
+    world->gfx.specular[1] = 204.f/255.f;
+    world->gfx.specular[2] = 51.f/255.f;
 
     world->primitives = create_primitives();
 
@@ -271,14 +284,19 @@ struct world* world_init(char** argv, int argc, void* p)
         glfwSetWindowTitle(world->gfx.window, v_name);
 #endif
         network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
+        world->server_on = true;
     } else if(strcmp(net_mode,"client")==0)
-    {
+    {        
+        world->client_on = true;
         if(!network_download)
             network_connect(&world->client, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
     } else if(strcmp(net_mode,"host")==0)
     {
         network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
         network_connect(&world->client, "127.0.0.1", config_number_get(&world->config,"network_port"));
+
+        world->client_on = true;
+        world->server_on = true;
     }
 
     snd_init(&world->s_mgr);
@@ -381,10 +399,14 @@ void world_frame(struct world* world)
 
     if(world->world_frame_user)
         world->world_frame_user(world);
-    if(world->cam.pitch > 85.f)
-        world->cam.pitch = 85.f;
-    if(world->cam.pitch < -85.f)
-        world->cam.pitch = -85.f;
+
+    if(world->cam.lock)
+    {
+        if(world->cam.pitch > 85.f)
+            world->cam.pitch = 85.f;
+        if(world->cam.pitch < -85.f)
+            world->cam.pitch = -85.f;
+    }
 
     glm_perspective(world->cam.fov * M_PI_180f, world->gfx.screen_width/world->gfx.screen_height, 0.1f, world->gfx.fog_maxdist, world->p);
     glm_ortho(0.f, world->viewport[2], 0.f, world->viewport[3], 0.1f, 1000.f, world->ui->projection);
@@ -666,9 +688,13 @@ void world_frame(struct world* world)
 #ifndef HEADLESS
     if(keys_down[GLFW_KEY_GRAVE_ACCENT])
     {
-        char* pixels = (char*)malloc(3*world->gfx.screen_width*world->gfx.screen_height);
+        int pixel_buf_size = 3*world->gfx.screen_width*world->gfx.screen_height;
+        char* pixels = (char*)malloc(pixel_buf_size);
+        sglc(glBindFramebuffer(GL_READ_FRAMEBUFFER, world->gfx.hdr_fbo));
+        sglc(glReadBuffer(GL_COLOR_ATTACHMENT0));
         sglc(glReadPixels(0, 0, world->gfx.screen_width, world->gfx.screen_height, GL_RGB, GL_UNSIGNED_BYTE, pixels));
         stbi_flip_vertically_on_write(true);
+        printf("sglthing: screenshot taken (%ix%i)\n", world->gfx.screen_width, world->gfx.screen_height);
         stbi_write_png("screenshot.png", world->gfx.screen_width, world->gfx.screen_height, 3, pixels, 0);
         free(pixels);
     }
@@ -700,6 +726,9 @@ void world_uniforms(struct world* world, int shader_program, mat4 model_matrix)
     glUniform4fv(glGetUniformLocation(shader_program,"viewport"), 1, world->viewport);
     glUniform3fv(glGetUniformLocation(shader_program,"sun_direction"), 1, world->gfx.sun_direction);
     glUniform3fv(glGetUniformLocation(shader_program,"sun_position"), 1, world->gfx.sun_position);
+    glUniform3fv(glGetUniformLocation(shader_program,"diffuse"), 1, world->gfx.diffuse);
+    glUniform3fv(glGetUniformLocation(shader_program,"ambient"), 1, world->gfx.ambient);
+    glUniform3fv(glGetUniformLocation(shader_program,"specular"), 1, world->gfx.specular);
     glUniform1f(glGetUniformLocation(shader_program,"time"), (float)world->time);
     glUniform1i(glGetUniformLocation(shader_program,"banding_effect"), world->gfx.banding_effect);
     glUniform1i(glGetUniformLocation(shader_program,"sel_map"), world->gfx.current_map);

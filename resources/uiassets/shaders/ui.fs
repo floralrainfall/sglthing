@@ -1,6 +1,5 @@
 in vec2 f_uv;
 
-
 out vec4 FragColor;
 uniform vec4 background_color;
 uniform vec4 foreground_color;

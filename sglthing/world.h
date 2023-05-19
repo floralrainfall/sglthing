@@ -35,6 +35,7 @@ struct world {
         float random_shake;
         float wobble; // yaw = sin(2t), pitch = cos(t) where t is time in seconds
         float lsd;
+        bool lock;
     } cam;
 
     struct {
@@ -43,6 +44,9 @@ struct world {
         vec4 fog_color;
         vec4 clear_color;
         vec3 sun_direction;
+        vec3 ambient;
+        vec3 diffuse;
+        vec3 specular;
         int banding_effect;
         int screen_width;
         int screen_height;
@@ -97,6 +101,9 @@ struct world {
     struct primitives primitives;
 
     int render_count;
+
+    bool client_on;
+    bool server_on;
     
     double delta_time;
     double last_time;

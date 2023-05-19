@@ -8,6 +8,8 @@ endif()
 execute_process(COMMAND git rev-list --count HEAD
     OUTPUT_VARIABLE GIT_COMMIT_COUNT)
 
+message(STATUS "configuring sglthing r" ${GIT_COMMIT_COUNT})
+
 set(ASSIMP_HUNTER_ENABLED FALSE)
 
 option(USE_ODE "Use ODE library" OFF)
@@ -35,8 +37,9 @@ if(USE_PKGCONFIG)
     pkg_check_modules(cglm REQUIRED IMPORTED_TARGET cglm)
     pkg_check_modules(libcurl REQUIRED IMPORTED_TARGET libcurl)
     pkg_check_modules(sqlite REQUIRED IMPORTED_TARGET sqlite3)
+    pkg_check_modules(freetype REQUIRED IMPORTED_TARGET freetype2)
     set(PKGCONFIG_LIBRARIES 
-        PkgConfig::glib PkgConfig::zlib PkgConfig::assimp PkgConfig::cglm PkgConfig::libcurl PkgConfig::sqlite)
+        PkgConfig::glib PkgConfig::zlib PkgConfig::assimp PkgConfig::cglm PkgConfig::libcurl PkgConfig::sqlite PkgConfig::freetype)
 else()
     message(WARNING "you probably wont be able to use glib or zlib")
 endif()
@@ -106,6 +109,8 @@ if(GAMES_COMPILE)
         sglrdm2/rdm_net.h
         sglrdm2/weapons.c
         sglrdm2/weapons.h
+        sglrdm2/perlin.c
+        sglrdm2/perlin.h
         sglrdm2/rdm2.c
         sglrdm2/rdm2.h
         sglrdm2/map.c

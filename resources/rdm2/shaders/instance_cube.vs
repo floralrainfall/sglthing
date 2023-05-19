@@ -30,7 +30,7 @@ float far  = 1000.0;
 
 vec3 color_id_color(float color)
 {
-    return hsv2rgb(vec3(color/255,1.0,0.1));
+    return hsv2rgb(vec3(color/255,1.0,1.0));
 }
 
 void main()
@@ -38,7 +38,7 @@ void main()
     vec4 position_model = (model * (vec4(v_pos + v_offset, 1.0)));
 
     f_normal = v_normal;
-    f_color = v_color * vec4(color_id_color(float(v_color_id%uint(255))),1.0);
+    f_color = vec4(color_id_color(float(v_color_id%uint(255))),1.0);
     f_pos = position_model.xyz;
     f_pos_light = lsm * vec4(f_pos, 1.0);
     f_pos_light_far = lsm_far * vec4(f_pos, 1.0);

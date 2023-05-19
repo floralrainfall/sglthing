@@ -2,6 +2,8 @@
 #define UI_H
 #include <stdbool.h>
 #include <cglm/cglm.h>
+#include <freetype2/ft2build.h>
+#include FT_FREETYPE_H  
 
 #define UI_VBO_LIMIT 512
 
@@ -12,6 +14,22 @@ struct ui_font
     int cw, ch;
     int tx, ty;
     int chr_off;
+};
+
+struct ui_font2_chara
+{
+    unsigned int texture;
+    vec2 size;
+    vec2 bearing;
+    unsigned int advance;
+};
+
+#define MAX_FONT_GLYPHS 255
+
+struct ui_font2
+{
+    struct ui_font2_chara characters[MAX_FONT_GLYPHS];
+    FT_Face face;
 };
 
 struct ui_panel
@@ -32,10 +50,16 @@ struct ui_data
     int ui_program;
     int ui_img_program;
     int ui_panel_program;
+    int ui_ttf_program;
     struct ui_font* ui_font;
+    
+    FT_Library ui_freetype;
 
     int ui_vao;
     int ui_vbo;
+
+    int ui_ttf_vao;
+    int ui_ttf_vbo;
 
     mat4 projection;
     vec2 screen_size;
@@ -71,6 +95,9 @@ void ui_draw_panel(struct ui_data* ui, float position_x, float position_y, float
 void ui_end_panel(struct ui_data* ui);
 void ui_init(struct ui_data* ui);
 struct ui_font* ui_load_font(char* file, float cx, float cy, float cw, float ch);
+void ui_font2_render(struct ui_data* ui, struct ui_font2* font);
+void ui_font2_text(struct ui_data* ui, float position_x, float position_y, struct ui_font2* font, char* text, float depth);
+struct ui_font2* ui_load_font2(struct ui_data* ui, char* file, int font_w, int font_h);
 
 #define SCREEN_TOP 644.f
 
