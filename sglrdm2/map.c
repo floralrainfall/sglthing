@@ -46,12 +46,16 @@ static void __map_render_chunk_init(struct __render_chunk* chunk)
                 t_position[2] = z * CUBE_SIZE;
                 
                 glm_vec3_copy(t_position,chunk->x[x].y[y].z[z].position);
+
+                chunk->x[x].y[y].z[z].obscure = 1;
+                chunk->x[x].y[y].z[z].color = 254;
             }
     sglc(glGenBuffers(1,&chunk->vbo));
 }
 
 static void __map_render_chunk_update(struct __render_chunk* chunk)
 {
+    profiler_event("__map_render_chunk_update");
     for(int x = 0; x < RENDER_CHUNK_SIZE; x++)
         for(int y = 0; y < RENDER_CHUNK_SIZE; y++)
             for(int z = 0; z < RENDER_CHUNK_SIZE; z++)
@@ -63,6 +67,7 @@ static void __map_render_chunk_update(struct __render_chunk* chunk)
     sglc(glBindBuffer(GL_ARRAY_BUFFER,chunk->vbo));
     sglc(glBufferData(GL_ARRAY_BUFFER,sizeof(chunk->x),&chunk->x,GL_STATIC_DRAW));
     sglc(glBindBuffer(GL_ARRAY_BUFFER, 0)); 
+    profiler_end();
 }
 
 static struct __render_chunk* __map_chunk_position(struct map_manager* map, int c_x, int c_y, int c_z)
@@ -84,7 +89,7 @@ void __map_render_chunk(struct world* world, struct map_manager* map, struct __r
     glm_mat4_identity(matrix);
     glm_translate(matrix, (vec3){chunk->chunk_x*(RENDER_CHUNK_SIZE*CUBE_SIZE),chunk->chunk_y*(RENDER_CHUNK_SIZE*CUBE_SIZE),chunk->chunk_z*(RENDER_CHUNK_SIZE*CUBE_SIZE)});
 
-    sglc(glUseProgram(map->cube_program));
+    sglc(glUseProgram(world->gfx.shadow_pass ? map->cube_program_light : map->cube_program));
 
     world_uniforms(world, map->cube_program, matrix);
 
@@ -113,12 +118,15 @@ void __map_render_chunk(struct world* world, struct map_manager* map, struct __r
 
 void map_render_chunks(struct world* world, struct map_manager* map)
 {
+    profiler_event("map_render_chunks");
     for(int i = 0; i < map->chunk_list->len; i++)
         __map_render_chunk(world, map, g_array_index(map->chunk_list, struct __render_chunk*, i));
+    profiler_end();
 }
 
 void map_update_chunks(struct map_manager* map, struct world* world)
 {
+    profiler_event("map_update_chunks");
     for(int i = 0; i < map->chunk_list->len; i++)
     {
         struct __render_chunk* chunk = g_array_index(map->chunk_list, struct __render_chunk*, i);
@@ -137,15 +145,17 @@ void map_update_chunks(struct map_manager* map, struct world* world)
         }
     }
 
-    int p_c_x = roundf(world->cam.position[0]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
-    int p_c_y = roundf(world->cam.position[1]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
-    int p_c_z = roundf(world->cam.position[2]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
+    int p_c_x = floorf(world->cam.position[0]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
+    int p_c_y = floorf(world->cam.position[1]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
+    int p_c_z = floorf(world->cam.position[2]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
 
     int request_range = 2;
 
-    if(client_state.local_player)
-        for(int x = -request_range+1; x <= request_range; x++)
-            for(int y = -request_range+1; y <= request_range; y++)
+    if(client_state.local_player && world->time > map->next_map_rq)
+    {
+        map->next_map_rq = world->time + 1.0;
+        for(int x = -request_range-1; x <= request_range; x++)
+            for(int y = -request_range-1; y <= request_range; y++)
             {
                 struct __render_chunk* c = __map_chunk_position(map, p_c_x + x, 0, p_c_z + y);
                 if(!c)
@@ -161,9 +171,11 @@ void map_update_chunks(struct map_manager* map, struct world* world)
                     network_transmit_packet(client_state.local_player->client->owner, &client_state.local_player->client->owner->client, _pak);
                 }
             }
+    }
+    profiler_end();
 }
 
-void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_x, int d_y, char* chunk_data)
+void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_x, char* chunk_data)
 {
     struct __render_chunk* new_chunk = __map_chunk_position(map, c_x, c_y, c_z);
     if(!new_chunk)
@@ -180,12 +192,13 @@ void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_
         g_array_append_val(map->chunk_list, _chunk);
     }
     
-    for(int i = 0; i < RENDER_CHUNK_SIZE; i++)
-    {
-        struct __render_chunk_block* block = &new_chunk->x[d_x].y[d_y].z[i];
-        block->color = chunk_data[i];
-        block->obscure = chunk_data[i];
-    }
+    for(int y = 0; y < RENDER_CHUNK_SIZE; y++)
+        for(int z = 0; z < RENDER_CHUNK_SIZE; z++)
+        {
+            struct __render_chunk_block* block = &new_chunk->x[d_x].y[y].z[z];
+            block->color = chunk_data[y*RENDER_CHUNK_SIZE+z];
+            block->obscure = chunk_data[y*RENDER_CHUNK_SIZE+z];
+        }
 
     __map_render_chunk_update(new_chunk);
 }
@@ -199,7 +212,12 @@ void map_init(struct map_manager* map)
     int cube_fragment = compile_shader("shaders/fragment_simple.fs", GL_FRAGMENT_SHADER);
     map->cube_program = link_program(cube_vertex, cube_fragment);
 
+    int cube_light_vertex = compile_shader("rdm2/shaders/instance_cube_light.vs", GL_VERTEX_SHADER);
+    map->cube_program_light = link_program(cube_light_vertex, cube_fragment);
+
     map->chunk_list = g_array_new(true, true, sizeof(struct __render_chunk*));
+
+    map->next_map_rq = 0.f;
 }
 
 void map_server_init(struct map_server* map)
@@ -215,33 +233,81 @@ void map_server_init(struct map_server* map)
                         int map_size = RENDER_CHUNK_SIZE/MAP_SIZE;
                         float true_x = _x+(x*RENDER_CHUNK_SIZE);
                         float true_z = _z+(y*RENDER_CHUNK_SIZE);
-                        float noise = perlin2d((float)true_x/map_size,(float)true_z/map_size,0.1,4)*RENDER_CHUNK_SIZE;
+                        float noise = perlin2d((float)true_x/map_size,(float)true_z/map_size,0.1,4)*(RENDER_CHUNK_SIZE/2)+2;
                         chunk->x[_x].y[_y].z[_z] = (noise > _y) ? _y*2 : 0;
                     }
         }   
 }
 
-void map_determine_collision_client(struct map_manager* map, vec3 position)
+bool map_determine_collision_client(struct map_manager* map, vec3 position)
 {   
-    position[0] /= CUBE_SIZE;
-    position[1] /= CUBE_SIZE;
-    position[2] /= CUBE_SIZE;
+    if(position[1] < 0)
+        return true;
+    profiler_event("map_determine_collision_client");
 
-    position[0] = roundf(position[0]);
-    position[1] = roundf(position[1]);
-    position[2] = roundf(position[2]);
+    int map_global_tile_x = floorf((position[0]+0.5f) / CUBE_SIZE);
+    int map_global_tile_y = floorf((position[1]) / CUBE_SIZE);
+    int map_global_tile_z = floorf((position[2]+0.5f) / CUBE_SIZE);
 
+    int map_chunk_x = floorf((float)map_global_tile_x / RENDER_CHUNK_SIZE);
+    int map_chunk_y = floorf((float)map_global_tile_y / RENDER_CHUNK_SIZE);
+    int map_chunk_z = floorf((float)map_global_tile_z / RENDER_CHUNK_SIZE);
 
+    // printf("%ix%ix%i %ix%ix%i\n", map_chunk_x, map_chunk_y, map_chunk_z, map_global_tile_x, map_global_tile_y, map_global_tile_z);
+
+    struct __render_chunk* chunk = __map_chunk_position(map, map_chunk_x, map_chunk_y, map_chunk_z);
+    if(chunk)
+    {
+        int map_chunk_tile_x = map_global_tile_x - (map_chunk_x * RENDER_CHUNK_SIZE);
+        int map_chunk_tile_y = map_global_tile_y - (map_chunk_y * RENDER_CHUNK_SIZE);
+        int map_chunk_tile_z = map_global_tile_z - (map_chunk_z * RENDER_CHUNK_SIZE);
+
+        struct __render_chunk_block block = chunk->x[map_chunk_tile_x].y[map_chunk_tile_y].z[map_chunk_tile_z];
+
+        profiler_end();
+        return block.color != 0;
+    }
+    else
+    {
+        profiler_end();
+        return false;
+    }
 }
 
-void map_determine_collision_server(struct map_server* map, vec3 position)
+bool map_determine_collision_server(struct map_server* map, vec3 position)
 {
-    position[0] /= CUBE_SIZE;
-    position[1] /= CUBE_SIZE;
-    position[2] /= CUBE_SIZE;
+    if(position[1] < 0)
+        return true;
+    profiler_event("map_determine_collision_server");
 
-    position[0] = roundf(position[0]);
-    position[1] = roundf(position[1]);
-    position[2] = roundf(position[2]);
+    int map_global_tile_x = floorf((position[0]+0.5f) / CUBE_SIZE);
+    int map_global_tile_y = floorf((position[1]) / CUBE_SIZE);
+    int map_global_tile_z = floorf((position[2]+0.5f) / CUBE_SIZE);
 
+    int map_chunk_x = floorf((float)map_global_tile_x / RENDER_CHUNK_SIZE);
+    int map_chunk_y = floorf((float)map_global_tile_y / RENDER_CHUNK_SIZE);
+    int map_chunk_z = floorf((float)map_global_tile_z / RENDER_CHUNK_SIZE);
+
+    // printf("%ix%ix%i %ix%ix%i\n", map_chunk_x, map_chunk_y, map_chunk_z, map_global_tile_x, map_global_tile_y, map_global_tile_z);
+
+    if(map_chunk_y != 0)
+        return false;
+        
+    struct map_chunk* chunk = &map->chunk_x[map_chunk_x].chunk_y[map_chunk_z];
+    if(chunk)
+    {
+        int map_chunk_tile_x = map_global_tile_x - (map_chunk_x * RENDER_CHUNK_SIZE);
+        int map_chunk_tile_y = map_global_tile_y - (map_chunk_y * RENDER_CHUNK_SIZE);
+        int map_chunk_tile_z = map_global_tile_z - (map_chunk_z * RENDER_CHUNK_SIZE);
+
+        char block = chunk->x[map_chunk_tile_x].y[map_chunk_tile_y].z[map_chunk_tile_z];
+
+        profiler_end();
+        return block != 0;
+    }
+    else
+    {
+        profiler_end();
+        return false;
+    }
 }

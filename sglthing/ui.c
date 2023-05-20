@@ -21,6 +21,8 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return;
 
+    profiler_event("ui_draw_text");
+
     ADJUST_POSITION(ui);
 
     int txlen = strlen(text);
@@ -184,6 +186,8 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 
     ui->ui_elements++;
     ui->background_color[3] = old_background;
+
+    profiler_end();
     #endif
 }
 
@@ -193,6 +197,8 @@ bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, floa
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return false;
     #endif    
+
+    profiler_event("ui_draw_button");
     
     ui_draw_image(ui, position_x, position_y, size_x, size_y, image, depth);
 
@@ -214,6 +220,8 @@ bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, floa
     if(!mouse_state.mouse_button_l)
         ui->debounce = false;
 
+    profiler_end();
+
     return false;
 }
 
@@ -233,6 +241,8 @@ void ui_draw_panel(struct ui_data* ui, float position_x, float position_y, float
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return false;
     #endif
+
+    profiler_event("ui_draw_panel");
 
     ADJUST_POSITION(ui);
 
@@ -327,6 +337,8 @@ void ui_draw_panel(struct ui_data* ui, float position_x, float position_y, float
     //sglc(glUniform4fv(glGetUniformLocation(ui->ui_panel_program,"foreground_color"), 1, ui->current_panel->top_color));
     //sglc(glUniform4fv(glGetUniformLocation(ui->ui_panel_program,"background_color"), 1, ui->current_panel->bottom_color));
     sglc(glDrawArrays(GL_TRIANGLES, 0, 6));
+
+    profiler_end();
 }
 
 void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, int image, float depth)
@@ -335,6 +347,8 @@ void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return false;
     #endif
+
+    profiler_event("ui_draw_image");
     
     ADJUST_POSITION(ui);
     
@@ -410,6 +424,8 @@ void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float
     sglc(glUniform4fv(glGetUniformLocation(ui->ui_img_program,"foreground_color"), 1, ui->foreground_color));
     sglc(glUniform4fv(glGetUniformLocation(ui->ui_img_program,"background_color"), 1, ui->background_color));
     sglc(glDrawArrays(GL_TRIANGLES, 0, 6));
+
+    profiler_end();
 }
 
 void ui_init(struct ui_data* ui)
@@ -487,6 +503,8 @@ void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, ve
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return;
     #endif
+
+    profiler_event("ui_draw_text_3d");
         
     vec3 dest_position;
     vec3 direction;
@@ -506,6 +524,8 @@ void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, ve
 
         ui_draw_text(ui, dest_position[0] - txt_off, dest_position[1], text, dist);
     }
+
+    profiler_end();
 }
 
 struct ui_font* ui_load_font(char* file, float cx, float cy, float cw, float ch)
@@ -592,6 +612,7 @@ struct ui_font2* ui_load_font2(struct ui_data* ui, char* file, int font_w, int f
 
 void ui_font2_text(struct ui_data* ui, float position_x, float position_y, struct ui_font2* font, char* text, float depth)
 {
+    profiler_event("ui_font2_text");
     glUseProgram(ui->ui_ttf_program);
 
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"time"), (float)glfwGetTime()));
@@ -634,4 +655,17 @@ void ui_font2_text(struct ui_data* ui, float position_x, float position_y, struc
     
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
+    profiler_end();
+}
+
+float ui_font2_text_len(struct ui_font2* font, char* text)
+{
+    float text_len_pix = 0.f;
+    for(int i = 0; i < strlen(text); i++)
+    {
+        char c = text[i];
+        struct ui_font2_chara* chara = &font->characters[c];
+        text_len_pix += (chara->advance >> 6);
+    }
+    return text_len_pix;
 }

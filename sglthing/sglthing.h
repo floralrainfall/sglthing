@@ -2,6 +2,7 @@
 #define SGLTHING_H
 
 #include "_sglthing.h"
+#include "prof.h"
 
 void __sglthing_assert_failed();
 

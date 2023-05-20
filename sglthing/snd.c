@@ -33,7 +33,7 @@ struct snd* get_snd(char* file_name)
 #endif
 }
 
-#define EAR_DISTANCE 30
+#define EAR_DISTANCE 1
 #ifdef SOUND_ENABLED
 static int snd_callback(void* input, void* output, unsigned long frame_count, const PaStreamCallbackTimeInfo* pa_time, PaStreamCallbackFlags status, void* user)
 {

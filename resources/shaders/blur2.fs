@@ -77,7 +77,7 @@ void main()
     );
     vec2 texcoord_t = (off * lsd) + texcoord;
     //float depth = texture(depth, texcoord_t).r * (500.0 + sin(time/100.0)) + camera_position.y + camera_position.x;
-    vec4 uv_i = vec4(texcoord, texcoord - (res * (0.5 + FXAA_SUBPIX_SHIFT)));
+    vec4 uv_i = vec4(texcoord_t, texcoord_t - (res * (0.5 + FXAA_SUBPIX_SHIFT)));
     float depth = FxaaPixelShader(uv_i, depth, res).r;
 
     float lsdPerlinA = snoise(vec3(sin(texcoord.x*1.5)*1.5+sin(time/1.5) + camera_position.x,cos(texcoord.y*2.0)*2.0+cos(time/2.5) + camera_position.y,depth*5.0+time/100.0)) / 2.0;

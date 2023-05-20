@@ -67,7 +67,6 @@ int main(int argc, char** argv)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 4);
     window = glfwCreateWindow(640,480,v_name,NULL,NULL);
     if(!window)
         return -2;    
@@ -94,7 +93,6 @@ int main(int argc, char** argv)
     glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
     glEnable(GL_BLEND);
-    glEnable(GL_MULTISAMPLE);  
 #endif
 
 #ifdef HEADLESS
@@ -111,6 +109,8 @@ int main(int argc, char** argv)
     set_focus(window, false);
 #endif
     
+    profiler_global_init();
+
     should_close = false;
     world = world_init(argv, argc, window);
 

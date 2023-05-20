@@ -433,6 +433,7 @@ static void network_manage_packet(struct network* network, struct network_client
         return;
     else if(in_packet.meta.packet_version != CR_PACKET_VERSION)
         return;
+    profiler_event("network_manage_packet");
     bool passthru = true;
     if(in_packet.meta.acknowledge)
     {
@@ -443,9 +444,16 @@ static void network_manage_packet(struct network* network, struct network_client
         network_transmit_packet(network, client, ack);
     }
     if(network->receive_packet_callback)
+    {
+        profiler_event("receive_packet_callback");
         passthru = network->receive_packet_callback(network, client, &in_packet);
+        profiler_end();
+    }
     if(!passthru)
+    {
+        profiler_end();
         return;
+    }
     switch(in_packet.meta.packet_type)
     {
         case PACKETTYPE_ACKNOWLEDGE:
@@ -762,11 +770,12 @@ static void network_manage_packet(struct network* network, struct network_client
             printf("sglthing: %s unknown packet %i\n", network->mode?"true":"false", (int)in_packet.meta.packet_type);
             break;
     }
-
+    profiler_end();
 }
 
 void network_manage_socket(struct network* network, struct network_client* client)
 {
+    profiler_event("network_manage_socket");
     struct network_packet in_packet;
     struct sockaddr_in sockaddr;
     int sockaddr_len = sizeof(sockaddr);
@@ -831,6 +840,7 @@ void network_manage_socket(struct network* network, struct network_client* clien
     }
     //if(errno)
     //    printf("sglthing: send() %s\n", strerror(errno));
+    profiler_end();
 }
 
 void network_frame(struct network* network, float delta_time, double time)
@@ -849,6 +859,7 @@ void network_frame(struct network* network, float delta_time, double time)
     network->network_frames++;
     network->time = time;
 
+    profiler_event("network_frame");
     for(int i = 0; i < network->packet_unacknowledged->len; i++)
     {
         struct unacknowledged_packet* pkt = &g_array_index(network->packet_unacknowledged, struct unacknowledged_packet, i);
@@ -870,6 +881,7 @@ void network_frame(struct network* network, float delta_time, double time)
         {
             printf("sglthing: server shutting down because it is empty\n");
             network_close(network);
+            profiler_end();
             return;
         }
 #ifndef NETWORK_TCP
@@ -978,6 +990,7 @@ void network_frame(struct network* network, float delta_time, double time)
     {
         network_manage_socket(network, &network->client);
     }
+    profiler_end();
 }
 
 void network_disconnect_player(struct network* network, bool transmit_disconnect, char* reason, struct network_client* client)

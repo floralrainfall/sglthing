@@ -128,7 +128,7 @@ vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_lig
         combined_light_result += calc_point_light(lights[i], normal, frag_pos, view_dir);
 
     //return vec3(1.0,0.0,1.0) * 1.0-shadow;
-    return ambient + (1.0 - shadow) * (diffuse + specular) + combined_light_result;
+    return ambient + (1.5 - shadow) * (diffuse + specular) + combined_light_result;
 }
 
 //	Simplex 3D Noise 

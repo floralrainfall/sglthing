@@ -97,6 +97,7 @@ void ui_init(struct ui_data* ui);
 struct ui_font* ui_load_font(char* file, float cx, float cy, float cw, float ch);
 void ui_font2_render(struct ui_data* ui, struct ui_font2* font);
 void ui_font2_text(struct ui_data* ui, float position_x, float position_y, struct ui_font2* font, char* text, float depth);
+float ui_font2_text_len(struct ui_font2* font, char* text);
 struct ui_font2* ui_load_font2(struct ui_data* ui, char* file, int font_w, int font_h);
 
 #define SCREEN_TOP 644.f

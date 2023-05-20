@@ -4,11 +4,14 @@
 #include <sglthing/world.h>
 #include "rdm_net.h"
 #include "map.h"
+#include "gamemode.h"
 
 void sglthing_init_api(struct world* world);
 
 struct rdm2_state
 {
+    struct model* cloud_layer;
+    struct model* sun;
     struct model* rdm_guy;
     struct ui_font2* big_font;
     struct ui_font2* normal_font;
@@ -20,7 +23,13 @@ struct rdm2_state
     struct map_server* map_server;
 
     int object_shader;
+    int skybox_shader;
+    int cloud_layer_shader;
     
+    struct gamemode_data gamemode;
+
+    vec3 player_velocity;
+    bool player_grounded;
 };
 
 extern struct rdm2_state client_state;

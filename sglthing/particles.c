@@ -97,6 +97,7 @@ void particles_render(struct world* world, struct particle_system* system)
         particle->life -= world->delta_time;
         if(particle->life > 0.0f)
         {
+            profiler_event("particle_render");
             vec3 truevel;
             glm_vec3_mul(particle->velocity, (vec3){world->delta_time,world->delta_time,world->delta_time}, truevel);
             glm_vec3_sub(particle->position, truevel, particle->position);
@@ -118,6 +119,7 @@ void particles_render(struct world* world, struct particle_system* system)
             sglc(glUniformMatrix4fv(glGetUniformLocation(system->shader,"model"), 1, GL_FALSE, model_matrix[0]));   
 
             sglc(glDrawArrays(GL_TRIANGLES, 0, 6));
+            profiler_end();
         }
     }
     sglc(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));

@@ -306,6 +306,8 @@ struct world* world_init(char** argv, int argc, void* p)
     world->world_frame_render_user = NULL;
     world->world_uniforms_set = NULL;
 
+    world->profiler_on = false;
+
     load_texture("uiassets/white.png");
     world->gfx.white_texture = get_texture("uiassets/white.png");
 
@@ -315,6 +317,7 @@ struct world* world_init(char** argv, int argc, void* p)
 void world_frame_render(struct world* world)
 {    
     #ifndef HEADLESS
+    profiler_event("world_frame_render");
     glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Scene");
     if(!world->assets_downloading)
         script_frame_render(world->script, world->gfx.shadow_pass);
@@ -322,12 +325,14 @@ void world_frame_render(struct world* world)
         world->world_frame_render_user(world);
     //world_draw_model(world, world->test_object, world->normal_shader, test_model, true);
     glPopDebugGroupKHR();  
+    profiler_end();
     #endif 
 }
 
 void world_frame_light_pass(struct world* world, float quality, int framebuffer, int framebuffer_x, int framebuffer_y)
 {
     #ifndef HEADLESS
+    profiler_event("world_frame_light_pass");
     glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Light Pass");
     world->gfx.shadow_pass = true;
 
@@ -342,11 +347,13 @@ void world_frame_light_pass(struct world* world, float quality, int framebuffer,
     
     world->gfx.shadow_pass = false;
     glPopDebugGroupKHR();   
+    profiler_end();
     #endif
 }
 
 void world_frame(struct world* world)
 {
+    profiler_event("world_frame");
     world->render_count = 0;
 
     sglc(glViewport(0, 0, world->gfx.screen_width, world->gfx.screen_height));
@@ -398,7 +405,11 @@ void world_frame(struct world* world)
 #endif
 
     if(world->world_frame_user)
+    {
+        profiler_event("world_frame_user");
         world->world_frame_user(world);
+        profiler_end();
+    }
 
     if(world->cam.lock)
     {
@@ -408,7 +419,7 @@ void world_frame(struct world* world)
             world->cam.pitch = -85.f;
     }
 
-    glm_perspective(world->cam.fov * M_PI_180f, world->gfx.screen_width/world->gfx.screen_height, 0.1f, world->gfx.fog_maxdist, world->p);
+    glm_perspective(world->cam.fov * M_PI_180f, MAX(world->gfx.screen_height,world->gfx.screen_width)/MIN(world->gfx.screen_width,world->gfx.screen_height), 0.1f, world->gfx.fog_maxdist, world->p);
     glm_ortho(0.f, world->viewport[2], 0.f, world->viewport[3], 0.1f, 1000.f, world->ui->projection);
     world->ui->screen_size[0] = world->viewport[2];
     world->ui->screen_size[1] = world->viewport[3];
@@ -506,11 +517,13 @@ void world_frame(struct world* world)
         world_frame_render(world);
 
     #ifdef FBO_ENABLED
+        profiler_event("gfx: bloom");
         bool bloom_blur_horiz = true, first_bloom_iter = true;
         int amount = 25;
         sglc(glUseProgram(world->gfx.hdr_blur_shader));
         for(int i = 0; i < amount; i++)
         {
+            profiler_event("gfx: gaussian blur");
             sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_pingpong_fbos[bloom_blur_horiz]));
             sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur_shader,"horizontal"), bloom_blur_horiz)); 
             //sglc(glUniform2f(glGetUniformLocation(world->gfx.hdr_blur_shader,"size"), 1.0f, 1.0f)); 
@@ -524,6 +537,7 @@ void world_frame(struct world* world)
             bloom_blur_horiz = !bloom_blur_horiz;
             if(first_bloom_iter)
                 first_bloom_iter = false;
+            profiler_end();
         }
 
         sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
@@ -547,6 +561,7 @@ void world_frame(struct world* world)
         sglc(glUniform4fv(glGetUniformLocation(world->gfx.hdr_blur2_shader,"viewport"), 1, world->viewport));
         sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
         sglc(glDrawArrays(GL_POINTS, 0, 1));
+        profiler_end();
     #endif
         // world_draw_model(world, world->test_object, world->normal_shader, test_model2, true);
 
@@ -615,8 +630,12 @@ void world_frame(struct world* world)
 
         if(!world->assets_downloading)
             script_frame_ui(world->script);
+        profiler_event("world_frame_ui_user");
         if(world->world_frame_ui_user)
             world->world_frame_ui_user(world);
+        profiler_end();
+        if(world->profiler_on)
+            profiler_ui(world);
     }
     else
     {
@@ -704,11 +723,13 @@ void world_frame(struct world* world)
         printf("sglthing: frame 1 done\n");
     world->frames++;
     world->ui->ui_elements = 0;
+    profiler_end();
 }
 
 void world_uniforms(struct world* world, int shader_program, mat4 model_matrix)
 {
 #ifndef HEADLESS
+    profiler_event("world_uniforms");
     // camera
     glUniformMatrix4fv(glGetUniformLocation(shader_program,"model"), 1, GL_FALSE, model_matrix[0]);
     glUniformMatrix4fv(glGetUniformLocation(shader_program,"view"), 1, GL_FALSE, world->v[0]);
@@ -745,11 +766,13 @@ void world_uniforms(struct world* world, int shader_program, mat4 model_matrix)
         world->world_uniforms_set(world);
 
     while(glGetError()!=0);
+    profiler_end();
 #endif
 }
 
 void world_draw(struct world* world, int count, int vertex_array, int shader_program, mat4 model_matrix)
 {
+    profiler_event("world_draw");
     ASSERT(count != 0);
     ASSERT(vertex_array != 0);
     if(world->gfx.shadow_pass)
@@ -760,11 +783,13 @@ void world_draw(struct world* world, int count, int vertex_array, int shader_pro
     sglc(glBindVertexArray(vertex_array));
     sglc(glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, 0));
     world->render_count++;
+    profiler_end();
 }
 
 void world_draw_model(struct world* world, struct model* model, int shader_program, mat4 model_matrix, bool set_textures)
 {
 #ifndef HEADLESS
+    profiler_event("world_draw_model");
     mat4 mvp;
 
     ASSERT(model != 0);
@@ -813,6 +838,7 @@ void world_draw_model(struct world* world, struct model* model, int shader_progr
         //ui_draw_text_3d(world->ui, world->viewport, world->cam.position, world->cam.front, (vec3){0.f,1.f,0.f}, world->cam.fov, model_matrix, world->vp, txbuf);
         //world_draw_primitive(world, PRIMITIVE_BOX, model_matrix, (vec4){1.f, 1.f, 1.f, 1.f});
     }
+    profiler_end();
 #endif
 }
 

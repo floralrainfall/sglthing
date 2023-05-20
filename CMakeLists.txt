@@ -105,6 +105,10 @@ project(lua)
 if(GAMES_COMPILE)
     project(RDM2)
     add_executable(RDM2
+        sglrdm2/objective.c
+        sglrdm2/objective.h
+        sglrdm2/gamemode.c
+        sglrdm2/gamemode.h
         sglrdm2/rdm_net.c
         sglrdm2/rdm_net.h
         sglrdm2/weapons.c
@@ -181,6 +185,8 @@ add_library(sglthing STATIC
     sglthing/model.c 
     sglthing/bone.h
     sglthing/bone.c 
+    sglthing/prof.h
+    sglthing/prof.c 
     sglthing/http.h
     sglthing/http.c 
     sglthing/net.h

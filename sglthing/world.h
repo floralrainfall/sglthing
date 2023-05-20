@@ -13,6 +13,7 @@
 #include "net.h"
 #include "script.h"
 #include "snd.h"
+#include "prof.h"
 #ifndef HEADLESS
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -138,6 +139,7 @@ struct world {
     void (*world_uniforms_set)(struct world* world);
 
     bool debug_mode;
+    bool profiler_on;
 };
 
 #ifndef HEADLESS
