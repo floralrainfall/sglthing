@@ -23,11 +23,11 @@ float shadow_calculate(vec3 camera, float b1, float b2, sampler2D map, vec3 pos,
     proj_coords = proj_coords * 0.5 + 0.5;
 
     if(proj_coords.x <= 0.01 || proj_coords.x >= 0.999)
-        return -1;
+        return -1.0;
     if(proj_coords.y <= 0.01 || proj_coords.y >= 0.999)
-        return -1;
+        return -1.0;
     if(proj_coords.z <= 0.01 || proj_coords.z >= 0.999)
-        return -1;
+        return -1.0;
     //float closest_depth = texture(map, proj_coords.xy).r;
     float current_depth = proj_coords.z;  
     float bias = max(b1 * (1.0 - dot(normal, light_dir)), b2);  
@@ -44,7 +44,7 @@ float shadow_calculate(vec3 camera, float b1, float b2, sampler2D map, vec3 pos,
     }
     shadow /= 9.0;
 
-    return shadow;
+    return float(shadow);
 }
 
 struct light {

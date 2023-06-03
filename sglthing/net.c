@@ -405,7 +405,7 @@ int network_transmit_packet(struct network* network, struct network_client* clie
     int s_cmd = sendto(network->client.socket, &packet, sizeof(struct network_packet), MSG_DONTWAIT | MSG_NOSIGNAL, &client->sockaddr, sizeof(client->sockaddr));
     network->packet_tx_numbers[network->packet_time]++;
     if(network->packet_tx_numbers[network->packet_time] > 500)
-        printf("sglthing: (m:%i) over 500 packets sent in network frame???\n", network->mode);
+        printf("sglthing: (m:%i) over 500 packets sent in network frame??? (trying to send a %i)\n", network->mode, packet.meta.packet_type);
     return s_cmd;
 #endif
 }
