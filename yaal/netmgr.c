@@ -2,6 +2,7 @@
 
 void net_send_fx(struct network* network, struct network_client* client, struct fx fx)
 {
+    profiler_event("net_send_fx");
     struct player* player;
     player = (struct player*)client->user_data;
     ASSERT(player);
@@ -11,10 +12,12 @@ void net_send_fx(struct network* network, struct network_client* client, struct 
     upd_pak.meta.packet_type = YAAL_CREATE_FX;
     x_data->packet.create_fx.new_fx = fx;
     network_transmit_packet(network, client, upd_pak);
+    profiler_end();
 }
 
 void net_upd_player(struct network* network, struct network_client* client)
 {
+    profiler_event("net_upd_player");
     struct player* player;
     player = (struct player*)client->user_data;
     ASSERT(player);
@@ -30,10 +33,12 @@ void net_upd_player(struct network* network, struct network_client* client)
     x_data->packet.update_stats.player_max_mana = player->player_max_mana;
     upd_pak.meta.acknowledge = true;
     network_transmit_packet(network, client, upd_pak);
+    profiler_end();
 }
 
 void net_send_player_lvl(struct network* network, struct network_client* client, int level_id)
 {
+    profiler_event("net_send_player_lvl");
     struct player* player;
     player = (struct player*)client->user_data;
     ASSERT(player);
@@ -51,10 +56,12 @@ void net_send_player_lvl(struct network* network, struct network_client* client,
     }
     else
         printf("yaal: no map id 0\n");        
+    profiler_end();
 }
 
 static bool __work_action(struct network_packet* packet, struct network* network, struct network_client* client)
 {
+    profiler_event("__work_action");
     struct xtra_packet_data* x_data = (struct xtra_packet_data*)&packet->packet.data;
     struct player* player;
     player = (struct player*)client->user_data;
@@ -73,9 +80,12 @@ static bool __work_action(struct network_packet* packet, struct network* network
             x_data->packet.player_action.position[2] = player->player_position[2];
         case ACTION_BOMB_THROW:
             if(network->mode == NETWORKMODE_SERVER)
-            {
+            { 
                 if(player->player_bombs == 0)
+                {
+                    profiler_end();
                     return false;
+                }
                 player->player_bombs--;
                 
                 net_upd_player(network, client);
@@ -109,6 +119,7 @@ static bool __work_action(struct network_packet* packet, struct network* network
                         .level_id = x_data->packet.player_action.level_id,
                     });
             }
+            profiler_end();
             return true;
         case ACTION_HEAL:
             if(network->mode == NETWORKMODE_SERVER)
@@ -120,6 +131,7 @@ static bool __work_action(struct network_packet* packet, struct network* network
             printf("yaal: unknown action id %i\n", x_data->packet.player_action.action_id);
             break;
     }
+    profiler_end();
     return false;
 }
 

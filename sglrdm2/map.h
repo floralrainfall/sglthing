@@ -2,6 +2,8 @@
 #define MAP_H
 
 #define RENDER_CHUNK_SIZE 16
+#define MAP_SIZE 32
+#define CUBE_SIZE 1
 
 #include <cglm/cglm.h>
 #include <sglthing/world.h>
@@ -33,7 +35,6 @@ struct map_manager
     double next_map_rq;
 };
 
-#define MAP_SIZE 16
 
 struct map_server
 {
@@ -41,6 +42,8 @@ struct map_server
     {
         struct map_chunk chunk_y[MAP_SIZE];
     } chunk_x[MAP_SIZE];
+    int map_seed;
+    bool map_ready;
 };
 
 void map_server_init(struct map_server* map);

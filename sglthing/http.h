@@ -25,6 +25,7 @@ struct http_user
 {
     bool found;
 
+    int item_id;
     int user_id; 
 };
 

@@ -38,6 +38,7 @@ void add_fx(struct fx_manager* manager, struct fx fx)
 
 void tick_fx(struct world* world, struct fx_manager* manager)
 {
+    profiler_event("tick_fx");
     for(int i = 0; i < manager->fx_active->len; i++)
     {
         struct fx *fx = &g_array_index(manager->fx_active, struct fx, i);
@@ -103,12 +104,14 @@ void tick_fx(struct world* world, struct fx_manager* manager)
             g_array_remove_index(manager->fx_active, 0);
         }
     }
+    profiler_end();
 }
 
 void render_fx(struct world* world, struct fx_manager* manager)
 {
     if(world->gfx.shadow_pass)
         return;
+    profiler_event("render_fx");
     for(int i = 0; i < manager->fx_active->len; i++)
     {
         struct fx *fx = &g_array_index(manager->fx_active, struct fx, i);
@@ -183,10 +186,12 @@ void render_fx(struct world* world, struct fx_manager* manager)
             }
         }
     }
+    profiler_end();
 }
 
 void render_ui_fx(struct world* world, struct fx_manager* manager)
 {
+    profiler_event("render_ui_fx");
     vec4 oldfg, oldbg;
     glm_vec4_copy(world->ui->foreground_color, oldfg);
     glm_vec4_copy(world->ui->background_color, oldbg);
@@ -240,4 +245,5 @@ void render_ui_fx(struct world* world, struct fx_manager* manager)
     }
     glm_vec4_copy(oldfg, world->ui->foreground_color);
     glm_vec4_copy(oldbg, world->ui->background_color);
+    profiler_end();
 }

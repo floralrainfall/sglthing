@@ -3,6 +3,7 @@
 #include "config.h"
 #include <string.h>
 #include <stdlib.h>
+#include "model.h"
 
 static bool curl_initialized = false;
 
@@ -147,12 +148,15 @@ struct http_user http_get_userdata(struct http_client* client, char* key)
     user.found = true;
     char* token;
     token = strtok(result, ",");
-    enum { TOKEN_USER_ID, TOKEN_REGISTRATION_DATE, TOKEN_STOP } token_id = 0;
+    enum { TOKEN_USER_ID, TOKEN_REGISTRATION_DATE, TOKEN_ITEM_ID, TOKEN_STOP } token_id = 0;
     while(token != NULL) {
         switch(token_id)
         {
             case TOKEN_USER_ID:
                 user.user_id = atoi(token);
+                break;
+            case TOKEN_ITEM_ID:
+                user.item_id = atoi(token);
                 break;
             case TOKEN_STOP:
                 break;

@@ -119,6 +119,8 @@ if(GAMES_COMPILE)
         sglrdm2/rdm2.h
         sglrdm2/map.c
         sglrdm2/map.h
+        sglrdm2/ray.c
+        sglrdm2/ray.h
     )
     project(Yaal)
     add_executable(Yaal
@@ -171,6 +173,8 @@ add_library(sglthing STATIC
     sglthing/texture.c 
     sglthing/graphic.h 
     sglthing/graphic.c
+    sglthing/memory.h 
+    sglthing/memory.c
     sglthing/shader.h
     sglthing/shader.c 
     sglthing/script.h

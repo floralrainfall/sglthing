@@ -30,6 +30,8 @@ struct ui_font2
 {
     struct ui_font2_chara characters[MAX_FONT_GLYPHS];
     FT_Face face;
+    int size_x;
+    int size_y;
 };
 
 struct ui_panel
@@ -62,6 +64,7 @@ struct ui_data
     int ui_ttf_vbo;
 
     mat4 projection;
+    mat4 transform;
     vec2 screen_size;
 
     int ui_elements;

@@ -21,6 +21,7 @@ bool determine_tile_collision(struct map_tile_data tile)
 
 void map_render(struct world* world, struct map_tile_data map[MAP_SIZE_MAX_X][MAP_SIZE_MAX_Y])
 {
+    profiler_event("map_render");
     for(int map_x = 0; map_x < MAP_SIZE_MAX_X; map_x++)
     {
         for(int map_y = 0; map_y < MAP_SIZE_MAX_Y; map_y++)
@@ -107,10 +108,12 @@ void map_render(struct world* world, struct map_tile_data map[MAP_SIZE_MAX_X][MA
             }
         }
     }    
+    profiler_end();
 }
 
 void server_determine_tile_event(struct player* player, int x, int y, int level_id)
 {
+    profiler_event("server_determine_tile_event");
     struct map_file_data* map = g_hash_table_lookup(server_state.maps, &level_id);
     for(int i = 0; i < map->map_object_count; i++)
     {
@@ -120,4 +123,5 @@ void server_determine_tile_event(struct player* player, int x, int y, int level_
 
         }
     }
+    profiler_end();
 }

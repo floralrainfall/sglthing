@@ -6,11 +6,14 @@
 #include <stdbool.h>
 #include <cglm/cglm.h>
 #include <glib.h>
+#include "memory.h"
+
+#define MAX_SOUNDS 2
 
 struct sndmgr {
 #ifdef SOUND_ENABLED
     bool mute;
-    GArray* sounds_loaded;
+    GArray* sounds_playing;
 #endif
 };
 
@@ -32,6 +35,8 @@ struct snd {
     float multiplier;
 
     bool sound_3d;    
+    bool auto_dealloc;
+    bool callback;
     vec3 sound_position;
     vec3* camera_position;
 #endif
@@ -39,10 +44,14 @@ struct snd {
 
 void snd_init(struct sndmgr* mgr);
 void snd_deinit(struct sndmgr* mgr);
+void snd_frame(struct sndmgr* mgr);
+void snd_rmref(struct sndmgr* mgr, struct snd* snd);
 struct snd* get_snd(char* file_name);
 struct snd* load_snd(char* file_name);
 struct snd* play_snd(char* file_name);
+struct snd*  play_snd2(struct snd* snd);
 void resume_snd(struct snd* snd);
 void stop_snd(struct snd* snd);
+void kill_snd(struct snd* snd);
 
 #endif

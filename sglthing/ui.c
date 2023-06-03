@@ -135,6 +135,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"time"), (float)glfwGetTime()));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"waviness"), ui->waviness));
     sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_program,"projection"), 1, GL_FALSE, ui->projection[0]));      
+    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_program,"transform"), 1, GL_FALSE, ui->transform[0])); 
 
     offset[0] = 0.0f;
     offset[1] = 0.0f;
@@ -333,6 +334,7 @@ void ui_draw_panel(struct ui_data* ui, float position_x, float position_y, float
     sglc(glUniform1f(glGetUniformLocation(ui->ui_panel_program,"time"), (float)glfwGetTime()));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_panel_program,"waviness"), ui->waviness));
     sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_panel_program,"projection"), 1, GL_FALSE, ui->projection[0])); 
+    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_panel_program,"transform"), 1, GL_FALSE, ui->transform[0])); 
     sglc(glUniform3fv(glGetUniformLocation(ui->ui_panel_program,"offset"), 1, offset));
     //sglc(glUniform4fv(glGetUniformLocation(ui->ui_panel_program,"foreground_color"), 1, ui->current_panel->top_color));
     //sglc(glUniform4fv(glGetUniformLocation(ui->ui_panel_program,"background_color"), 1, ui->current_panel->bottom_color));
@@ -420,6 +422,7 @@ void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float
     sglc(glUniform1f(glGetUniformLocation(ui->ui_img_program,"time"), (float)glfwGetTime()));
     sglc(glUniform1f(glGetUniformLocation(ui->ui_img_program,"waviness"), ui->waviness));
     sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_img_program,"projection"), 1, GL_FALSE, ui->projection[0])); 
+    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_img_program,"transform"), 1, GL_FALSE, ui->transform[0])); 
     sglc(glUniform3fv(glGetUniformLocation(ui->ui_img_program,"offset"), 1, offset));
     sglc(glUniform4fv(glGetUniformLocation(ui->ui_img_program,"foreground_color"), 1, ui->foreground_color));
     sglc(glUniform4fv(glGetUniformLocation(ui->ui_img_program,"background_color"), 1, ui->background_color));
@@ -430,6 +433,8 @@ void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float
 
 void ui_init(struct ui_data* ui)
 {
+    glm_mat4_identity(ui->transform);
+
     int ui_vertex = compile_shader("uiassets/shaders/ui.vs", GL_VERTEX_SHADER);
     int ui_frag = compile_shader("uiassets/shaders/ui.fs", GL_FRAGMENT_SHADER);
     ui->ui_program = link_program(ui_vertex, ui_frag);
@@ -597,6 +602,8 @@ struct ui_font2* ui_load_font2(struct ui_data* ui, char* file, int font_w, int f
 
         struct ui_font2* font = (struct ui_font2*)malloc(sizeof(struct ui_font2));
         font->face = font_face;
+        font->size_x = font_w;
+        font->size_y = font_h;
         FT_Set_Pixel_Sizes(font->face, font_w, font_h);  
         
         ui_font2_render(ui, font);
@@ -615,19 +622,32 @@ void ui_font2_text(struct ui_data* ui, float position_x, float position_y, struc
     profiler_event("ui_font2_text");
     glUseProgram(ui->ui_ttf_program);
 
-    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"time"), (float)glfwGetTime()));
-    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"waviness"), ui->waviness));
-    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_program,"projection"), 1, GL_FALSE, ui->projection[0]));      
-    sglc(glUniform1f(glGetUniformLocation(ui->ui_program,"depth"), -depth));
-    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"background_color"), 1, ui->background_color));
-    sglc(glUniform4fv(glGetUniformLocation(ui->ui_program,"foreground_color"), 1, ui->foreground_color));
+    ADJUST_POSITION(ui);
+
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_ttf_program,"time"), (float)glfwGetTime()));
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_ttf_program,"waviness"), ui->waviness));
+    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_ttf_program,"projection"), 1, GL_FALSE, ui->projection[0]));      
+    sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_ttf_program,"transform"), 1, GL_FALSE, ui->transform[0]));      
+    sglc(glUniform1f(glGetUniformLocation(ui->ui_ttf_program,"depth"), -depth));
+    sglc(glUniform4fv(glGetUniformLocation(ui->ui_ttf_program,"background_color"), 1, ui->background_color));
+    sglc(glUniform4fv(glGetUniformLocation(ui->ui_ttf_program,"foreground_color"), 1, ui->foreground_color));
 
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(ui->ui_ttf_vao);
 
+    float old_position_x = position_x;
+
     for(int i = 0; i < strlen(text); i++)
     {
         char c = text[i];
+
+        if(c == '\n')
+        {
+            position_x = old_position_x;
+            position_y -= font->size_y;
+            continue;
+        }
+
         struct ui_font2_chara* chara = &font->characters[c];
 
         float xpos = position_x + chara->bearing[0];

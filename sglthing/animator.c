@@ -21,7 +21,7 @@ void animation_read_hierarchy(struct assimp_node_data* dest, const struct aiNode
     dest->children_count = 0;
     for (int i = 0; i < src->mNumChildren; i++)
     {
-        struct assimp_node_data* new_data = (struct assimp_node_data*)malloc(sizeof(struct assimp_node_data));
+        struct assimp_node_data* new_data = (struct assimp_node_data*)malloc2(sizeof(struct assimp_node_data));
         animation_read_hierarchy(new_data, src->mChildren[i]);
         dest->children[i] = new_data;
         dest->children_count++;
@@ -80,7 +80,7 @@ static void __animation_create2(struct animation* anim, struct mesh* model, int 
     struct aiAnimation* anim_2 = scene->mAnimations[id];
     anim->duration = anim_2->mDuration;
     anim->ticks_per_second = anim_2->mTicksPerSecond;
-    anim->node = (struct assimp_node_data*)malloc(sizeof(struct assimp_node_data));
+    anim->node = (struct assimp_node_data*)malloc2(sizeof(struct assimp_node_data));
     anim->bones = g_array_new(false,true,sizeof(struct bone));
     animation_read_hierarchy(anim->node, scene->mRootNode);
     animation_get_bones(anim, anim_2, model);

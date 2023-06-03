@@ -35,6 +35,7 @@ extern vec2 mouse_position;
 extern int keys_down[GLFW_KEY_LAST];
 extern char input_text[MAX_INPUT_TEXT];
 extern bool input_disable;
+extern bool input_lock_tab;
 
 #ifndef HEADLESS
 void init_kbd(GLFWwindow* window);

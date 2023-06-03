@@ -13,8 +13,16 @@ struct rdm2_state
     struct model* cloud_layer;
     struct model* sun;
     struct model* rdm_guy;
+    
+    struct model* weapons[__WEAPON_MAX];
+    int weapon_icon_textures[__WEAPON_MAX];
+
     struct ui_font2* big_font;
     struct ui_font2* normal_font;
+
+    struct snd* lobby_music;
+    struct snd* playing_music;
+    struct snd* roundstart_sound;
 
     struct rdm_player* local_player;
     struct map_manager* map_manager;
@@ -30,6 +38,16 @@ struct rdm2_state
 
     vec3 player_velocity;
     bool player_grounded;
+
+    bool server_motd_dismissed;
+    bool server_information_panel;
+    bool context_mode;
+
+    GArray* chunk_packets_pending;
+    double next_pending;
+
+    vec3 last_position;
+    float mouse_update_diff;
 };
 
 extern struct rdm2_state client_state;

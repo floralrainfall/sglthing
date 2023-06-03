@@ -5,7 +5,6 @@
 #include "rdm_net.h"
 #include "rdm2.h"
 
-#define CUBE_SIZE 1
 
 static int last_render_chunk_id;
 
@@ -13,7 +12,10 @@ struct __render_chunk_block
 {
     vec3 position;
     char obscure;
-    char color;
+    char r;
+    char g;
+    char b;
+    char air;
 };
 
 struct __render_chunk
@@ -48,7 +50,9 @@ static void __map_render_chunk_init(struct __render_chunk* chunk)
                 glm_vec3_copy(t_position,chunk->x[x].y[y].z[z].position);
 
                 chunk->x[x].y[y].z[z].obscure = 1;
-                chunk->x[x].y[y].z[z].color = 254;
+                chunk->x[x].y[y].z[z].r = 255;
+                chunk->x[x].y[y].z[z].g = 0;
+                chunk->x[x].y[y].z[z].b = 255;
             }
     sglc(glGenBuffers(1,&chunk->vbo));
 }
@@ -60,8 +64,8 @@ static void __map_render_chunk_update(struct __render_chunk* chunk)
         for(int y = 0; y < RENDER_CHUNK_SIZE; y++)
             for(int z = 0; z < RENDER_CHUNK_SIZE; z++)
             {
-                struct __render_chunk_block bottom_block = chunk->x[x].y[y-1].z[z];
-                chunk->x[x].y[y].z[z].obscure = (bottom_block.color != 0);
+                //struct __render_chunk_block bottom_block = chunk->x[x].y[y-1].z[z];
+                //chunk->x[x].y[y].z[z].obscure = (bottom_block.color != 0);
             }
     
     sglc(glBindBuffer(GL_ARRAY_BUFFER,chunk->vbo));
@@ -103,11 +107,11 @@ void __map_render_chunk(struct world* world, struct map_manager* map, struct __r
     sglc(glVertexAttribDivisor(6, 1)); // had to update the entirety of sglthing to opengl 3.3 because of this...
     
     sglc(glEnableVertexAttribArray(7));
-    sglc(glVertexAttribPointer(7, 1, GL_BYTE, GL_FALSE, sizeof(struct __render_chunk_block), (void*)(offsetof(struct __render_chunk_block,obscure)))); // char: obscure
+    sglc(glVertexAttribPointer(7, 1, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(struct __render_chunk_block), (void*)(offsetof(struct __render_chunk_block,obscure)))); // char: obscure
     sglc(glVertexAttribDivisor(7, 1));  
 
     sglc(glEnableVertexAttribArray(8));
-    sglc(glVertexAttribPointer(8, 1, GL_BYTE, GL_FALSE, sizeof(struct __render_chunk_block), (void*)(offsetof(struct __render_chunk_block,color)))); // char: color
+    sglc(glVertexAttribPointer(8, 3, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(struct __render_chunk_block), (void*)(offsetof(struct __render_chunk_block,r)))); // char[3]: color
     sglc(glVertexAttribDivisor(8, 1));  
 
     sglc(glBindBuffer(GL_ARRAY_BUFFER, 0)); 
@@ -153,10 +157,19 @@ void map_update_chunks(struct map_manager* map, struct world* world)
 
     if(client_state.local_player && world->time > map->next_map_rq)
     {
-        map->next_map_rq = world->time + 1.0;
+        map->next_map_rq = world->time + 1.5f;        
         for(int x = -request_range-1; x <= request_range; x++)
+        {
+            if(p_c_x + x < 0)
+                continue;
+            if(p_c_x + x > MAP_SIZE)
+                continue;
             for(int y = -request_range-1; y <= request_range; y++)
             {
+                if(p_c_z + y < 0)
+                    continue;
+                if(p_c_z + y > MAP_SIZE)
+                    continue;
                 struct __render_chunk* c = __map_chunk_position(map, p_c_x + x, 0, p_c_z + y);
                 if(!c)
                 {    
@@ -168,9 +181,12 @@ void map_update_chunks(struct map_manager* map, struct world* world)
                     _data->update_chunk.chunk_x = MAX(p_c_x + x, 0);
                     _data->update_chunk.chunk_y = 0;
                     _data->update_chunk.chunk_z = MAX(p_c_z + y, 0);
+
+                    // printf("rdm2: requesting chunk %ix%i\n", p_c_x + x, p_c_z + y);
                     network_transmit_packet(client_state.local_player->client->owner, &client_state.local_player->client->owner->client, _pak);
                 }
             }
+        }
     }
     profiler_end();
 }
@@ -196,7 +212,56 @@ void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_
         for(int z = 0; z < RENDER_CHUNK_SIZE; z++)
         {
             struct __render_chunk_block* block = &new_chunk->x[d_x].y[y].z[z];
-            block->color = chunk_data[y*RENDER_CHUNK_SIZE+z];
+            char data = chunk_data[y*RENDER_CHUNK_SIZE+z];
+            block->air = false;
+            switch(data)
+            {
+                default:
+                case 0:
+                    block->air = true; 
+                    break;
+                case 1:
+                    block->r = 255;
+                    block->g = 255;
+                    block->b = 255;
+                    break;
+                case 2:
+                    block->r = 127;
+                    block->g = 127;
+                    block->b = 127;
+                    break;
+                case 3:
+                    block->r = 32;
+                    block->g = 32;
+                    block->b = 32;
+                    break;
+                case 4:
+                    block->r = 64;
+                    block->g = 64;
+                    block->b = 64;
+                    break;
+                case 5:
+                    block->r = 32;
+                    block->g = 255;
+                    block->b = 32;
+                    break;
+                case 6:
+                    block->r = 255;
+                    block->g = 32;
+                    block->b = 255;
+                    break;
+                case 7:
+                    block->r = 255;
+                    block->g = 32;
+                    block->b = 32;
+                    break;
+                case 8:
+                    block->r = 32;
+                    block->g = 32;
+                    block->b = 255;
+                    break;
+                
+            }
             block->obscure = chunk_data[y*RENDER_CHUNK_SIZE+z];
         }
 
@@ -222,21 +287,92 @@ void map_init(struct map_manager* map)
 
 void map_server_init(struct map_server* map)
 {
+    GTimer* generation_timer = g_timer_new();
+    double start_time = g_timer_elapsed(generation_timer, NULL);
+    float map_size = 1.0;
+    int highway_pos = MAP_SIZE/2;
     for(int x = 0; x < MAP_SIZE; x++)
         for(int y = 0; y < MAP_SIZE; y++)
         {
             struct map_chunk* chunk = &map->chunk_x[x].chunk_y[y];
+            perlin_seed = map->map_seed + 1;
+            float selector = perlin2d(x/0.1,y/0.1,0.1,4);
+            perlin_seed = map->map_seed + 2;
+            float selector2 = perlin2d(x/0.1,y/0.1,0.1,4);
+            if(x == 0 || x == MAP_SIZE-1 || y == 0 || y == MAP_SIZE-1)
+                selector = 0.67f;
+            float city_value = (selector2 * (RENDER_CHUNK_SIZE));
+            int pavement_color = 3;
+            int ground_color = 1;
+            bool city_tile = false;
+            int underground_color = ground_color;
             for(int _x = 0; _x < RENDER_CHUNK_SIZE; _x++)
-                for(int _y = 0; _y < RENDER_CHUNK_SIZE; _y++)
-                    for(int _z = 0; _z < RENDER_CHUNK_SIZE; _z++)
+                for(int _z = 0; _z < RENDER_CHUNK_SIZE; _z++)
+                {
+                    float true_x = _x+(x*RENDER_CHUNK_SIZE);
+                    float true_z = _z+(y*RENDER_CHUNK_SIZE);
+                    perlin_seed = map->map_seed + x+(y*MAP_SIZE);
+                    float noise = perlin2d(true_x/map_size,true_z/map_size,0.1,4);
+                    float noise_2 = (noise * (RENDER_CHUNK_SIZE/2)+2);
+                    perlin_seed = map->map_seed;
+                    float gnoise = perlin2d(true_x/map_size,true_z/map_size,0.1,4);
+                    float gnoise_2 = (gnoise * (RENDER_CHUNK_SIZE/2)+2);
+                    bool is_road = false;
+
+                    float value = noise_2;
+                    
+                    city_tile = false;
+                    if(selector < 0.58f)
                     {
-                        int map_size = RENDER_CHUNK_SIZE/MAP_SIZE;
-                        float true_x = _x+(x*RENDER_CHUNK_SIZE);
-                        float true_z = _z+(y*RENDER_CHUNK_SIZE);
-                        float noise = perlin2d((float)true_x/map_size,(float)true_z/map_size,0.1,4)*(RENDER_CHUNK_SIZE/2)+2;
-                        chunk->x[_x].y[_y].z[_z] = (noise > _y) ? _y*2 : 0;
+                        ground_color = 5;
+                        is_road = false;
+                        value = gnoise_2;
                     }
+                    else if(selector > 0.78f)
+                    {
+                        pavement_color = floorf(selector * 3 + 3);
+                        is_road = true;
+                    }
+                    else
+                    {
+                        city_tile = true;
+                        if(floorf(fmodf(true_x/2,4)) == 0)
+                            is_road = true;
+                        else if(floorf(fmodf(true_z/2,4)) == 0)
+                            is_road = true;
+                    }
+                    if(x == 0 && y == 0)
+                    {
+                        is_road = true;
+                        pavement_color = 7;
+                    }
+                    if(x == MAP_SIZE - 1 && y == MAP_SIZE - 1)
+                    {
+                        is_road = true;
+                        pavement_color = 8;
+                    }
+                    if(x == highway_pos || y == highway_pos)
+                    {
+                        is_road = true;
+                        pavement_color = 3;
+                    }
+
+                    for(int _y = 0; _y < RENDER_CHUNK_SIZE; _y++)
+                    {
+                        float actual_value = city_tile ? city_value : value;
+                        int actual_color = (floorf(value) == _y) ? ground_color : underground_color;
+
+                        if(!is_road)
+                            chunk->x[_x].y[_y].z[_z] = (actual_value > _y) ? actual_color : 0;
+                        else
+                            chunk->x[_x].y[_y].z[_z] = (3 > _y) ? pavement_color : 0;
+                    }
+                }
         }   
+    map->map_ready = true;
+    double time_generating = g_timer_elapsed(generation_timer, NULL) - start_time;
+    printf("rdm2: generated a map %ix%i, %i bytes in memory (1 chunk is %i bytes), took %f seconds\n", MAP_SIZE, MAP_SIZE, sizeof(map->chunk_x), sizeof(struct map_chunk), time_generating);
+    g_timer_destroy(generation_timer);
 }
 
 bool map_determine_collision_client(struct map_manager* map, vec3 position)
@@ -265,12 +401,12 @@ bool map_determine_collision_client(struct map_manager* map, vec3 position)
         struct __render_chunk_block block = chunk->x[map_chunk_tile_x].y[map_chunk_tile_y].z[map_chunk_tile_z];
 
         profiler_end();
-        return block.color != 0;
+        return !block.air;
     }
     else
     {
         profiler_end();
-        return false;
+        return map_chunk_y == 0;
     }
 }
 

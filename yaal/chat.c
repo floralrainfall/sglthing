@@ -7,6 +7,7 @@ void chat_render_player(struct world* world, struct chat_system* chat, struct pl
 {
     if(world->gfx.shadow_pass)
         return;
+    profiler_event("chat_render_player");
     char tx[256];
     for(int i = chat->chat_messages->len-1; i >= 0; i--)
     {
@@ -18,6 +19,7 @@ void chat_render_player(struct world* world, struct chat_system* chat, struct pl
             break;
         }
     }
+    profiler_end();
 }
 
 void chat_new_message(struct chat_system* chat, struct chat_message message)
@@ -42,6 +44,7 @@ void chat_render(struct world* world, struct chat_system* chat)
 {
     if(chat->chat_messages->len == 0)
         return;
+    profiler_event("chat_render");
     vec4 oldfg, oldbg;
     glm_vec4_copy(world->ui->foreground_color, oldfg);
     glm_vec4_copy(world->ui->background_color, oldbg);
@@ -57,4 +60,5 @@ void chat_render(struct world* world, struct chat_system* chat)
     }
     glm_vec4_copy(oldfg, world->ui->foreground_color);
     glm_vec4_copy(oldbg, world->ui->background_color);
+    profiler_end();
 }

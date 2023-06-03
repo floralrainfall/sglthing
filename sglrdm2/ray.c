@@ -1,0 +1,93 @@
+#include "ray.h"
+#include "map.h"
+#include "rdm_net.h"
+#include "rdm2.h"
+#include <sglthing/sglthing.h>
+
+#define RAY_FRACTION 0.25f
+
+struct ray_cast_info ray_cast(struct network* network, vec3 starting_position, versor direction, double length, int ignore)
+{
+    if(network->mode != NETWORKMODE_SERVER)
+        return;
+    struct ray_cast_info info;
+    profiler_event("ray_cast");
+
+    vec3 ray_position;
+    vec4 forward = {0.0, 0.0, 0.0};
+
+    mat4 rotation;
+    vec4 front = {0.0,0.0,1.0,1.0};
+    vec3 _forward;
+
+    glm_vec3_copy(starting_position, ray_position);
+    glm_quat_mat4(direction, rotation);
+    glm_mat4_mulv(rotation, front, forward);
+
+    glm_vec3_mul(forward, (vec3){RAY_FRACTION,RAY_FRACTION,RAY_FRACTION}, _forward);
+
+    double distance_traversed = 0.f;
+    info.object = RAYCAST_NOTHING;
+    info.player = 0;
+    while(distance_traversed < length)
+    {
+        if(map_determine_collision_server(server_state.map_server, ray_position))
+        {
+            info.real_voxel_x = floorf((ray_position[0]+0.5f) / CUBE_SIZE);
+            info.real_voxel_y = floorf((ray_position[1]) / CUBE_SIZE);
+            info.real_voxel_z = floorf((ray_position[2]+0.5f) / CUBE_SIZE);
+
+            info.chunk_x = floorf((float)info.real_voxel_x / RENDER_CHUNK_SIZE);
+            info.chunk_y = floorf((float)info.real_voxel_y / RENDER_CHUNK_SIZE);
+            info.chunk_z = floorf((float)info.real_voxel_z / RENDER_CHUNK_SIZE);
+
+            info.voxel_x = info.real_voxel_x - (info.chunk_x * RENDER_CHUNK_SIZE);
+            info.voxel_y = info.real_voxel_y - (info.chunk_y * RENDER_CHUNK_SIZE);
+            info.voxel_z = info.real_voxel_z - (info.chunk_z * RENDER_CHUNK_SIZE);
+
+            if(forward[0] > 0.5)
+                info.voxel_hit_side = RAYCAST_HIT_RIGHT;
+            else if(forward[0] < -0.5)
+                info.voxel_hit_side = RAYCAST_HIT_LEFT;
+            else if(forward[1] > 0.5)
+                info.voxel_hit_side = RAYCAST_HIT_BOTTOM;
+            else if(forward[1] < -0.5)
+                info.voxel_hit_side = RAYCAST_HIT_TOP;
+            else if(forward[2] > 0.5)
+                info.voxel_hit_side = RAYCAST_HIT_FORWARD;
+            else if(forward[2] < -0.5)
+                info.voxel_hit_side = RAYCAST_HIT_BACK;
+
+            info.object = RAYCAST_VOXEL;
+            break;
+        }
+        else {
+            for(int i = 0; i < network->server_clients->len; i++)
+            {
+                struct network_client* client = &g_array_index(network->server_clients, struct network_client, i);
+                struct rdm_player* player = (struct rdm_player*)client->user_data;
+                if(client && player && client->player_id != ignore)
+                {
+                    // FIXME: distance based, should be a cuboid around player/hitboxes on model
+                    if(glm_vec3_distance(ray_position, player->replicated_position) < 1.f)
+                    {
+                        info.object = RAYCAST_PLAYER;
+                        info.player = player;
+                        break;
+                    }
+                }
+            }
+        }
+        if(info.object != RAYCAST_NOTHING)
+            break;
+
+        glm_vec3_add(ray_position, _forward, ray_position);
+        distance_traversed += RAY_FRACTION;
+    }
+
+    info.distance = distance_traversed;
+    glm_vec3_copy(ray_position, info.position);
+
+    profiler_end();
+    return info;
+}

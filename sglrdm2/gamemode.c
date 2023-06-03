@@ -1,5 +1,6 @@
 #include "gamemode.h"
 #include "rdm_net.h"
+#include "rdm2.h"
 
 char* gamemode_name(enum rdm_gamemode gamemode)
 {
@@ -20,7 +21,7 @@ void gamemode_init(struct gamemode_data* data, bool server)
     data->secret = false;
     data->gamemode = GAMEMODE_SECRET;
     data->started = false;
-    data->gamemode_end = 120.f;
+    data->gamemode_end = 5.f;
     data->server = server;
     data->gamemode_nextannouncement = 1.f;
     if(data->server)
@@ -39,21 +40,28 @@ void gamemode_frame(struct gamemode_data* data, struct world* world)
     {
         if(data->gamemode_end < data->network_time)
         {
-            printf("rdm2: starting mission\n");
             data->started = true;
             data->gamemode_end = data->network_time + 1740.f; 
+
+            if(data->server)
+            {
+                printf("rdm2: starting mission\n");
+                struct network_packet _pak;
+                union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
+
+                _pak.meta.packet_type = RDM_PACKET_GAME_START;
+                _pak.meta.acknowledge = false;
+
+                network_transmit_packet_all(&world->server, _pak);
+
+                map_server_init(server_state.map_server);
+            }
 
             switch(data->gamemode)
             {
                 case GAMEMODE_SECRET:
                     if(data->server)
                     {
-                        data->gamemode = g_random_int_range(GAMEMODE_FREEFORALL, __MAX_GAMEMODE - 1);                        
-                        if(!data->secret)
-                        {
-
-                        }
-
                         data->last_team = TEAM_BLUE;
                         for(int i = 0; i < world->server.server_clients->len; i++)
                         {
@@ -61,10 +69,33 @@ void gamemode_frame(struct gamemode_data* data, struct world* world)
                             struct rdm_player* player = (struct rdm_player*)client->user_data;
                             
                             if(data->last_team == TEAM_RED)
+                            {
+                                net_player_moveto(&world->server, player, (vec3){RENDER_CHUNK_SIZE*CUBE_SIZE*MAP_SIZE-(RENDER_CHUNK_SIZE*CUBE_SIZE/2),32.f,RENDER_CHUNK_SIZE*CUBE_SIZE*MAP_SIZE-(RENDER_CHUNK_SIZE*CUBE_SIZE/2)});
                                 data->last_team = TEAM_BLUE;
+                            }
                             else if(data->last_team == TEAM_BLUE)
+                            {
+                                net_player_moveto(&world->server, player, (vec3){RENDER_CHUNK_SIZE*CUBE_SIZE/2,32.f,RENDER_CHUNK_SIZE*CUBE_SIZE/2});
                                 data->last_team = TEAM_RED;
+                            }
+
                             player->team = data->last_team;
+                        }
+                    }
+                    break;
+                case GAMEMODE_FREEFORALL:
+                    if(data->server)
+                    {
+                        for(int i = 0; i < world->server.server_clients->len; i++)
+                        {
+                            struct network_client* client = &g_array_index(world->server.server_clients, struct network_client, i);
+                            struct rdm_player* player = (struct rdm_player*)client->user_data;
+                            net_player_moveto(&world->server, player, (vec3){
+                                g_random_double_range(1, RENDER_CHUNK_SIZE*CUBE_SIZE*MAP_SIZE-1),
+                                32.f,
+                                g_random_double_range(1, RENDER_CHUNK_SIZE*CUBE_SIZE*MAP_SIZE-1)
+                            });
+                            player->team = TEAM_NA;
                         }
                     }
                     break;

@@ -355,6 +355,7 @@ void world_frame(struct world* world)
 {
     profiler_event("world_frame");
     world->render_count = 0;
+    snd_frame(&world->s_mgr);
 
     sglc(glViewport(0, 0, world->gfx.screen_width, world->gfx.screen_height));
     world->viewport[2] = (float)world->gfx.screen_width;
@@ -709,8 +710,6 @@ void world_frame(struct world* world)
     {
         int pixel_buf_size = 3*world->gfx.screen_width*world->gfx.screen_height;
         char* pixels = (char*)malloc(pixel_buf_size);
-        sglc(glBindFramebuffer(GL_READ_FRAMEBUFFER, world->gfx.hdr_fbo));
-        sglc(glReadBuffer(GL_COLOR_ATTACHMENT0));
         sglc(glReadPixels(0, 0, world->gfx.screen_width, world->gfx.screen_height, GL_RGB, GL_UNSIGNED_BYTE, pixels));
         stbi_flip_vertically_on_write(true);
         printf("sglthing: screenshot taken (%ix%i)\n", world->gfx.screen_width, world->gfx.screen_height);
@@ -767,6 +766,7 @@ void world_uniforms(struct world* world, int shader_program, mat4 model_matrix)
 
     while(glGetError()!=0);
     profiler_end();
+    profiler_end_frame();
 #endif
 }
 

@@ -1,9 +1,11 @@
 #ifndef MODEL_H
 #define MODEL_H
 #include <cglm/cglm.h>
+#include "memory.h"
 
 #define MAX_BONE_WEIGHTS 4
 void load_model(char* file);
+void load_model_mem(void* mem, int length, char* name);
 struct model* get_model(char* file);
 
 struct model_vertex

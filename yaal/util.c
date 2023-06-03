@@ -13,6 +13,7 @@ void yaal_update_player_action(int key_id, struct player_action action, struct n
 
 void yaal_update_player_transform(struct player* player)
 {
+    profiler_event("yaal_update_player_transform");
     mat4 rotation_matrix;
     glm_mat4_identity(player->model_matrix);
 
@@ -23,6 +24,7 @@ void yaal_update_player_transform(struct player* player)
 
     glm_vec3_copy(player->player_position, player->player_light.position);
     player->player_light.position[1] = 1.5f;
+    profiler_end();
 }
 
 void yaal_update_song()
@@ -38,16 +40,14 @@ void yaal_update_song()
         case YAAL_STATE_MAP:
             if(yaal_state.current_song)
             {
-                stop_snd(yaal_state.current_song);
-                free(yaal_state.current_song);
+                kill_snd(yaal_state.current_song);
             }
             yaal_state.current_song = play_snd("yaal/snd/mus/theme_0.mp3");
             break;
         case YAAL_STATE_GAME:
             if(yaal_state.current_song)
             {
-                stop_snd(yaal_state.current_song);
-                free(yaal_state.current_song);
+                kill_snd(yaal_state.current_song);
             }
             yaal_state.current_song = play_snd(song_fname);
             break;

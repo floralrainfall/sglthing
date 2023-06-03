@@ -6,7 +6,7 @@
 
 struct light_area* light_create_area()
 {
-    struct light_area* new_area = malloc(sizeof(struct light_area));
+    struct light_area* new_area = malloc2(sizeof(struct light_area));
     for(int i = 0; i < MAX_LIGHTS; i++)
         new_area->active_lights[i] = 0;
     new_area->mask = 0;

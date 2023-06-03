@@ -1,6 +1,6 @@
 #include "perlin.h"
 
-static int SEED = 0;
+int perlin_seed = 0;
 
 static int hash[] = {208,34,231,213,32,248,233,56,161,78,24,140,71,48,140,254,245,255,247,247,40,
                      185,248,251,245,28,124,204,204,76,36,1,107,28,234,163,202,224,245,128,167,204,
@@ -17,7 +17,7 @@ static int hash[] = {208,34,231,213,32,248,233,56,161,78,24,140,71,48,140,254,24
 
 int noise2(int x, int y)
 {
-    int tmp = hash[(y + SEED) % 256];
+    int tmp = hash[(y + perlin_seed) % 256];
     return hash[(tmp + x) % 256];
 }
 

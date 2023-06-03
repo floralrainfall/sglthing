@@ -12,6 +12,7 @@ vec2 mouse_position = { 0, 0 };
 bool mouse_focus = false;
 char input_text[MAX_INPUT_TEXT] = {0};
 bool input_disable = false;
+bool input_lock_tab = false;
 int input_cursor = 0;
 
 #ifndef HEADLESS
@@ -63,7 +64,7 @@ static void __kbd_callback(GLFWwindow* window, int key, int scancode, int action
 
     if(action == GLFW_PRESS || action == GLFW_RELEASE)
     {
-        if(key == GLFW_KEY_TAB && action == GLFW_PRESS)
+        if(key == GLFW_KEY_TAB && action == GLFW_PRESS && !input_lock_tab)
             set_focus(window, !mouse_focus);
         keys_down[key] = action;
     }

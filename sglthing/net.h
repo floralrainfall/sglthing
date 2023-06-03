@@ -8,6 +8,7 @@
 #include "sockets.h"
 #include "http.h"
 #include <sqlite3.h> 
+#include "memory.h"
 
 #define CR_PACKET_VERSION 200
 #define NO_DATAPACKETS_TICK 512
@@ -237,12 +238,15 @@ struct network {
     bool server_open;
     bool security;
 
+    bool pung;
+
     bool shutdown_empty;
     bool shutdown_ready;
 
     bool (*receive_packet_callback)(struct network* network, struct network_client* client, struct network_packet* packet);
     void (*new_player_callback)(struct network* network, struct network_client* client);
     void (*del_player_callback)(struct network* network, struct network_client* client);
+    void (*old_player_add_callback)(struct network* network, struct network_client* client, struct network_client* old_client);
 
     GHashTable* players;
 
@@ -267,7 +271,7 @@ void network_frame(struct network* network, float delta_time, double time);
 #ifdef SGLTHING_COMPILE
 void network_dbg_ui(struct network* network, struct ui_data* ui);
 #endif
-struct network_client* network_get_player(struct network* network, int* player_id);
+struct network_client* network_get_player(struct network* network, int player_id);
 void network_close(struct network* network);
 
 void network_start_download(struct network_downloader* network, char* ip, int port, char* rqname, char* pass);

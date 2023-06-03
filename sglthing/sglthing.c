@@ -15,6 +15,8 @@
 #include "config.h"
 #include "sglthing.h"
 #include "stb_image.h"
+#include "memory.h"
+#include "prof.h"
 
 #ifndef SGLTHING_COMPILE
 #error "sglthing/sglthing.c should be compiled with SGLTHING_COMPILE"
@@ -41,8 +43,16 @@ static void sighandler(int sig)
             glfwSetWindowShouldClose(world->gfx.window, true);
 #endif
             should_close = true;
+            profiler_dump();
             break;
         case SIGHUP: // no term
+            break;
+        case SIGSEGV: // segmentation fault
+            printf("sglthing: segmentation fault\n");
+            __sglthing_assert_failed();
+            if(world->client_on)
+                network_disconnect_player(&world->client,true,"Segmentation fault",&world->client.client);
+            exit(-1);
             break;
         default:
             break;
@@ -60,6 +70,9 @@ int main(int argc, char** argv)
     void* window = NULL;
     #endif
     #ifndef HEADLESS
+
+    m2_init();
+
     // init GLFW & GLAD
     if(!glfwInit())
         return -1;
@@ -75,6 +88,7 @@ int main(int argc, char** argv)
     signal(SIGINT, sighandler);
     signal(SIGHUP, sighandler);
     signal(SIGTERM, sighandler);
+    signal(SIGSEGV, sighandler);
     
     #ifndef HEADLESS
     printf("sglthing: window created\n");

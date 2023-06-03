@@ -6,13 +6,52 @@
 struct snd snd_cache[CACHE_SIZE];
 int snd_count = 0;
 
+static struct sndmgr* default_mgr;
+
 void snd_init(struct sndmgr* mgr)
 {
 #ifdef SOUND_ENABLED
     Pa_Initialize();
+    mgr->sounds_playing = g_array_new(true, true, sizeof(struct snd*));
+    default_mgr = mgr;
 
     printf("sglthing: sound init (%p)\n", mgr);
 #endif
+}
+
+void snd_frame(struct sndmgr* mgr)
+{
+    profiler_event("snd_frame");
+    for(int i = 0; i < mgr->sounds_playing->len; i++)
+    {
+        struct snd* snd = g_array_index(mgr->sounds_playing, struct snd*, i);
+        if(snd->stop && snd->auto_dealloc)
+        {
+            Pa_AbortStream(snd);
+            while(snd->callback);
+            Pa_Sleep(100);
+            printf("sglthing: dealloc sound %p\n", snd);
+            snd->file = 0;
+            snd->stream = 0;
+            free2(snd);
+            g_array_remove_index(mgr->sounds_playing, i);
+            break;
+        }
+    }
+    profiler_end();
+}
+
+void snd_rmref(struct sndmgr* mgr, struct snd* snd)
+{
+    for(int i = 0; i < mgr->sounds_playing->len; i++)
+    {
+        struct snd* _snd = g_array_index(mgr->sounds_playing, struct snd*, i);
+        if(snd == _snd)
+        {
+            g_array_remove_index(mgr->sounds_playing, i);
+            return;
+        }
+    }
 }
 
 struct snd* get_snd(char* file_name)
@@ -39,7 +78,15 @@ static int snd_callback(void* input, void* output, unsigned long frame_count, co
 {
     struct snd* snd = (struct snd*)user;
     while(snd->lock);
+    snd->callback = true;
 
+    if(!snd)
+        return paAbort;
+    if(!snd->file)
+        return paAbort;
+    if(!snd->stream)
+        return paAbort;
+    
     float *cursor;
     float *out = (float*)output;
     int sz = frame_count;
@@ -68,7 +115,7 @@ static int snd_callback(void* input, void* output, unsigned long frame_count, co
         float distance_r = glm_vec3_distance(ear_position, snd->sound_position);
         attenuation_l = multiplier/distance_l;
         attenuation_r = multiplier/distance_r;
-        printf("%i (%p) %0.2f %0.2f %0.2f %0.2f %f %f %f %f %f %f\n", snd->id, snd, attenuation_l, attenuation_r, distance_l, distance_r, snd->sound_position[0], snd->sound_position[1], snd->sound_position[2], camera_position[0], camera_position[1], camera_position[2]);
+        // printf("%i (%p) %0.2f %0.2f %0.2f %0.2f %f %f %f %f %f %f\n", snd->id, snd, attenuation_l, attenuation_r, distance_l, distance_r, snd->sound_position[0], snd->sound_position[1], snd->sound_position[2], camera_position[0], camera_position[1], camera_position[2]);
     }
 
     bool stop = snd->stop;
@@ -91,19 +138,23 @@ static int snd_callback(void* input, void* output, unsigned long frame_count, co
         sf_readf_float(snd->file, cursor, rd);
 
         bool stereo = (snd->libsndfile_info.channels == 2);
-        int frame_rd_count = stereo ? sz*2 : sz;
+        int frame_rd_count = stereo ? rd*2 : rd;
         int add_no = stereo ? 2 : 1;
+        // printf("%p %p %p %i\n", snd, cursor, cursor+frame_rd_count, frame_rd_count);
         for(int i = 0; i < frame_rd_count; i+=add_no)
         {
             cursor[i] *= multiplier * attenuation_l;
             if(stereo)
+            {
                 cursor[i+1] *= multiplier * attenuation_r;
+            }
         }
 
         cursor += rd;
         sz -= rd;
     }
     
+    snd->callback = false;
     return stop ? paComplete : paContinue;
 }
 #endif
@@ -131,6 +182,7 @@ struct snd* load_snd(char* file_name)
     n_snd->sound_3d = false;
     n_snd->id = snd_count-1;
     n_snd->multiplier = 1.0f;
+    n_snd->auto_dealloc = true;
     printf("sglthing: %s sound file rate %i, %i channels, %i frames\n", 
         dest_path,
         n_snd->libsndfile_info.samplerate,
@@ -143,16 +195,14 @@ struct snd* load_snd(char* file_name)
 #endif
 }
 
-struct snd*  play_snd(char* file_name)
+struct snd* play_snd2(struct snd* snd)
 {
 #ifdef SOUND_ENABLED
-    struct snd* snd = get_snd(file_name);    
-    if(!snd)
-    {
-        printf("sglthing: attempted to play nonexistent snd %s\n", file_name);
+    printf("%i\n", default_mgr->sounds_playing->len);
+    if(default_mgr->sounds_playing->len > MAX_SOUNDS)
         return 0;
-    }
-    struct snd* new_snd = malloc(sizeof(struct snd));
+
+    struct snd* new_snd = malloc2(sizeof(struct snd));
     memcpy(new_snd, snd, sizeof(struct snd));
 
     new_snd->lock = false;
@@ -168,8 +218,29 @@ struct snd*  play_snd(char* file_name)
     if(error)
         printf("sglthing: error opening stream (%i)\n", error);
 
+    g_array_append_val(default_mgr->sounds_playing, new_snd);
     Pa_StartStream(new_snd->stream);
     return new_snd;
+#else
+    return 0;
+#endif
+}
+
+struct snd*  play_snd(char* file_name)
+{
+#ifdef SOUND_ENABLED
+    printf("%i\n", default_mgr->sounds_playing->len);
+    if(default_mgr->sounds_playing->len > MAX_SOUNDS)
+        return 0;
+
+    struct snd* snd = get_snd(file_name);    
+    if(!snd)
+    {
+        printf("sglthing: attempted to play nonexistent snd %s\n", file_name);
+        return 0;
+    }
+
+    return play_snd2(snd);
 #else
     return 0;
 #endif
@@ -188,5 +259,15 @@ void stop_snd(struct snd* snd)
 #ifdef SOUND_ENABLED
     snd->stop = true;
     Pa_StopStream(snd->stream);
+#endif
+}
+
+void kill_snd(struct snd* snd)
+{
+#ifdef SOUND_ENABLED
+    snd->stop = true;
+    Pa_AbortStream(snd->stream);
+    snd_rmref(default_mgr, snd);
+    free2(snd);
 #endif
 }

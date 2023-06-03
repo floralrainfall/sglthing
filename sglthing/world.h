@@ -14,6 +14,7 @@
 #include "script.h"
 #include "snd.h"
 #include "prof.h"
+#include "memory.h"
 #ifndef HEADLESS
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>

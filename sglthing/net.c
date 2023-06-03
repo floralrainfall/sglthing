@@ -84,6 +84,9 @@ void network_init(struct network* network, struct script_system* script)
     network->client.connected = false;
     network->script = script;
     network->receive_packet_callback = NULL;
+    network->del_player_callback = NULL;
+    network->new_player_callback = NULL;
+    network->old_player_add_callback = NULL;
     network->shutdown_ready = false;
     network->shutdown_empty = false;
     network->players = g_hash_table_new(g_int_hash, g_int_equal);
@@ -401,6 +404,8 @@ int network_transmit_packet(struct network* network, struct network_client* clie
 #else
     int s_cmd = sendto(network->client.socket, &packet, sizeof(struct network_packet), MSG_DONTWAIT | MSG_NOSIGNAL, &client->sockaddr, sizeof(client->sockaddr));
     network->packet_tx_numbers[network->packet_time]++;
+    if(network->packet_tx_numbers[network->packet_time] > 500)
+        printf("sglthing: (m:%i) over 500 packets sent in network frame???\n", network->mode);
     return s_cmd;
 #endif
 }
@@ -414,15 +419,20 @@ void network_transmit_packet_all(struct network* network, struct network_packet 
     }
 }
 
-struct network_client* network_get_player(struct network* network, int* player_id)
+struct network_client* network_get_player(struct network* network, int player_id)
 {
     if(network->mode == NETWORKMODE_SERVER)
     {
-        int cid = (int)g_hash_table_lookup(network->players, &player_id);
-        return &g_array_index(network->server_clients, struct network_client, cid);
+        for(int i = 0; i < network->server_clients->len; i++)
+        {
+            struct network_client* client = &g_array_index(network->server_clients, struct network_client, i);
+            if(player_id == client->connection_id)
+                return client;
+        }
+        return NULL;
     }
     else
-        return (struct network_client*)g_hash_table_lookup(network->players, player_id);
+        return (struct network_client*)g_hash_table_lookup(network->players, &player_id);
 }
 
 int last_given_player_id = 0;
@@ -489,6 +499,7 @@ static void network_manage_packet(struct network* network, struct network_client
                 network_transmit_packet(network, client, response);
 
                 network->distributed_time = in_packet.packet.ping.distributed_time;
+                network->pung = true;
             }
             else
             {
@@ -611,6 +622,9 @@ static void network_manage_packet(struct network* network, struct network_client
                             strncpy(response.packet.player_add.client_name, cli->client_name, 64);
                             printf("sglthing: player list: %s (%i, c: %p)\n", cli->client_name, cli->player_id, cli);
                             network_transmit_packet(network, client, response);
+
+                            if(network->old_player_add_callback)
+                                network->old_player_add_callback(network, client, cli);
                         }
                     }
 
@@ -640,7 +654,7 @@ static void network_manage_packet(struct network* network, struct network_client
 
                 for(int i = 0; i < in_packet.packet.serverinfo.player_count; i++)
                 {
-                    struct network_client* new_client = (struct network_client*)malloc(sizeof(struct network_client));
+                    struct network_client* new_client = (struct network_client*)malloc2(sizeof(struct network_client));
                     struct player_auth_list_entry* player = &in_packet.packet.serverinfo.players[i];
 
                     if(player->player_id == network->client.player_id)
@@ -698,13 +712,13 @@ static void network_manage_packet(struct network* network, struct network_client
                 if(network->del_player_callback)
                     network->del_player_callback(network, client);
                 g_hash_table_remove(network->players, &in_packet.packet.player_remove.player_id);
-                free(old_client);
-                if(in_packet.packet.player_remove.player_id == client->player_id)
+                if(in_packet.packet.player_remove.player_id != client->player_id)
                 {
-                    client->connected = false;
-                    network->status = NETWORKSTATUS_DISCONNECTED;
-                    printf("sglthing: we ought to be out of here!\n");
-                    network_disconnect_player(network, false, "disconnected", client);
+                    free(old_client);
+                    //client->connected = false;
+                    //network->status = NETWORKSTATUS_DISCONNECTED;
+                    //printf("sglthing: we ought to be out of here!\n");
+                    //network_disconnect_player(network, false, "disconnected", client);
                     return;
                 }
             }
@@ -815,6 +829,7 @@ void network_manage_socket(struct network* network, struct network_client* clien
                     new_client.connected = true;
                     new_client.last_ping_time = network->distributed_time;
                     new_client.ping_time_interval = 5.0;
+                    new_client.next_ping_time = network->distributed_time + new_client.ping_time_interval;
                     new_client.dl_data = NULL;
                     new_client.owner = network;                    
                     new_client.user_data = 0;
@@ -863,11 +878,15 @@ void network_frame(struct network* network, float delta_time, double time)
     for(int i = 0; i < network->packet_unacknowledged->len; i++)
     {
         struct unacknowledged_packet* pkt = &g_array_index(network->packet_unacknowledged, struct unacknowledged_packet, i);
-        if(pkt->tries >= 10)
-            continue;
         if(network->distributed_time > pkt->next_time)
         {
-            pkt->next_time = network->distributed_time + 1.f;
+            if(pkt->tries >= 10)
+            {
+                printf("sglthing: pkt too many tries (%i)\n", pkt->packet->meta.packet_type);
+                g_array_remove_index(network->packet_unacknowledged, i);
+                break;
+            }
+            pkt->next_time = network->distributed_time + 0.5f;
             pkt->tries++;
             pkt->packet->meta.acknowledge_tries = pkt->tries;
             network_transmit_packet(network, pkt->client, *pkt->packet);

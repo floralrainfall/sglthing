@@ -230,8 +230,8 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
     {
         struct aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 
-        struct model_vertex* vtx_array = (struct model_vertex*)malloc(mesh->mNumVertices*sizeof(struct model_vertex));
-        int* idx_array = (int*)malloc(mesh->mNumFaces*3*sizeof(int)); // safe to assume we'll have 3 vertices per face since we use Triangulate, do fix in future
+        struct model_vertex* vtx_array = (struct model_vertex*)malloc2(mesh->mNumVertices*sizeof(struct model_vertex));
+        int* idx_array = (int*)malloc2(mesh->mNumFaces*3*sizeof(int)); // safe to assume we'll have 3 vertices per face since we use Triangulate, do fix in future
         int idx_count = 0, vtx_count = 0;
 
         model_parse_mesh(vtx_array, &vtx_count, idx_array, &idx_count, mesh, scene);
@@ -265,7 +265,7 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
 
         model->mesh_count++;
 
-        free(idx_array);
+        free2(idx_array);
     }
     for(int i = 0; i < node->mNumChildren; i++)
     {
@@ -273,6 +273,27 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
     }
 }
 
+void load_model_mem(void* mem, int length, char* name)
+{
+    struct model* sel_model = &models[models_loaded];
+    sel_model->mesh_count = 0;
+    const struct aiScene *scene = aiImportFileFromMemory(mem, length, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals, NULL);
+    if(!scene)
+    {
+        printf("sglthing: model %s not loadable\n", name);
+        return;
+    }
+
+    sel_model->path = "sglsiteassets";
+    model_parse_node(sel_model, scene->mRootNode, scene);
+
+    strncpy(&sel_model->name[0], name, 64);
+    sel_model->scene = scene;
+
+    printf("sglthing: model %s loaded from memory\n", name);
+
+    models_loaded++;
+}
 
 void load_model(char* file)
 {
