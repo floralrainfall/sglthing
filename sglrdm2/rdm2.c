@@ -108,11 +108,12 @@ static void rdm_frame(struct world* world)
 
                 _pak.meta.packet_type = RDM_PACKET_UPDATE_POSITION;
                 _pak.meta.acknowledge = false;
+                _pak.meta.packet_size = sizeof(union rdm_packet_data);
                 glm_vec3_copy(client_state.local_player->position, _data->update_position.position);
                 glm_quat_copy(client_state.local_player->direction, _data->update_position.direction);
                 _data->update_position.player_id = client_state.local_player_id;
 
-                network_transmit_packet(&world->client, &world->client.client, _pak);
+                network_transmit_packet(&world->client, &world->client.client, &_pak);
 
                 client_state.mouse_update_diff = 0.f;
             }
@@ -149,6 +150,7 @@ static void rdm_frame(struct world* world)
             {
                 network_transmit_packet(&world->server, packet.client, packet.packet);
                 g_array_remove_index(server_state.chunk_packets_pending, 0);
+                free2(packet.packet);
                 server_state.next_pending = world->time + 0.001f;
             }
             profiler_end();
@@ -245,9 +247,10 @@ static void rdm_frame_ui(struct world* world)
 
                     _pak.meta.packet_type = RDM_PACKET_UPDATE_WEAPON;
                     _pak.meta.acknowledge = false;
+                    _pak.meta.packet_size = sizeof(union rdm_packet_data);
                     _data->update_weapon.weapon = i;
 
-                    network_transmit_packet(&world->client, &world->client.client, _pak);
+                    network_transmit_packet(&world->client, &world->client.client, &_pak);
                 }
                 float pos_off = 0.f;
                 if(client_state.local_player->active_weapon == i)

@@ -28,6 +28,7 @@ struct model_bone_info
 struct mesh
 {
     struct model_vertex* vtx_data;
+    int* idx_data;
     int vtx_data_count;
 
     int vertex_array;
@@ -43,6 +44,7 @@ struct mesh
     struct model_bone_info bone_info[128];
     int bone_infos;
     int bone_counter;
+    int bones;
 
     char* path;
     struct model* model_parent;

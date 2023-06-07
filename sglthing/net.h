@@ -10,11 +10,14 @@
 #include <sqlite3.h> 
 #include "memory.h"
 
+// TODO: completely remove the legacy TCP code as it makes the source look ugly
+
 #define CR_PACKET_VERSION 200
 #define NO_DATAPACKETS_TICK 512
 
 #define MAGIC_NUMBER 0x7930793179327934
 #define DATA_PACKET_SIZE 256
+#define NETWORK_PACKET_SIZE 512
 
 typedef uint64_t checksum_t;
 
@@ -92,37 +95,40 @@ struct player_auth_list_entry
     float player_color_b;
 };
 
+struct network_packet_header {
+    enum { 
+        PACKETTYPE_CLIENTINFO = 0xff00, // C-->S
+        PACKETTYPE_SERVERINFO,          // C<--S
+        PACKETTYPE_PING,                // C<->S
+        PACKETTYPE_ACKNOWLEDGE,         // C<->S
+        PACKETTYPE_DISCONNECT,          // C<->S
+
+        PACKETTYPE_PLAYER_ADD,          // C<--S
+        PACKETTYPE_PLAYER_REMOVE,       // C<--S
+        PACKETTYPE_CHAT_MESSAGE,        // C<->S
+        
+        PACKETTYPE_DATA,                // C<--S
+        PACKETTYPE_DATA_REQUEST,        // C<->S
+        PACKETTYPE_LUA_DATA,            // C<->S
+
+        PACKETTYPE_DEBUGGER_QUIT,       // C-->S
+        PACKETTYPE_DEBUGGER_KICK,       // C-->S
+
+        PACKETTYPE_LAST_ID,
+    } packet_type;
+    int packet_version;
+    int packet_id;
+    int packet_checksum;
+    int packet_size;
+    bool acknowledge;
+    int acknowledge_tries;
+    float distributed_time;
+    uint64_t magic_number;
+    int network_frames;
+};
+
 struct network_packet {
-    struct {
-        enum { 
-            PACKETTYPE_CLIENTINFO,       // C-->S
-            PACKETTYPE_SERVERINFO,       // C<--S
-            PACKETTYPE_PING,             // C<->S
-            PACKETTYPE_ACKNOWLEDGE,      // C<->S
-            PACKETTYPE_DISCONNECT,       // C<->S
-
-            PACKETTYPE_PLAYER_ADD,       // C<--S
-            PACKETTYPE_PLAYER_REMOVE,    // C<--S
-            PACKETTYPE_CHAT_MESSAGE,     // C<->S
-            
-            PACKETTYPE_DATA,             // C<--S
-            PACKETTYPE_DATA_REQUEST,     // C<->S
-            PACKETTYPE_LUA_DATA,         // C<->S
-
-            PACKETTYPE_DEBUGGER_QUIT,    // C-->S
-            PACKETTYPE_DEBUGGER_KICK,    // C-->S
-
-            PACKETTYPE_LAST_ID,
-        } packet_type;
-        int packet_version;
-        int packet_id;
-        int packet_checksum;
-        bool acknowledge;
-        int acknowledge_tries;
-        float distributed_time;
-        uint64_t magic_number;
-        int network_frames;
-    } meta;
+    struct network_packet_header meta;
     union {
         struct {
             int packet_id;
@@ -160,7 +166,6 @@ struct network_packet {
             float player_color_b;
 
             int player_count;
-            struct player_auth_list_entry players[];
         } serverinfo;
         struct {
             char client_name[64];
@@ -209,6 +214,8 @@ struct network_packet {
         } dbg_kick;
     } packet;
 };
+
+#define PAK_SIZE(P) sizeof(P) + sizeof(struct network_packet_header)
 
 #define NETWORK_HISTORY_FRAMES 16
 
@@ -263,8 +270,8 @@ void network_init(struct network* network, struct script_system* script);
 void network_connect(struct network* network, char* ip, int port);
 void network_open(struct network* network, char* ip, int port);
 void network_manage_socket(struct network* network, struct network_client* client);
-int network_transmit_packet(struct network* network, struct network_client* client, struct network_packet packet);
-void network_transmit_packet_all(struct network* network, struct network_packet packet);
+int network_transmit_packet(struct network* network, struct network_client* client, struct network_packet* packet);
+void network_transmit_packet_all(struct network* network, struct network_packet* packet);
 void network_transmit_data(struct network* network, struct network_client* client, char* data, int data_length);
 void network_disconnect_player(struct network* network, bool transmit_disconnect, char* reason, struct network_client* client);
 void network_frame(struct network* network, float delta_time, double time);

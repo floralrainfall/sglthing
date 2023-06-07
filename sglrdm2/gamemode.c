@@ -49,10 +49,11 @@ void gamemode_frame(struct gamemode_data* data, struct world* world)
                 struct network_packet _pak;
                 union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
 
+                _pak.meta.packet_size = 0;
                 _pak.meta.packet_type = RDM_PACKET_GAME_START;
                 _pak.meta.acknowledge = false;
 
-                network_transmit_packet_all(&world->server, _pak);
+                network_transmit_packet_all(&world->server, &_pak);
 
                 map_server_init(server_state.map_server);
             }
@@ -104,7 +105,10 @@ void gamemode_frame(struct gamemode_data* data, struct world* world)
     }
 
     if(data->gamemode_nextannouncement < world->time && data->server)
+    {
         net_sync_gamemode(&world->server, data);
+        data->gamemode_nextannouncement += world->time + 0.5f;
+    }
     profiler_end();
 }
 

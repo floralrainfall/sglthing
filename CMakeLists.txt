@@ -225,14 +225,15 @@ target_include_directories(sglthing PUBLIC
     ${CURL_INCLUDE_DIRS}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}
+    ${USER_INCLUDE_DIR}
 )
 
 target_link_libraries(sglthing PUBLIC
     ${GLAD_LIBRARY}
     ${GLFW_LIBRARY}
-    cglm
-    assimp
-    m
+    cglm ${USER_CGLM_LIBRARY}
+    assimp ${USER_ASSIMP_LIBRARY}
+    m 
     lua
     ${ZLIB_LIBRARIES} # from assimp
     ${CURL_LIBRARIES}

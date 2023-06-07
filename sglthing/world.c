@@ -67,6 +67,7 @@ struct world* world_init(char** argv, int argc, void* p)
     for(int i = 2; i < argc; i += 2)
         g_key_file_set_value(world->config.key_file, "sglthing", argv[i-1], argv[i]);
 
+    m2_init(0);
 
     int archives_length;
     char** archives = g_key_file_get_string_list(world->config.key_file, "sglthing", "archives", &archives_length, NULL);
@@ -594,9 +595,9 @@ void world_frame(struct world* world)
 
         if(config_number_get(&world->config,"debug_mode") == 1.0)
         {
-            char dbg_info[256];
+            char dbg_info[512];
             int old_elements = world->ui->ui_elements;
-            snprintf(dbg_info, 256, "DEBUG\n\ncam: V=(%.2f,%.2f,%.2f)\nY=%.2f,P=%.2f\nU=(%.2f,%.2f,%.2f)\nF=(%.2f,%.2f,%.2f)\nR=(%.f,%.f,%.f)\nF=%.f\nv=(%i,%i)\nr (scene)=%i,r (ui)=%i\nt=%f, F=%i, d=%f, fps=%f\n\n"
+            snprintf(dbg_info, 512, "DEBUG\n\ncam: V=(%.2f,%.2f,%.2f)\nY=%.2f,P=%.2f\nU=(%.2f,%.2f,%.2f)\nF=(%.2f,%.2f,%.2f)\nR=(%.f,%.f,%.f)\nF=%.f\nv=(%i,%i)\nr (scene)=%i,r (ui)=%i\nt=%f, F=%i, d=%f, fps=%f\nm_alloc: %fkB, m_leaked: %fkB, m_using: %fKB\nm_alloc_count: %i\n"
 #ifdef ODE_ENABLED
                 "physics pause=%s\nphysics geoms=%i\ncollisions in frame=%i\n"
 #endif
@@ -610,7 +611,8 @@ void world_frame(struct world* world)
                 (int)world->viewport[2], (int)world->viewport[3],
                 world->render_count,
                 old_elements,
-                world->time, world->frames, world->delta_time, world->fps
+                world->time, world->frames, world->delta_time, world->fps,
+                memory_allocated / 1000.f, memory_leaked / 1000.f, (memory_allocated - memory_leaked) / 1000.f, memory_allocations
 #ifdef ODE_ENABLED
                 , world->physics.paused?"true":"false",
                 dSpaceGetNumGeoms(world->physics.space),
@@ -838,6 +840,7 @@ void world_draw_model(struct world* world, struct model* model, int shader_progr
         //ui_draw_text_3d(world->ui, world->viewport, world->cam.position, world->cam.front, (vec3){0.f,1.f,0.f}, world->cam.fov, model_matrix, world->vp, txbuf);
         //world_draw_primitive(world, PRIMITIVE_BOX, model_matrix, (vec4){1.f, 1.f, 1.f, 1.f});
     }
+    m2_frame();
     profiler_end();
 #endif
 }

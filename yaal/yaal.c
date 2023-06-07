@@ -38,7 +38,7 @@ static void __player_iter(gpointer key, gpointer value, gpointer user)
     {
         if(player)
         {
-            animator_update(&player->animator, network->world->delta_time);
+            // animator_update(&player->animator, network->world->delta_time);
         }
     }
     else
@@ -727,7 +727,7 @@ static void __sglthing_frame_ui(struct world* world)
 
 static void __load_map(const char* file_name)
 {
-    struct map_file_data* mfd = (struct map_file_data*)malloc(sizeof(struct map_file_data));
+    struct map_file_data* mfd = (struct map_file_data*)malloc2(sizeof(struct map_file_data));
     FILE* mf = file_open(file_name, "r");
     if(mf)
     {
@@ -814,7 +814,7 @@ void sglthing_init_api(struct world* world)
     for(int i = 0; i < maps_length; i++)
         __load_map(maps_to_load[i]);
 
-    yaal_state.chat = (struct chat_system*)malloc(sizeof(struct chat_system));
+    yaal_state.chat = (struct chat_system*)malloc2(sizeof(struct chat_system));
     chat_init(yaal_state.chat);
 
     world->gfx.sgl_background_image = get_texture("yaal/ui/yaal_image.png");

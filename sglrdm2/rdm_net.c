@@ -21,11 +21,12 @@ void net_player_syncinfo2(struct network* network, struct rdm_player* player)
 
     _pak.meta.packet_type = RDM_PACKET_PLAYER_STATUS;
     _pak.meta.acknowledge = true;
+    _pak.meta.packet_size = sizeof(union rdm_packet_data);
     _data->player_status.urgent = false;
     _data->player_status.player_id = player->client->player_id;
     // TODO: This
 
-    network_transmit_packet(network, player->client, _pak);
+    network_transmit_packet(network, player->client, &_pak);
 }
 
 void net_player_syncinfo(struct network* network, struct rdm_player* player)
@@ -35,13 +36,14 @@ void net_player_syncinfo(struct network* network, struct rdm_player* player)
 
     _pak.meta.packet_type = RDM_PACKET_PLAYER_STATUS;
     _pak.meta.acknowledge = true;
+    _pak.meta.packet_size = sizeof(union rdm_packet_data);
     _data->player_status.urgent = true;
     _data->player_status.health = player->health;
     _data->player_status.player_id = player->client->player_id;
     for(int i = 0; i < __WEAPON_MAX; i++)
         _data->player_status.weapon_ammos[i] = player->weapon_ammos[i];
 
-    network_transmit_packet(network, player->client, _pak);
+    network_transmit_packet(network, player->client, &_pak);
 }
 
 void net_player_damage(struct network* network, struct rdm_player* player, int damage, int attacker_id)
@@ -62,32 +64,36 @@ void net_player_moveto(struct network* network, struct rdm_player* player, vec3 
 
     _pak.meta.packet_type = RDM_PACKET_UPDATE_POSITION;
     _pak.meta.acknowledge = false;
+    _pak.meta.packet_size = sizeof(union rdm_packet_data);
     glm_vec3_copy(position, _data->update_position.position);
     glm_vec3_copy(position, player->replicated_position);
     glm_quat_copy(player->direction, _data->update_position.direction);
     _data->update_position.urgent = true;
     _data->update_position.player_id = player->client->player_id;
 
-    network_transmit_packet_all(network, _pak);
+    network_transmit_packet_all(network, &_pak);
 }
 
 void net_send_chunk(struct network* network, struct network_client* client, int c_x, int c_y, int c_z, struct map_chunk* chunk)
 {
     profiler_event("net_send_chunk");
-    struct pending_packet pending;
-    union rdm_packet_data* _data = (union rdm_packet_data*)&pending.packet.packet.data;
 
-    pending.client = client;
-
-    pending.packet.meta.packet_type = RDM_PACKET_UPDATE_CHUNK;
-    pending.packet.meta.acknowledge = true;
-    pending.giveup = network->time + 10.0;
-    _data->update_chunk.chunk_x = c_x;
-    _data->update_chunk.chunk_y = c_y;
-    _data->update_chunk.chunk_z = c_z;
 
     for(int x = 0; x < RENDER_CHUNK_SIZE; x++)
     {
+        struct pending_packet pending;
+        pending.packet = (struct network_packet*)malloc2(sizeof(struct network_packet_header) + sizeof(union rdm_packet_data));
+        union rdm_packet_data* _data = (union rdm_packet_data*)&pending.packet->packet.data;
+
+        pending.client = client;
+
+        pending.packet->meta.packet_size = sizeof(_data->update_chunk);
+        pending.packet->meta.packet_type = RDM_PACKET_UPDATE_CHUNK;
+        pending.packet->meta.acknowledge = true;
+        pending.giveup = network->time + 10.0;
+        _data->update_chunk.chunk_x = c_x;
+        _data->update_chunk.chunk_y = c_y;
+        _data->update_chunk.chunk_z = c_z;        
         _data->update_chunk.chunk_data_x = x;
 
         memcpy(_data->update_chunk.chunk_data, chunk->x[x].y, RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE);
@@ -106,11 +112,12 @@ void net_play_sound(struct network* network, struct rdm_player* player, char* sn
     union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
 
     _pak.meta.packet_type = RDM_PACKET_REPLICATE_SOUND;
+    _pak.meta.packet_size = sizeof(union rdm_packet_data);
     _pak.meta.acknowledge = false;
     strncpy(_data->replicate_sound.sound_name, snd_name, 128);
     glm_vec3_copy(position, _data->replicate_sound.position);
 
-    network_transmit_packet(network, player->client, _pak);
+    network_transmit_packet(network, player->client, &_pak);
 }
 
 void net_play_g_sound(struct network* network, char* snd_name, vec3 position)
@@ -126,10 +133,11 @@ void net_sync_gamemode(struct network* network, struct gamemode_data* gamemode)
 
     _pak.meta.packet_type = RDM_PACKET_UPDATE_GAMEMODE;
     _pak.meta.acknowledge = true;
+    _pak.meta.packet_size = sizeof(union rdm_packet_data);  
 
     memcpy(&_data->update_gamemode.gm_data, gamemode, sizeof(struct gamemode_data));
 
-    network_transmit_packet_all(network, _pak);
+    network_transmit_packet_all(network, &_pak);
 }
 
 static void net_info_player(struct network* network, struct network_client* new_client, struct network_client* old_client)
@@ -142,11 +150,12 @@ static void net_info_player(struct network* network, struct network_client* new_
 
         _pak.meta.packet_type = RDM_PACKET_UPDATE_POSITION;
         _pak.meta.acknowledge = false;
+        _pak.meta.packet_size = sizeof(union rdm_packet_data);  
         glm_vec3_copy(old_player->replicated_position, _data->update_position.position);
         glm_quat_copy(old_player->direction, _data->update_position.direction);
         _data->update_position.player_id = old_client->player_id;
 
-        network_transmit_packet(network, new_client, _pak);
+        network_transmit_packet(network, new_client, &_pak);
     }
 }
 
@@ -223,6 +232,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
 
                         _pak.meta.packet_type = RDM_PACKET_UPDATE_POSITION;
                         _pak.meta.acknowledge = false;
+                        _pak.meta.packet_size = sizeof(union rdm_packet_data);  
                         glm_vec3_copy(remote_player->replicated_position, _data->update_position.position);
                         glm_quat_copy(remote_player->direction, _data->update_position.direction);
                         _data->update_position.urgent = true;
@@ -230,7 +240,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
 
                         printf("rdm2[%s]: player %s going too fast (%fu in 1 packet)\n", net_name_manager(network), client->client_name, distance);
 
-                        network_transmit_packet_all(network, _pak);
+                        network_transmit_packet_all(network, &_pak);
                     }
                     else
                     {
@@ -238,7 +248,8 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                         glm_quat_copy(packet_data->update_position.direction, remote_player->direction);       
 
                         struct network_packet _pak; // snap back
-                        union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;                 
+                        union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;               
+                        _pak.meta.packet_size = sizeof(union rdm_packet_data);  
                         _pak.meta.packet_type = RDM_PACKET_UPDATE_POSITION;
                         _pak.meta.acknowledge = false;
                         glm_vec3_copy(remote_player->replicated_position, _data->update_position.position);
@@ -246,7 +257,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                         _data->update_position.urgent = false;
                         _data->update_position.player_id = client->player_id;
 
-                        network_transmit_packet_all(network, _pak);
+                        network_transmit_packet_all(network, &_pak);
                     }
                 }
                 else
@@ -258,12 +269,13 @@ static bool net_receive_packet(struct network* network, struct network_client* c
 
                     _pak.meta.packet_type = RDM_PACKET_UPDATE_POSITION;
                     _pak.meta.acknowledge = false;
+                    _pak.meta.packet_size = sizeof(union rdm_packet_data);
                     glm_vec3_copy(remote_player->replicated_position, _data->update_position.position);
                     glm_quat_copy(remote_player->direction, _data->update_position.direction);
                     _data->update_position.urgent = true;
                     _data->update_position.player_id = client->player_id;
 
-                    network_transmit_packet_all(network, _pak);
+                    network_transmit_packet_all(network, &_pak);
                 }
             }
             else if(network->mode == NETWORKMODE_CLIENT)
@@ -361,10 +373,11 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                     
                     _pak.meta.packet_type = RDM_PACKET_WEAPON_FIRE;
                     _pak.meta.acknowledge = false;
+                    _pak.meta.packet_size = sizeof(union rdm_packet_data);
                     _data->weapon_fire.player_id = client->player_id,
                     _data->weapon_fire.secondary = packet_data->weapon_fire.secondary;
 
-                    network_transmit_packet_all(network, _pak);
+                    network_transmit_packet_all(network, &_pak);
                 }
             }
             else if(network->mode == NETWORKMODE_CLIENT)
@@ -407,11 +420,12 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                 
                 _pak.meta.packet_type = RDM_PACKET_UPDATE_WEAPON;
                 _pak.meta.acknowledge = false;
+                _pak.meta.packet_size = sizeof(union rdm_packet_data);
                 _data->update_weapon.player_id = client->player_id,
                 _data->update_weapon.weapon = packet_data->update_weapon.weapon;
                 remote_player->active_weapon = packet_data->update_weapon.weapon;
 
-                network_transmit_packet_all(network, _pak);
+                network_transmit_packet_all(network, &_pak);
             }
             else if(network->mode == NETWORKMODE_CLIENT)
             {

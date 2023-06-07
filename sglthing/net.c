@@ -19,8 +19,11 @@
 
 struct unacknowledged_packet
 {
+    struct network_packet_header header;
+
     struct network_packet* packet;
     struct network_client* client;
+    
     double next_time;
     int tries;
 };
@@ -153,11 +156,12 @@ void network_tick_download(struct network_downloader* network)
     if(network->socket == -1)
         return;
 
-    struct network_packet in_packet;
-    while(recv(network->socket, &in_packet, sizeof(struct network_packet), MSG_DONTWAIT) != -1)
+    // TODO: make work with packet_size
+    struct network_packet* in_packet;
+    while(recv(network->socket, in_packet, NETWORK_PACKET_SIZE, MSG_DONTWAIT) != -1)
     {
         bool cancel_tick = false;
-        switch(in_packet.meta.packet_type)
+        switch(in_packet->meta.packet_type)
         {
             case PACKETTYPE_PING:
                 {
@@ -171,8 +175,8 @@ void network_tick_download(struct network_downloader* network)
                 }
                 break;
             case PACKETTYPE_SERVERINFO:
-                strncpy(network->server_motd, in_packet.packet.serverinfo.server_motd, 128);
-                strncpy(network->server_name, in_packet.packet.serverinfo.server_name, 64);
+                strncpy(network->server_motd, in_packet->packet.serverinfo.server_motd, 128);
+                strncpy(network->server_name, in_packet->packet.serverinfo.server_name, 64);
                 {
                     struct network_packet response;
                     ZERO(response);
@@ -190,30 +194,30 @@ void network_tick_download(struct network_downloader* network)
                     network_stop_download(network);
                     break;
                 }
-                for(int i = 0; i < in_packet.packet.data.data_size; i++)
+                for(int i = 0; i < in_packet->packet.data.data_size; i++)
                 {
-                    char byte = in_packet.packet.data.data[i];
-                    uint64_t addr = in_packet.packet.data.data_size * in_packet.packet.data.data_packet_id + i;
+                    char byte = in_packet->packet.data.data[i];
+                    uint64_t addr = in_packet->packet.data.data_size * in_packet->packet.data.data_packet_id + i;
                     if(addr > network->data_size + 512)
                     {
-                        printf("sglthing: BAD INTENTS AHEAD\nsglthing: server attempted to send PACKETTYPE_DATA write to address out of data size (packet id: %i, offset: %08x)\n", in_packet.packet.data.data_packet_id, addr);
+                        printf("sglthing: BAD INTENTS AHEAD\nsglthing: server attempted to send PACKETTYPE_DATA write to address out of data size (packet id: %i, offset: %08x)\n", in_packet->packet.data.data_packet_id, addr);
                         network_stop_download(network);
                         return;
                     }
                     network->data_offset[addr] = byte;
-                    if(in_packet.packet.data.data_packet_id < network->data_packet_id)
+                    if(in_packet->packet.data.data_packet_id < network->data_packet_id)
                     {
-                        printf("sglthing: packet %i resent\n", in_packet.packet.data.data_packet_id);
+                        printf("sglthing: packet %i resent\n", in_packet->packet.data.data_packet_id);
                     }
                     else
                     {
                         network->data_downloaded ++;
-                        network->data_packet_id = in_packet.packet.data.data_packet_id;
+                        network->data_packet_id = in_packet->packet.data.data_packet_id;
                     }
 
-                    if(in_packet.packet.data.data_packet_id == in_packet.packet.data.data_final_packet_id)
+                    if(in_packet->packet.data.data_packet_id == in_packet->packet.data.data_final_packet_id)
                     {
-                        printf("sglthing: last packet downloaded, datapacket id: %i\n", in_packet.packet.data.data_packet_id);
+                        printf("sglthing: last packet downloaded, datapacket id: %i\n", in_packet->packet.data.data_packet_id);
                         network->data_done = true;
                         network_stop_download(network);
                         return;
@@ -222,12 +226,12 @@ void network_tick_download(struct network_downloader* network)
                 cancel_tick = true;
                 break;
             case PACKETTYPE_DATA_REQUEST:
-                network->data_size = in_packet.packet.data_request.data_size;
-                network->data_offset = malloc(network->data_size + 512);
+                network->data_size = in_packet->packet.data_request.data_size;
+                network->data_offset = malloc2(network->data_size + 512);
                 printf("sglthing: dl: packet request, size: %i bytes\n", network->data_size);
                 break;
             default:
-                //printf("sglthing: dl: unknown packet id %i\n", in_packet.meta.packet_type);
+                //printf("sglthing: dl: unknown packet id %i\n", in_packet->meta.packet_type);
                 break;
         }
     }
@@ -291,6 +295,7 @@ void network_connect(struct network* network, char* ip, int port)
         ZERO(client_info);
         network->status = NETWORKSTATUS_CONNECTED;
         network->client.connected = true;
+        client_info.meta.packet_size = sizeof(client_info.packet);
         client_info.meta.acknowledge = true;
         client_info.meta.packet_type = PACKETTYPE_CLIENTINFO;
         client_info.packet.clientinfo.sglthing_revision = GIT_COMMIT_COUNT;
@@ -301,7 +306,7 @@ void network_connect(struct network* network, char* ip, int port)
         client_info.packet.clientinfo.color_r = network->client.player_color_r;
         client_info.packet.clientinfo.color_g = network->client.player_color_g;
         client_info.packet.clientinfo.color_b = network->client.player_color_b;
-        network_transmit_packet(network, &network->client, client_info);
+        network_transmit_packet(network, &network->client, &client_info);
 
         network->next_tick = network->distributed_time + 0.01;
 #ifdef NETWORK_TCP
@@ -375,42 +380,39 @@ void network_transmit_data(struct network* network, struct network_client* clien
     client->dl_retries = 0;
 }
 
-int network_transmit_packet(struct network* network, struct network_client* client, struct network_packet packet)
+int network_transmit_packet(struct network* network, struct network_client* client, struct network_packet* packet)
 {
-    packet.meta.distributed_time = network->distributed_time;
-    packet.meta.packet_version = CR_PACKET_VERSION;
-    packet.meta.magic_number = MAGIC_NUMBER;
-    packet.meta.network_frames = network->network_frames;
-    if(packet.meta.acknowledge && packet.meta.acknowledge_tries == 0)
+    packet->meta.distributed_time = network->distributed_time;
+    packet->meta.packet_version = CR_PACKET_VERSION;
+    packet->meta.magic_number = MAGIC_NUMBER;
+    packet->meta.network_frames = network->network_frames;
+    if(!client->connected)
+        return -1;
+    if(packet->meta.acknowledge && packet->meta.acknowledge_tries == 0)
     {
-        packet.meta.packet_id = network->packet_id++;
-        struct network_packet* tmp = (struct network_packet*)malloc(sizeof(struct network_packet));
-        memcpy(tmp,&packet,sizeof(struct network_packet));
+        packet->meta.packet_id = network->packet_id++;
+        struct network_packet* tmp = (struct network_packet*)malloc2(sizeof(struct network_packet_header) + packet->meta.packet_size);
+        memcpy(tmp, packet, sizeof(struct network_packet_header) + packet->meta.packet_size);
         struct unacknowledged_packet tmp2;
         tmp2.packet = tmp;
         tmp2.tries = 1;
         tmp2.client = client;
         tmp2.next_time = network->distributed_time + 1.f;
+        memcpy(&tmp2.header, &packet->meta, sizeof(struct network_packet_header));
         g_array_append_val(network->packet_unacknowledged, tmp2);
     }
-    if(!client->connected)
-        return -1;
-#ifdef NETWORK_FAKE_DROP
-    if(g_random_double_range(0.0, 1.0) < 0.1)
-        return -1;
-#endif
-#ifdef NETWORK_TCP
-    return send(client->socket, &packet, sizeof(struct network_packet), MSG_DONTWAIT | MSG_NOSIGNAL);
-#else
-    int s_cmd = sendto(network->client.socket, &packet, sizeof(struct network_packet), MSG_DONTWAIT | MSG_NOSIGNAL, &client->sockaddr, sizeof(client->sockaddr));
-    network->packet_tx_numbers[network->packet_time]++;
-    if(network->packet_tx_numbers[network->packet_time] > 500)
-        printf("sglthing: (m:%i) over 500 packets sent in network frame??? (trying to send a %i)\n", network->mode, packet.meta.packet_type);
-    return s_cmd;
-#endif
+    #ifdef NETWORK_TCP
+        return send(client->socket, packet, packet->meta.packet_size, MSG_DONTWAIT | MSG_NOSIGNAL);
+    #else
+        int s_cmd = sendto(network->client.socket, packet, sizeof(struct network_packet_header) + packet->meta.packet_size, MSG_DONTWAIT | MSG_NOSIGNAL, &client->sockaddr, sizeof(client->sockaddr));
+        network->packet_tx_numbers[network->packet_time]++;
+        if(network->packet_tx_numbers[network->packet_time] > 500)
+            printf("sglthing: (m:%i) over 500 packets sent in network frame??? (trying to send a %i)\n", network->mode, packet->meta.packet_type);
+        return s_cmd;
+    #endif
 }
 
-void network_transmit_packet_all(struct network* network, struct network_packet packet)
+void network_transmit_packet_all(struct network* network, struct network_packet* packet)
 {
     for(int i = 0; i < network->server_clients->len; i++)
     {
@@ -437,26 +439,27 @@ struct network_client* network_get_player(struct network* network, int player_id
 
 int last_given_player_id = 0;
 
-static void network_manage_packet(struct network* network, struct network_client* client, struct network_packet in_packet)
+static void network_manage_packet(struct network* network, struct network_client* client, struct network_packet* in_packet)
 {
-    if(in_packet.meta.magic_number != MAGIC_NUMBER)
+    if(in_packet->meta.magic_number != MAGIC_NUMBER)
         return;
-    else if(in_packet.meta.packet_version != CR_PACKET_VERSION)
+    else if(in_packet->meta.packet_version != CR_PACKET_VERSION)
         return;
     profiler_event("network_manage_packet");
     bool passthru = true;
-    if(in_packet.meta.acknowledge)
+    if(in_packet->meta.acknowledge)
     {
         struct network_packet ack;
         ack.meta.packet_type = PACKETTYPE_ACKNOWLEDGE;
+        ack.meta.packet_size = sizeof(ack.packet.acknowledge);
         ack.meta.acknowledge = false;
-        ack.packet.acknowledge.packet_id = in_packet.meta.packet_id;
-        network_transmit_packet(network, client, ack);
+        ack.packet.acknowledge.packet_id = in_packet->meta.packet_id;
+        network_transmit_packet(network, client, &ack);
     }
     if(network->receive_packet_callback)
     {
         profiler_event("receive_packet_callback");
-        passthru = network->receive_packet_callback(network, client, &in_packet);
+        passthru = network->receive_packet_callback(network, client, in_packet);
         profiler_end();
     }
     if(!passthru)
@@ -464,16 +467,17 @@ static void network_manage_packet(struct network* network, struct network_client
         profiler_end();
         return;
     }
-    switch(in_packet.meta.packet_type)
+    switch(in_packet->meta.packet_type)
     {
         case PACKETTYPE_ACKNOWLEDGE:
             for(int i = 0; i < network->packet_unacknowledged->len; i++)
             {
                 struct unacknowledged_packet pkt = g_array_index(network->packet_unacknowledged, struct unacknowledged_packet, i);
-                if(pkt.packet->meta.packet_id == in_packet.packet.acknowledge.packet_id)
+                if(pkt.packet->meta.packet_id == in_packet->packet.acknowledge.packet_id)
                 {
                     g_array_remove_index(network->packet_unacknowledged, i);
-                    free(pkt.packet);
+                    printf("freeing packet %p %x\n", pkt.packet, pkt.header.packet_type);
+                    free2(pkt.packet);
                     break;
                 }
             }
@@ -481,12 +485,12 @@ static void network_manage_packet(struct network* network, struct network_client
         case PACKETTYPE_DISCONNECT:
             if(network->mode == NETWORKMODE_CLIENT)
             {
-                network_disconnect_player(network, false, in_packet.packet.disconnect.disconnect_reason, client);
+                network_disconnect_player(network, false, in_packet->packet.disconnect.disconnect_reason, client);
             }
             else
             {
-                printf("sglthing: client '%s' disconnected '%s'\n", client->client_name, in_packet.packet.disconnect.disconnect_reason);
-                network_disconnect_player(network, true, in_packet.packet.disconnect.disconnect_reason, client);
+                printf("sglthing: client '%s' disconnected '%s'\n", client->client_name, in_packet->packet.disconnect.disconnect_reason);
+                network_disconnect_player(network, true, in_packet->packet.disconnect.disconnect_reason, client);
             }
             break;
         case PACKETTYPE_PING:
@@ -495,27 +499,28 @@ static void network_manage_packet(struct network* network, struct network_client
                 struct network_packet response;
                 ZERO(response);
                 response.meta.packet_type = PACKETTYPE_PING;
+                response.meta.packet_size = sizeof(response.packet.ping);
                 response.packet.ping.distributed_time = network->distributed_time;
-                network_transmit_packet(network, client, response);
+                network_transmit_packet(network, client, &response);
 
-                network->distributed_time = in_packet.packet.ping.distributed_time;
+                network->distributed_time = in_packet->packet.ping.distributed_time;
                 network->pung = true;
             }
             else
             {
                 client->last_ping_time = network->distributed_time;
-                client->lag = network->distributed_time - in_packet.packet.ping.distributed_time;
+                client->lag = network->distributed_time - in_packet->packet.ping.distributed_time;
             }
             break;
         case PACKETTYPE_CLIENTINFO:
             if(network->mode == NETWORKMODE_SERVER && !client->authenticated)
             {
-                if(strlen(network->server_pass) == 0 || strncmp(in_packet.packet.clientinfo.server_pass, network->server_pass, 64) == 0)
+                if(strlen(network->server_pass) == 0 || strncmp(in_packet->packet.clientinfo.server_pass, network->server_pass, 64) == 0)
                 {
                     client->verified = true;
-                    if(!http_check_sessionkey(&network->http_client, in_packet.packet.clientinfo.session_key))
+                    if(!http_check_sessionkey(&network->http_client, in_packet->packet.clientinfo.session_key))
                     {
-                        printf("sglthing: client '%s' failed key\n", in_packet.packet.clientinfo.client_name);
+                        printf("sglthing: client '%s' failed key\n", in_packet->packet.clientinfo.client_name);
                         if(network->security)
                             network_disconnect_player(network, true, "Bad key", client);
                         client->verified = false;
@@ -524,11 +529,11 @@ static void network_manage_packet(struct network* network, struct network_client
                         client->player_color_g = 1.0;
                         client->player_color_b = 1.0;
 
-                        //client->web_player_id = http_get_userid(&network->http_client, in_packet.packet.clientinfo.session_key);
+                        //client->web_player_id = http_get_userid(&network->http_client, in_packet->packet.clientinfo.session_key);
                     }
                     else
                     {
-                        client->user = http_get_userdata(&network->http_client, in_packet.packet.clientinfo.session_key);
+                        client->user = http_get_userdata(&network->http_client, in_packet->packet.clientinfo.session_key);
                         if(client->user.found)
                         {
                             printf("sglthing: was able to get web userdata, id = %i\n", client->user.user_id);
@@ -549,40 +554,41 @@ static void network_manage_packet(struct network* network, struct network_client
                         }
 
                         char url[256];
-                        snprintf(url,256,"auth/key_owner?sessionkey=%s",in_packet.packet.clientinfo.session_key);
+                        snprintf(url,256,"auth/key_owner?sessionkey=%s",in_packet->packet.clientinfo.session_key);
                         char* username = http_get(&network->http_client,url);
                         if(username)
                         {
-                            strncpy(in_packet.packet.clientinfo.client_name, username, 64);
-                            free(username);
+                            strncpy(in_packet->packet.clientinfo.client_name, username, 64);
+                            free2(username);
                         }
 
-                        client->player_color_r = in_packet.packet.clientinfo.color_r;
-                        client->player_color_g = in_packet.packet.clientinfo.color_g;
-                        client->player_color_b = in_packet.packet.clientinfo.color_b;
+                        client->player_color_r = in_packet->packet.clientinfo.color_r;
+                        client->player_color_g = in_packet->packet.clientinfo.color_g;
+                        client->player_color_b = in_packet->packet.clientinfo.color_b;
                         client->verified = true;
                     }
 
-                    if(!in_packet.packet.clientinfo.observer && strlen(network->debugger_pass) && strncmp(in_packet.packet.clientinfo.debugger_pass, network->debugger_pass, 64) == 0)
+                    if(!in_packet->packet.clientinfo.observer && strlen(network->debugger_pass) && strncmp(in_packet->packet.clientinfo.debugger_pass, network->debugger_pass, 64) == 0)
                     {
-                        printf("sglthing: client '%s' used debugger password\n", in_packet.packet.clientinfo.client_name);
+                        printf("sglthing: client '%s' used debugger password\n", in_packet->packet.clientinfo.client_name);
                         client->debugger = true;
                     }
 
-                    strncpy(client->client_name, in_packet.packet.clientinfo.client_name, 64);
+                    strncpy(client->client_name, in_packet->packet.clientinfo.client_name, 64);
                     client->authenticated = true;
                     client->player_id = last_given_player_id++;
-                    client->client_version = in_packet.packet.clientinfo.sglthing_revision;
+                    client->client_version = in_packet->packet.clientinfo.sglthing_revision;
                     client->owner = network;
                     if(client->client_version != GIT_COMMIT_COUNT)
-                        printf("sglthing: WARN: new client '%s' is on sglthing r%i, while server is on sglthing r%i\n", in_packet.packet.clientinfo.client_name, client->client_version, GIT_COMMIT_COUNT);
+                        printf("sglthing: WARN: new client '%s' is on sglthing r%i, while server is on sglthing r%i\n", in_packet->packet.clientinfo.client_name, client->client_version, GIT_COMMIT_COUNT);
 
-                    printf("sglthing: client '%s' authenticated\n", in_packet.packet.clientinfo.client_name);
+                    printf("sglthing: client '%s' authenticated\n", in_packet->packet.clientinfo.client_name);
 
                     struct network_packet response;
                     ZERO(response);
 
-                    response.meta.packet_type = PACKETTYPE_SERVERINFO;
+                    response.meta.packet_type = PACKETTYPE_SERVERINFO;  
+                    response.meta.packet_size = sizeof(response.packet);
                     response.meta.acknowledge = true;
                     response.packet.serverinfo.player_id = client->player_id;
                     response.packet.serverinfo.sglthing_revision = GIT_COMMIT_COUNT;
@@ -594,9 +600,9 @@ static void network_manage_packet(struct network* network, struct network_client
                     memcpy(response.packet.serverinfo.session_key, network->http_client.sessionkey, 256);
                     strncpy(response.packet.serverinfo.server_motd, network->server_motd,128);
                     strncpy(response.packet.serverinfo.server_name, network->server_name,64);
-                    network_transmit_packet(network, client, response);                            
+                    network_transmit_packet(network, client, &response);                            
 
-                    response.meta.packet_type = PACKETTYPE_PLAYER_ADD;                    
+                    response.meta.packet_type = PACKETTYPE_PLAYER_ADD;        
                     response.packet.player_add.player_id = client->player_id;
                     response.packet.player_add.admin = client->debugger;
                     response.packet.player_add.player_color_r = client->player_color_r;
@@ -604,10 +610,10 @@ static void network_manage_packet(struct network* network, struct network_client
                     response.packet.player_add.player_color_b = client->player_color_b;
                     response.packet.player_add.user_data = client->user;
                     response.packet.player_add.verified = client->verified;
-                    strncpy(response.packet.player_add.client_name, in_packet.packet.clientinfo.client_name, 64);
-                    network_transmit_packet_all(network, response);
+                    strncpy(response.packet.player_add.client_name, in_packet->packet.clientinfo.client_name, 64);
+                    network_transmit_packet_all(network, &response);
 
-                    g_hash_table_insert(network->players, &client->player_id, (gpointer)client->connection_id);
+                    /*g_hash_table_insert(network->players, &client->player_id, (gpointer)client->connection_id);
                     for(int i = 0; i < network->server_clients->len; i++)
                     {
                         struct network_client* cli = &g_array_index(network->server_clients, struct network_client, i);
@@ -626,9 +632,9 @@ static void network_manage_packet(struct network* network, struct network_client
                             if(network->old_player_add_callback)
                                 network->old_player_add_callback(network, client, cli);
                         }
-                    }
+                    }*/
 
-                    client->observer = in_packet.packet.clientinfo.observer;            
+                    client->observer = in_packet->packet.clientinfo.observer;            
                     client->ping_time_interval = network->client_default_tick;
 
                     if(network->new_player_callback)
@@ -636,7 +642,7 @@ static void network_manage_packet(struct network* network, struct network_client
                 }
                 else
                 {
-                    printf("sglthing: client '%s' failed password (%s)\n", in_packet.packet.clientinfo.client_name, in_packet.packet.clientinfo.server_pass);
+                    printf("sglthing: client '%s' failed password (%s)\n", in_packet->packet.clientinfo.client_name, in_packet->packet.clientinfo.server_pass);
                     network_disconnect_player(network, true, "Bad password", client);
                 }
             }
@@ -644,18 +650,18 @@ static void network_manage_packet(struct network* network, struct network_client
         case PACKETTYPE_SERVERINFO:
             if(network->mode == NETWORKMODE_CLIENT)
             {
-                printf("sglthing: authenticated to server %s, motd: %s\n", in_packet.packet.serverinfo.server_name, in_packet.packet.serverinfo.server_motd);
-                network->client.player_id = in_packet.packet.serverinfo.player_id;
-                strncpy(network->server_name, in_packet.packet.serverinfo.server_name, 64);
-                strncpy(network->server_motd, in_packet.packet.serverinfo.server_name, 128);
-                network->client.client_version = in_packet.packet.serverinfo.sglthing_revision;
+                printf("sglthing: authenticated to server %s, motd: %s\n", in_packet->packet.serverinfo.server_name, in_packet->packet.serverinfo.server_motd);
+                network->client.player_id = in_packet->packet.serverinfo.player_id;
+                strncpy(network->server_name, in_packet->packet.serverinfo.server_name, 64);
+                strncpy(network->server_motd, in_packet->packet.serverinfo.server_name, 128);
+                network->client.client_version = in_packet->packet.serverinfo.sglthing_revision;
                 network->client.authenticated = true;
-                network->client.verified = in_packet.packet.serverinfo.verified;
+                network->client.verified = in_packet->packet.serverinfo.verified;
 
-                for(int i = 0; i < in_packet.packet.serverinfo.player_count; i++)
+                /*for(int i = 0; i < in_packet->packet.serverinfo.player_count; i++)
                 {
                     struct network_client* new_client = (struct network_client*)malloc2(sizeof(struct network_client));
-                    struct player_auth_list_entry* player = &in_packet.packet.serverinfo.players[i];
+                    struct player_auth_list_entry* player = &in_packet->packet.serverinfo.players[i];
 
                     if(player->player_id == network->client.player_id)
                         continue;
@@ -675,28 +681,28 @@ static void network_manage_packet(struct network* network, struct network_client
 
                     if(network->new_player_callback)
                         network->new_player_callback(network, new_client);    
-                }
+                }*/
             }
             break;
         case PACKETTYPE_PLAYER_ADD:
             if(network->mode == NETWORKMODE_CLIENT)
             {
-                struct network_client* new_client = (struct network_client*)malloc(sizeof(struct network_client));
-                printf("sglthing: client new player %s %i\n", in_packet.packet.player_add.client_name, in_packet.packet.player_add.player_id);
+                struct network_client* new_client = (struct network_client*)malloc2(sizeof(struct network_client));
+                printf("sglthing: client new player %s %i\n", in_packet->packet.player_add.client_name, in_packet->packet.player_add.player_id);
                 // copy
 
                 new_client->authenticated = true;
                 new_client->connected = true;
-                new_client->player_color_r = in_packet.packet.player_add.player_color_r;
-                new_client->player_color_g = in_packet.packet.player_add.player_color_g;
-                new_client->player_color_b = in_packet.packet.player_add.player_color_b;
-                new_client->player_id = in_packet.packet.player_add.player_id;
-                new_client->user = in_packet.packet.player_add.user_data;
-                new_client->verified = in_packet.packet.player_add.verified;
+                new_client->player_color_r = in_packet->packet.player_add.player_color_r;
+                new_client->player_color_g = in_packet->packet.player_add.player_color_g;
+                new_client->player_color_b = in_packet->packet.player_add.player_color_b;
+                new_client->player_id = in_packet->packet.player_add.player_id;
+                new_client->user = in_packet->packet.player_add.user_data;
+                new_client->verified = in_packet->packet.player_add.verified;
                 new_client->owner = network;                    
                 new_client->user_data = 0;
 
-                strncpy(new_client->client_name, in_packet.packet.player_add.client_name, 64);
+                strncpy(new_client->client_name, in_packet->packet.player_add.client_name, 64);
 
                 g_hash_table_insert(network->players, &new_client->player_id, new_client);        
 
@@ -707,14 +713,14 @@ static void network_manage_packet(struct network* network, struct network_client
         case PACKETTYPE_PLAYER_REMOVE:
             if(network->mode == NETWORKMODE_CLIENT)
             {
-                printf("sglthing: client del player %i\n", in_packet.packet.player_remove.player_id);
-                struct network_client* old_client = g_hash_table_lookup(network->players, &in_packet.packet.player_remove.player_id);
+                printf("sglthing: client del player %i\n", in_packet->packet.player_remove.player_id);
+                struct network_client* old_client = g_hash_table_lookup(network->players, &in_packet->packet.player_remove.player_id);
                 if(network->del_player_callback)
                     network->del_player_callback(network, client);
-                g_hash_table_remove(network->players, &in_packet.packet.player_remove.player_id);
-                if(in_packet.packet.player_remove.player_id != client->player_id)
+                g_hash_table_remove(network->players, &in_packet->packet.player_remove.player_id);
+                if(in_packet->packet.player_remove.player_id != client->player_id)
                 {
-                    free(old_client);
+                    free2(old_client);
                     //client->connected = false;
                     //network->status = NETWORKSTATUS_DISCONNECTED;
                     //printf("sglthing: we ought to be out of here!\n");
@@ -724,21 +730,21 @@ static void network_manage_packet(struct network* network, struct network_client
             }
             break;
         case PACKETTYPE_LUA_DATA:
-            // printf("sglthing: %s received event %i, data: '%s'\n", (network->mode == NETWORKMODE_SERVER) ? "server" : "client", in_packet.packet.scm_event.event_id, in_packet.packet.scm_event.event_data);
+            // printf("sglthing: %s received event %i, data: '%s'\n", (network->mode == NETWORKMODE_SERVER) ? "server" : "client", in_packet->packet.scm_event.event_id, in_packet->packet.scm_event.event_data);
 
             break;
         case PACKETTYPE_CHAT_MESSAGE:
             if(network->mode == NETWORKMODE_SERVER)
             {
-                printf("sglthing '%s: %s'\n", client->client_name, in_packet.packet.chat_message.message);
-                in_packet.packet.chat_message.verified = client->verified;
-                in_packet.packet.chat_message.player_id = client->player_id;
-                strncpy(in_packet.packet.chat_message.client_name,client->client_name,64);
-                network_transmit_packet_all(network, in_packet);
+                printf("sglthing '%s: %s'\n", client->client_name, in_packet->packet.chat_message.message);
+                in_packet->packet.chat_message.verified = client->verified;
+                in_packet->packet.chat_message.player_id = client->player_id;
+                strncpy(in_packet->packet.chat_message.client_name,client->client_name,64);
+                network_transmit_packet_all(network, &in_packet);
             }
             else
             {
-                printf("sglthing '%s: %s'\n", in_packet.packet.chat_message.client_name, in_packet.packet.chat_message.message);
+                printf("sglthing '%s: %s'\n", in_packet->packet.chat_message.client_name, in_packet->packet.chat_message.message);
             }
             break;   
         case PACKETTYPE_DATA_REQUEST:
@@ -746,12 +752,12 @@ static void network_manage_packet(struct network* network, struct network_client
             {
                 if(!client->observer)
                     return;
-                printf("sglthing: client requested %s\n", in_packet.packet.data_request.data_name);
+                printf("sglthing: client requested %s\n", in_packet->packet.data_request.data_name);
 
-                if(strncmp(in_packet.packet.data_request.data_name,"game/data.tar",64)==0)
+                if(strncmp(in_packet->packet.data_request.data_name,"game/data.tar",64)==0)
                 {
                     #define TMP_DATA_SIZE 26666666
-                    char* mdata = malloc(TMP_DATA_SIZE);
+                    char* mdata = malloc2(TMP_DATA_SIZE);
                     z_stream strm;
                     strm.zalloc = Z_NULL;
                     strm.zfree = Z_NULL;
@@ -774,14 +780,14 @@ static void network_manage_packet(struct network* network, struct network_client
                     ZERO(response);
                     response.meta.packet_type = PACKETTYPE_DATA_REQUEST;
                     response.packet.data_request.data_size = TMP_DATA_SIZE;
-                    network_transmit_packet(network, client, response);
+                    network_transmit_packet(network, client, &response);
                     printf("sglthing: transmitting data\n");
                     network_transmit_data(network, client, mdata, TMP_DATA_SIZE);
                 }
             }
             break;      
         default:            
-            printf("sglthing: %s unknown packet %i\n", network->mode?"true":"false", (int)in_packet.meta.packet_type);
+            printf("sglthing: cli:%s unknown packet %i\n", network->mode?"true":"false", (int)in_packet->meta.packet_type);
             break;
     }
     profiler_end();
@@ -790,13 +796,14 @@ static void network_manage_packet(struct network* network, struct network_client
 void network_manage_socket(struct network* network, struct network_client* client)
 {
     profiler_event("network_manage_socket");
-    struct network_packet in_packet;
+    char packet_datagram[65527];
+    struct network_packet* in_packet = (struct network_packet*)packet_datagram;
     struct sockaddr_in sockaddr;
     int sockaddr_len = sizeof(sockaddr);
 #ifdef NETWORK_TCP
-    while(recv(client->socket, &in_packet, sizeof(struct network_packet), MSG_DONTWAIT) != -1)
+    while(recv(client->socket, packet_datagram, sizeof(struct network_packet_header), MSG_DONTWAIT) != -1)
 #else
-    while(recvfrom(client->socket, &in_packet, sizeof(struct network_packet), MSG_DONTWAIT, &sockaddr, &sockaddr_len) != -1)
+    while(recvfrom(client->socket, packet_datagram, 65527, MSG_DONTWAIT, &sockaddr, &sockaddr_len) != -1)
 #endif
     {
         network->packet_rx_numbers[network->packet_time]++;
@@ -847,10 +854,10 @@ void network_manage_socket(struct network* network, struct network_client* clien
         }
         else
         {
-        #endif
-        network_manage_packet(network, client, in_packet);
-        #ifndef NETWORK_TCP
+            network_manage_packet(network, &network->client, in_packet);
         }
+
+
         #endif
     }
     //if(errno)
@@ -889,7 +896,7 @@ void network_frame(struct network* network, float delta_time, double time)
             pkt->next_time = network->distributed_time + 0.5f;
             pkt->tries++;
             pkt->packet->meta.acknowledge_tries = pkt->tries;
-            network_transmit_packet(network, pkt->client, *pkt->packet);
+            network_transmit_packet(network, pkt->client, pkt->packet);
         }
     }
 
@@ -928,7 +935,7 @@ void network_frame(struct network* network, float delta_time, double time)
                     response.meta.packet_type = PACKETTYPE_PING;
                     response.packet.ping.distributed_time = network->distributed_time;
                     response.packet.ping.player_lag = cli->lag;
-                    network_transmit_packet(network, cli, response);
+                    network_transmit_packet(network, cli, &response);
                     cli->next_ping_time = network->time + cli->ping_time_interval;
                     if(cli->dl_data)
                     {
@@ -945,7 +952,7 @@ void network_frame(struct network* network, float delta_time, double time)
                                 data_packet.packet.data.data_size = cli->dl_packet_size;
                                 data_packet.packet.data.data_final_packet_id = cli->dl_final_packet_id;
                                 data_packet.packet.data.data_packet_id = cli->dl_packet_id;  
-                                int ret = network_transmit_packet(network, cli, data_packet);  
+                                int ret = network_transmit_packet(network, cli, &data_packet);  
                                 if(ret == -1)
                                 {
                                     cli->dl_retries++;
@@ -962,7 +969,7 @@ void network_frame(struct network* network, float delta_time, double time)
                                 printf("sglthing: final datapacket sent\n");
                                 printf("sglthing: transmission failure rate %f%%\n", ((float)cli->dl_retries/(cli->dl_retries+cli->dl_final_packet_id))*100.f);
                                 printf("sglthing: transmission sent rate (should be 100%%) %f%%\n", ((float)cli->dl_successes/(cli->dl_final_packet_id))*100.f);
-                                free(cli->dl_data);
+                                free2(cli->dl_data);
                                 cli->dl_data = NULL;
                                 break;
                             }
@@ -1020,7 +1027,7 @@ void network_disconnect_player(struct network* network, bool transmit_disconnect
         ZERO(response);
         response.meta.packet_type = PACKETTYPE_DISCONNECT;
         strncpy(response.packet.disconnect.disconnect_reason, reason, 32);
-        network_transmit_packet(network, client, response);
+        network_transmit_packet(network, client, &response);
         if(network->del_player_callback)
             network->del_player_callback(network, client);
         g_hash_table_remove(network->players, &client->player_id);
@@ -1037,7 +1044,7 @@ void network_disconnect_player(struct network* network, bool transmit_disconnect
         {
             response.meta.packet_type = PACKETTYPE_PLAYER_REMOVE;
             response.packet.player_remove.player_id = client->player_id;
-            network_transmit_packet_all(network, response);
+            network_transmit_packet_all(network, &response);
         }
     }
     else
@@ -1048,7 +1055,7 @@ void network_disconnect_player(struct network* network, bool transmit_disconnect
             ZERO(response);
             response.meta.packet_type = PACKETTYPE_DISCONNECT;
             strncpy(response.packet.disconnect.disconnect_reason, reason, 32);
-            network_transmit_packet(network, client, response);
+            network_transmit_packet(network, client, &response);
         }
         printf("sglthing: network disconnected '%s'\n", reason);
         strncpy(network->disconnect_reason, reason, 32);

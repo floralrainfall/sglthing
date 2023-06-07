@@ -112,12 +112,13 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
                     union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;                 
                     _pak.meta.packet_type = RDM_PACKET_UPDATE_CHUNK;
                     _pak.meta.acknowledge = false;
+                    _pak.meta.packet_size = sizeof(union rdm_packet_data);
                     _data->update_chunk.chunk_x = c_x;
                     _data->update_chunk.chunk_y = c_y;
                     _data->update_chunk.chunk_z = c_z;
                     _data->update_chunk.chunk_data_x = v_x;
                     memcpy(_data->update_chunk.chunk_data, &server_state.map_server->chunk_x[c_x].chunk_y[c_z].x[v_x],RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE);
-                    network_transmit_packet_all(network, _pak);
+                    network_transmit_packet_all(network, &_pak);
                 }
                 else
                 {
@@ -144,12 +145,13 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
                     union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;                 
                     _pak.meta.packet_type = RDM_PACKET_UPDATE_CHUNK;
                     _pak.meta.acknowledge = false;
+                    _pak.meta.packet_size = sizeof(union rdm_packet_data);
                     _data->update_chunk.chunk_x = ray.chunk_x;
                     _data->update_chunk.chunk_y = ray.chunk_y;
                     _data->update_chunk.chunk_z = ray.chunk_z;
                     _data->update_chunk.chunk_data_x = ray.voxel_x;
                     memcpy(_data->update_chunk.chunk_data, &server_state.map_server->chunk_x[ray.chunk_x].chunk_y[ray.chunk_z].x[ray.voxel_x],RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE);
-                    network_transmit_packet_all(network, _pak);
+                    network_transmit_packet_all(network, &_pak);
                     player->weapon_ammos[WEAPON_BLOCK]++;
                 }
                 player->primary_next_fire = network->time + 0.5;
@@ -191,8 +193,9 @@ void weapon_trigger_fire(struct world* world, bool secondary)
     
     _pak.meta.packet_type = RDM_PACKET_WEAPON_FIRE;
     _pak.meta.acknowledge = false;
+    _pak.meta.packet_size = sizeof(union rdm_packet_data);
     _data->weapon_fire.player_id = client_state.local_player_id,
     _data->weapon_fire.secondary = secondary;
 
-    network_transmit_packet(&world->client, &world->client.client, _pak);
+    network_transmit_packet(&world->client, &world->client.client, &_pak);
 }

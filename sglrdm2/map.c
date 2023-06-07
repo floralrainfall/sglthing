@@ -178,12 +178,13 @@ void map_update_chunks(struct map_manager* map, struct world* world)
 
                     _pak.meta.packet_type = RDM_PACKET_REQUEST_CHUNK;
                     _pak.meta.acknowledge = true;
+                    _pak.meta.packet_size = sizeof(union rdm_packet_data);
                     _data->update_chunk.chunk_x = MAX(p_c_x + x, 0);
                     _data->update_chunk.chunk_y = 0;
                     _data->update_chunk.chunk_z = MAX(p_c_z + y, 0);
 
                     // printf("rdm2: requesting chunk %ix%i\n", p_c_x + x, p_c_z + y);
-                    network_transmit_packet(client_state.local_player->client->owner, &client_state.local_player->client->owner->client, _pak);
+                    network_transmit_packet(client_state.local_player->client->owner, &client_state.local_player->client->owner->client, &_pak);
                 }
             }
         }

@@ -104,7 +104,7 @@ struct rdm_player
 struct pending_packet
 {
     struct network_client* client;
-    struct network_packet packet;
+    struct network_packet* packet;
     double giveup;
 };
 

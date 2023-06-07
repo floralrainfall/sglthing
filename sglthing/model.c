@@ -216,6 +216,7 @@ static void model_parse_mesh(struct model_vertex* vtx_array, int* vtx_count, uns
         struct aiFace face = mesh->mFaces[i];
         for(unsigned int j = 0; j < face.mNumIndices; j++)
         {
+            printf("%i, %i\n",*idx_count, (*idx_count) * sizeof(int));
             idx_array[*idx_count] = face.mIndices[j];
             (*idx_count)++;
         }
@@ -231,17 +232,23 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
         struct aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 
         struct model_vertex* vtx_array = (struct model_vertex*)malloc2(mesh->mNumVertices*sizeof(struct model_vertex));
-        int* idx_array = (int*)malloc2(mesh->mNumFaces*3*sizeof(int)); // safe to assume we'll have 3 vertices per face since we use Triangulate, do fix in future
+        int idx_num = 0;
+        for(int i = 0; i < mesh->mNumFaces; i++)
+            idx_num += mesh->mFaces[i].mNumIndices;
+        int* idx_array = (int*)malloc2(idx_num * sizeof(int));
+        printf("%i, thus %i bytes alloc\n",idx_num, idx_num * sizeof(int));
         int idx_count = 0, vtx_count = 0;
 
         model_parse_mesh(vtx_array, &vtx_count, idx_array, &idx_count, mesh, scene);
 
         int element_buffer, vertex_buffer;
+        model->meshes[model->mesh_count].idx_data = idx_array;
         model->meshes[model->mesh_count].element_count = idx_count;
         model->meshes[model->mesh_count].vtx_data = vtx_array;
         model->meshes[model->mesh_count].vtx_data_count = vtx_count;
         model->meshes[model->mesh_count].path = model->path;
         model->meshes[model->mesh_count].model_parent = model;
+        model->meshes[model->mesh_count].bones = mesh->mNumBones;
         model_load_textures(&model->meshes[model->mesh_count], mesh, scene);
         model_extract_bone_weights(&model->meshes[model->mesh_count], vtx_array, mesh, scene);    
         

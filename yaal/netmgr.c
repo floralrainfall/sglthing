@@ -138,7 +138,7 @@ static bool __work_action(struct network_packet* packet, struct network* network
 static void __sglthing_new_player(struct network* network, struct network_client* client)
 {
     printf("yaal: [%s] new player %i %p '%s'\n", (client->owner->mode == NETWORKMODE_SERVER)?"server":"client", client->player_id, client, client->client_name);
-    struct player* new_player = (struct player*)malloc(sizeof(struct player));
+    struct player* new_player = (struct player*)malloc2(sizeof(struct player));
     new_player->client = client;
     new_player->player_id = client->player_id;
     new_player->level_id = -1;
@@ -232,7 +232,7 @@ static void __sglthing_del_player(struct network* network, struct network_client
     welc_msg.msg_time = network->distributed_time;
     chat_new_message(yaal_state.chat, welc_msg);
 
-    free(old_player);
+    free2(old_player);
 }
 
 static bool __sglthing_packet(struct network* network, struct network_client* client, struct network_packet* packet)
@@ -308,7 +308,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                     struct map_tile_data* d = &yaal_state.map_data[x_data->packet.yaal_level_data.yaal_x][i];
                     if(d->tile_light_type != 0)
                     {
-                        struct light* tile_light = (struct light*)malloc(sizeof(struct light));  
+                        struct light* tile_light = (struct light*)malloc2(sizeof(struct light));  
                         glm_vec3_copy(map_pos, tile_light->position);                  
                         switch(d->tile_light_type)
                         {

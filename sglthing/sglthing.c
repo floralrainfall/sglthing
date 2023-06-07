@@ -52,6 +52,7 @@ static void sighandler(int sig)
             __sglthing_assert_failed();
             if(world->client_on)
                 network_disconnect_player(&world->client,true,"Segmentation fault",&world->client.client);
+            world_deinit(world);
             exit(-1);
             break;
         default:
@@ -66,12 +67,16 @@ int main(int argc, char** argv)
     printf("%s\n",v_name);
     #ifndef HEADLESS
     GLFWwindow* window = NULL;
+    FILE* wsl_test = fopen("/proc/sys/fs/binfmt_misc/WSLInterop", "r");
+    if(wsl_test)
+    {
+        printf("sglthing: cannot run in a mangled environment\n"); // teehee
+        exit(-1);
+    }
     #else
     void* window = NULL;
     #endif
     #ifndef HEADLESS
-
-    m2_init();
 
     // init GLFW & GLAD
     if(!glfwInit())
