@@ -10,8 +10,9 @@ void net_send_fx(struct network* network, struct network_client* client, struct 
     struct network_packet upd_pak;
     struct xtra_packet_data* x_data = (struct xtra_packet_data*)&upd_pak.packet.data;
     upd_pak.meta.packet_type = YAAL_CREATE_FX;
+    upd_pak.meta.packet_size = sizeof(x_data->packet.create_fx);
     x_data->packet.create_fx.new_fx = fx;
-    network_transmit_packet(network, client, upd_pak);
+    network_transmit_packet(network, client, &upd_pak);
     profiler_end();
 }
 
@@ -31,8 +32,9 @@ void net_upd_player(struct network* network, struct network_client* client)
     x_data->packet.update_stats.player_max_health = player->player_max_health;
     x_data->packet.update_stats.player_mana = player->player_mana;
     x_data->packet.update_stats.player_max_mana = player->player_max_mana;
+    upd_pak.meta.packet_size = sizeof(x_data->packet.update_stats);
     upd_pak.meta.acknowledge = true;
-    network_transmit_packet(network, client, upd_pak);
+    network_transmit_packet(network, client, &upd_pak);
     profiler_end();
 }
 
@@ -49,10 +51,11 @@ void net_send_player_lvl(struct network* network, struct network_client* client,
         struct network_packet upd_pak;
         struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
         upd_pak.meta.packet_type = YAAL_ENTER_LEVEL;
+        upd_pak.meta.packet_size = sizeof(x_data2->packet.yaal_level);
         x_data2->packet.yaal_level.level_id = map->level_id;
         x_data2->packet.yaal_level.song_id = 1;
         strncpy(x_data2->packet.yaal_level.level_name,map->level_name,64);
-        network_transmit_packet(network, client, upd_pak);
+        network_transmit_packet(network, client, &upd_pak);
     }
     else
         printf("yaal: no map id 0\n");        
@@ -138,7 +141,7 @@ static bool __work_action(struct network_packet* packet, struct network* network
 static void __sglthing_new_player(struct network* network, struct network_client* client)
 {
     printf("yaal: [%s] new player %i %p '%s'\n", (client->owner->mode == NETWORKMODE_SERVER)?"server":"client", client->player_id, client, client->client_name);
-    struct player* new_player = (struct player*)malloc2(sizeof(struct player));
+    struct player* new_player = (struct player*)malloc(sizeof(struct player));
     new_player->client = client;
     new_player->player_id = client->player_id;
     new_player->level_id = -1;
@@ -199,7 +202,7 @@ static void __sglthing_new_player(struct network* network, struct network_client
     new_player->player_position[2] = 3*MAP_TILE_SIZE;
     glm_vec3_copy(new_player->player_position,new_player->old_position);
 
-    yaal_update_player_transform(new_player);
+    //yaal_update_player_transform(new_player);
 
     new_player->combat_mode = false;
 
@@ -232,7 +235,7 @@ static void __sglthing_del_player(struct network* network, struct network_client
     welc_msg.msg_time = network->distributed_time;
     chat_new_message(yaal_state.chat, welc_msg);
 
-    free2(old_player);
+    free(old_player);
 }
 
 static bool __sglthing_packet(struct network* network, struct network_client* client, struct network_packet* packet)
@@ -255,13 +258,14 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                         struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
                         x_data2->packet.update_position.player_id = -1;
                         upd_pak.meta.packet_type = YAAL_UPDATE_POSITION;
+                        upd_pak.meta.packet_size = sizeof(x_data2->packet.update_position);
                         vec3 delta;
                         glm_vec3_sub(yaal_state.current_player->player_position, yaal_state.current_player->old_position, delta);
                         glm_vec3_copy(delta, x_data2->packet.update_position.delta_pos);
                         glm_vec3_copy(yaal_state.current_player->player_position, yaal_state.current_player->old_position);
                         glm_vec3_copy(yaal_state.aiming_arrow_position, yaal_state.last_aim_position);
                         glm_quat_copy(yaal_state.current_player->rotation_versor, x_data2->packet.update_position.new_versor);
-                        network_transmit_packet(network, client, upd_pak);
+                        network_transmit_packet(network, client, &upd_pak);
                         yaal_update_player_transform(yaal_state.current_player);
                     }
                 }
@@ -349,7 +353,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 {
                     // printf("yaal: sending %i bytes in level data from id %i\n", sizeof(x_data->packet.yaal_level_data), x_data->packet.yaal_level_data.level_id);
                     memcpy(&x_data->packet.yaal_level_data.data[0], &map->map_row[x_data->packet.yaal_level_data.yaal_x].data[0], sizeof(x_data->packet.yaal_level_data));
-                    network_transmit_packet(network, client, *packet);
+                    network_transmit_packet(network, client, packet);
                 }
                 else
                 {
@@ -394,9 +398,10 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                     struct network_packet upd_pak;
                     struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
                     upd_pak.meta.packet_type = YAAL_LEVEL_DATA;
+                    upd_pak.meta.packet_size = sizeof(x_data->packet.yaal_level_data);
                     x_data2->packet.yaal_level_data.level_id = yaal_state.current_level_id;
                     x_data2->packet.yaal_level_data.yaal_x = i;
-                    network_transmit_packet(network, client, upd_pak);
+                    network_transmit_packet(network, client, &upd_pak);
                 }
 #endif
 
@@ -459,6 +464,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 struct network_packet upd_pak;
                 struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
                 upd_pak.meta.packet_type = YAAL_UPDATE_POSITION;
+                upd_pak.meta.packet_size = sizeof(x_data->packet.update_position);
                 glm_vec3_copy(client_player->player_position, x_data2->packet.update_position.delta_pos);
                 x_data2->packet.update_position.player_id = client->player_id;
                 x_data2->packet.update_position.urgent = !collide;
@@ -466,7 +472,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 x_data2->packet.update_position.level_id = client_player->level_id;
                 glm_quat_copy(x_data->packet.update_position.new_versor, x_data2->packet.update_position.new_versor);
                 upd_pak.meta.acknowledge = true;
-                network_transmit_packet_all(network, upd_pak);
+                network_transmit_packet_all(network, &upd_pak);
             }
             else
             {
@@ -526,6 +532,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 struct network_packet upd_pak;
                 struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
                 upd_pak.meta.packet_type = YAAL_UPDATE_COMBAT_MODE;
+                upd_pak.meta.packet_size = sizeof(x_data->packet.update_combat_mode);
                 x_data2->packet.update_combat_mode.player_id = client->player_id;
                 x_data2->packet.update_combat_mode.combat_mode = client_player->combat_mode;
                 struct map_file_data* map = g_hash_table_lookup(server_state.maps, &client_player->level_id);
@@ -535,7 +542,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                         x_data2->packet.update_combat_mode.combat_mode = false;
                         client_player->combat_mode = false;
                     }
-                network_transmit_packet_all(network, upd_pak);            
+                network_transmit_packet_all(network, &upd_pak);            
             }
             return false;
         case YAAL_UPDATE_PLAYER_ACTION:
@@ -551,8 +558,9 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
             {
                 x_data->packet.player_action.player_id = client->player_id;
                 x_data->packet.player_action.level_id = client_player->level_id;
+                packet->meta.packet_size = sizeof(x_data->packet.update_combat_mode);
                 if(__work_action(packet, network, client))
-                    network_transmit_packet_all(network, *packet);            
+                    network_transmit_packet_all(network, packet);            
             }
             else
             {

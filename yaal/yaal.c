@@ -434,8 +434,9 @@ static void __sglthing_frame_ui(struct world* world)
                             struct network_packet upd_pak;
                             struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
                             upd_pak.meta.packet_type = YAAL_PLAYER_ACTION;
+                            upd_pak.meta.packet_size = sizeof(x_data2->packet);
                             x_data2->packet.player_action.action_id = action->action_id;
-                            network_transmit_packet(yaal_state.current_player->client->owner, &yaal_state.current_player->client->owner->client, upd_pak);
+                            network_transmit_packet(yaal_state.current_player->client->owner, &yaal_state.current_player->client->owner->client, &upd_pak);
                         }
                     }
                 if(yaal_state.player_action_debounce[i] && !(press || keys_down[GLFW_KEY_1 + i]))
@@ -550,9 +551,10 @@ static void __sglthing_frame_ui(struct world* world)
                     struct network_packet upd_pak;
                     struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
                     upd_pak.meta.packet_type = YAAL_UPDATE_COMBAT_MODE;
+                    upd_pak.meta.packet_size = sizeof(x_data2->packet);
                     x_data2->packet.update_combat_mode.player_id = -1;
                     x_data2->packet.update_combat_mode.combat_mode = !yaal_state.current_player->combat_mode;
-                    network_transmit_packet(yaal_state.current_player->client->owner, &yaal_state.current_player->client->owner->client, upd_pak);
+                    network_transmit_packet(yaal_state.current_player->client->owner, &yaal_state.current_player->client->owner->client, &upd_pak);
                 }
                 else if(chat_button)
                 {
@@ -595,9 +597,10 @@ static void __sglthing_frame_ui(struct world* world)
                             struct network_packet upd_pak;
                             struct xtra_packet_data* x_data2 = (struct xtra_packet_data*)&upd_pak.packet.data;
                             upd_pak.meta.packet_type = YAAL_PLAYER_ACTION;
+                            upd_pak.meta.packet_size = sizeof(x_data2->packet);
                             x_data2->packet.player_action.action_id = action->action_id;
                             glm_vec3_copy(yaal_state.aiming_arrow_position, x_data2->packet.player_action.position);
-                            network_transmit_packet(yaal_state.current_player->client->owner, &yaal_state.current_player->client->owner->client, upd_pak);
+                            network_transmit_packet(yaal_state.current_player->client->owner, &yaal_state.current_player->client->owner->client, &upd_pak);
                             yaal_state.current_aiming_action = -1;
                             yaal_state.player_action_disable = false;
                             yaal_state.arrow_light.disable = true;
@@ -620,9 +623,10 @@ static void __sglthing_frame_ui(struct world* world)
 
                         struct network_packet upd_pak;
                         upd_pak.meta.packet_type = PACKETTYPE_CHAT_MESSAGE;
+                        upd_pak.meta.packet_size = sizeof(upd_pak.packet.chat_message);
                         upd_pak.meta.acknowledge = true;
                         strncpy(upd_pak.packet.chat_message.message,input_text,128);
-                        network_transmit_packet(yaal_state.current_player->client->owner, &yaal_state.current_player->client->owner->client, upd_pak);
+                        network_transmit_packet(yaal_state.current_player->client->owner, &yaal_state.current_player->client->owner->client, &upd_pak);
                     }
                 }
 

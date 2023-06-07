@@ -6,6 +6,8 @@
 #include "util.h"
 #include "fx.h"
 
+// TODO: completely fix packets that dont work due to the M2 update
+
 enum yaal_packet_type
 {
     YAAL_ENTER_LEVEL = 0x4a11,

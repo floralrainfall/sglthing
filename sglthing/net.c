@@ -167,6 +167,7 @@ void network_tick_download(struct network_downloader* network)
                 {
                     struct network_packet response;
                     ZERO(response);
+                    response.meta.packet_size = sizeof(response.packet.ping);
                     response.meta.packet_version = CR_PACKET_VERSION;
                     response.meta.magic_number = MAGIC_NUMBER;
                     response.meta.packet_type = PACKETTYPE_PING;
@@ -476,7 +477,6 @@ static void network_manage_packet(struct network* network, struct network_client
                 if(pkt.packet->meta.packet_id == in_packet->packet.acknowledge.packet_id)
                 {
                     g_array_remove_index(network->packet_unacknowledged, i);
-                    printf("freeing packet %p %x\n", pkt.packet, pkt.header.packet_type);
                     free2(pkt.packet);
                     break;
                 }
@@ -496,15 +496,15 @@ static void network_manage_packet(struct network* network, struct network_client
         case PACKETTYPE_PING:
             if(network->mode == NETWORKMODE_CLIENT)
             {
+                network->distributed_time = in_packet->packet.ping.distributed_time;
+                network->pung = true;
+
                 struct network_packet response;
                 ZERO(response);
                 response.meta.packet_type = PACKETTYPE_PING;
                 response.meta.packet_size = sizeof(response.packet.ping);
                 response.packet.ping.distributed_time = network->distributed_time;
                 network_transmit_packet(network, client, &response);
-
-                network->distributed_time = in_packet->packet.ping.distributed_time;
-                network->pung = true;
             }
             else
             {
@@ -613,26 +613,29 @@ static void network_manage_packet(struct network* network, struct network_client
                     strncpy(response.packet.player_add.client_name, in_packet->packet.clientinfo.client_name, 64);
                     network_transmit_packet_all(network, &response);
 
-                    /*g_hash_table_insert(network->players, &client->player_id, (gpointer)client->connection_id);
+                    g_hash_table_insert(network->players, &client->player_id, (gpointer)client->connection_id);
                     for(int i = 0; i < network->server_clients->len; i++)
                     {
                         struct network_client* cli = &g_array_index(network->server_clients, struct network_client, i);
                         if(cli->player_id != client->player_id)
                         {
-                            response.packet.player_add.admin = cli->debugger;
-                            response.packet.player_add.player_color_r = cli->player_color_r;
-                            response.packet.player_add.player_color_g = cli->player_color_g;
-                            response.packet.player_add.player_color_b = cli->player_color_b;
-                            response.packet.player_add.observer = cli->observer;
-                            response.packet.player_add.player_id = cli->player_id;
-                            strncpy(response.packet.player_add.client_name, cli->client_name, 64);
+                            struct network_packet player_packet;
+                            player_packet.meta.packet_type = PACKETTYPE_PLAYER_ADD;        
+                            player_packet.meta.packet_size = sizeof(player_packet.packet.player_add);
+                            player_packet.packet.player_add.admin = cli->debugger;
+                            player_packet.packet.player_add.player_color_r = cli->player_color_r;
+                            player_packet.packet.player_add.player_color_g = cli->player_color_g;
+                            player_packet.packet.player_add.player_color_b = cli->player_color_b;
+                            player_packet.packet.player_add.observer = cli->observer;
+                            player_packet.packet.player_add.player_id = cli->player_id;
+                            strncpy(player_packet.packet.player_add.client_name, cli->client_name, 64);
                             printf("sglthing: player list: %s (%i, c: %p)\n", cli->client_name, cli->player_id, cli);
-                            network_transmit_packet(network, client, response);
+                            network_transmit_packet(network, client, &player_packet);
 
                             if(network->old_player_add_callback)
                                 network->old_player_add_callback(network, client, cli);
                         }
-                    }*/
+                    }
 
                     client->observer = in_packet->packet.clientinfo.observer;            
                     client->ping_time_interval = network->client_default_tick;
@@ -933,6 +936,7 @@ void network_frame(struct network* network, float delta_time, double time)
                     struct network_packet response;
                     ZERO(response);
                     response.meta.packet_type = PACKETTYPE_PING;
+                    response.meta.packet_size = sizeof(response.packet.ping);
                     response.packet.ping.distributed_time = network->distributed_time;
                     response.packet.ping.player_lag = cli->lag;
                     network_transmit_packet(network, cli, &response);
@@ -1106,8 +1110,6 @@ void network_dbg_ui(struct network* network, struct ui_data* ui)
         pos_base[1] = 64.f;
         snprintf(tx,256,"SERVER, %i clients connected, frame %i", network->server_clients->len, network->network_frames);
         ui_draw_text(ui,pos_base[0],pos_base[1]-16.f,tx,1.f);
-        snprintf(tx,256,"dT=%f", network->distributed_time);
-        ui_draw_text(ui,pos_base[0],pos_base[1],tx,1.f);
         ui->background_color[3] = 0.f;
         for(int i = 0; i < network->server_clients->len; i++)
         {
@@ -1124,19 +1126,24 @@ void network_dbg_ui(struct network* network, struct ui_data* ui)
         }
         glm_vec4_copy(oldfg, ui->foreground_color);
         glm_vec4_copy(oldbg, ui->background_color);
+        int frame_avg_rx = 0;
+        int frame_avg_tx = 0;
         for(int i = 0; i < NETWORK_HISTORY_FRAMES; i++)
         {
             snprintf(tx,256,"%03i\n%03i",network->packet_rx_numbers[i],network->packet_tx_numbers[i]);
             ui_draw_text(ui,(16.f*(i*2)),199.f-16.f,tx,1.f);
+            frame_avg_rx += network->packet_rx_numbers[i];
+            frame_avg_tx += network->packet_tx_numbers[i];
         }
+
+        snprintf(tx,256,"dT=%f, tx_a: %fpr, rx_a: %fpr", network->distributed_time, frame_avg_tx / 16.f, frame_avg_rx / 16.f);
+        ui_draw_text(ui,pos_base[0],pos_base[1],tx,1.f);
     }
     else
     {
         pos_base[0] = 512.f;
         pos_base[1] = 64.f;
         ui_draw_text(ui,pos_base[0],pos_base[1]-16.f,"CLIENT",1.f);
-        snprintf(tx,256,"dT=%f", network->distributed_time);
-        ui_draw_text(ui,pos_base[0],pos_base[1],tx,1.f);
         if(network->status == NETWORKSTATUS_DISCONNECTED)
             ui_draw_text(ui,pos_base[0],pos_base[1]+16.f,network->disconnect_reason,1.f);
 
@@ -1153,11 +1160,18 @@ void network_dbg_ui(struct network* network, struct ui_data* ui)
             ui_draw_text(ui, 0, 0, tx, 1.f);
             ui->foreground_color[2] = 1.f;
         }            
+        int frame_avg_rx = 0;
+        int frame_avg_tx = 0;
         for(int i = 0; i < NETWORK_HISTORY_FRAMES; i++)
         {
             snprintf(tx,256,"%03i\n%03i",network->packet_rx_numbers[i],network->packet_tx_numbers[i]);
             ui_draw_text(ui,(16.f*(i*2)),199.f+24.f,tx,1.f);
+            frame_avg_rx += network->packet_rx_numbers[i];
+            frame_avg_tx += network->packet_tx_numbers[i];
         }
+
+        snprintf(tx,256,"dT=%f, tx_a: %fpr, rx_a: %fpr", network->distributed_time, frame_avg_tx / 16.f, frame_avg_rx / 16.f);
+        ui_draw_text(ui,pos_base[0],pos_base[1],tx,1.f);
     }
     glm_vec4_copy(oldfg, ui->foreground_color);
     glm_vec4_copy(oldbg, ui->background_color);

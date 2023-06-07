@@ -16,6 +16,7 @@ void m2_frame();
 void* _malloc2(size_t len, char* caller, int line);
 void _free2(void* blk, char* caller, int line);
 
+// for now do not rely on this for aligned memory allocations
 #define malloc2(l) _malloc2(l,__FILE__,__LINE__)
 #define malloc2_s(l,n) _malloc2(l,n ## __FILE__,__LINE__)
 #define free2(l) _free2(l,__FILE__,__LINE__)

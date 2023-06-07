@@ -149,6 +149,9 @@ struct player {
     struct network_client* client;
     struct animator animator;
 
+    mat4 model_matrix;
+    mat4 ghost_matrix;
+    
     enum direction dir;
 
     vec3 player_position;
@@ -171,8 +174,6 @@ struct player {
 
     bool combat_mode;
 
-    mat4 model_matrix;
-    mat4 ghost_matrix;
 
     struct light player_light;
 

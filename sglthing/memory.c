@@ -4,13 +4,13 @@
 #include <stdio.h>
 #include "prof.h"
 
-#define SGL_MEMORY_GUARD_BYTE 0xf00dbabe
+#define SGL_MEMORY_GUARD_BYTE 0xf00dbabef00dbabe
 
 size_t memory_allocated = 0;
 size_t memory_leaked = 0;
 int memory_allocations = 0;
 
-typedef uint32_t alloc_guard_type;
+typedef uint64_t alloc_guard_type;
 
 struct __memory_alloc
 {
@@ -19,6 +19,7 @@ struct __memory_alloc
     char caller[64];
     double time;
     bool dirty;
+    int mem_base_off;
 
     alloc_guard_type* guard_byte_1;
     alloc_guard_type* guard_byte_2;
@@ -76,24 +77,24 @@ void* _malloc2(size_t len, char* caller, int line)
         snprintf(new_entry->caller, 64, "%s:%i", caller, line);
     else
         strncpy(new_entry->caller, "unknown_alloc", 64);
+    new_entry->mem_base_off = sizeof(alloc_guard_type);
     new_entry->guard_byte_1 = new_entry->offset;
-    new_entry->guard_byte_2 = new_entry->offset + len + sizeof(alloc_guard_type); 
+    new_entry->guard_byte_2 = new_entry->offset + len + new_entry->mem_base_off; 
     *new_entry->guard_byte_1 = SGL_MEMORY_GUARD_BYTE;
     *new_entry->guard_byte_2 = SGL_MEMORY_GUARD_BYTE;
     g_array_append_val(memory_alloc_table, new_entry);
     memory_allocations++;
-    return new_entry->offset + sizeof(alloc_guard_type);
+    return new_entry->offset + new_entry->mem_base_off;
 }
 
 void _free2(void* blk, char* caller, int line)
 {
     if(!blk)
         return;
-    blk -= sizeof(uint32_t);
     for(int i = 0; i < memory_alloc_table->len; i++)
     {
         struct __memory_alloc* entry = g_array_index(memory_alloc_table, struct __memory_alloc*, i);
-        if(entry->offset == blk)
+        if(entry->offset == blk - entry->mem_base_off)
         {
             alloc_guard_type* guard_ptr = (alloc_guard_type*)entry->offset;
             bool leak = false;
@@ -126,7 +127,7 @@ void _free2(void* blk, char* caller, int line)
 #ifdef FREE_UNFOUND
     // just try freeing the address
     printf("sglthing: freeing un-m2 allocated %p\n",blk);
-    free(blk+sizeof(alloc_guard_type));
+    free(blk);
 #else 
     printf("sglthing: attempted to free un-m2 allocated %p\n",blk);
 #endif
