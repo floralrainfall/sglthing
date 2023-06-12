@@ -58,6 +58,7 @@ struct network_client {
     int dl_successes;
     struct network* owner;
     void* user_data;
+    int last_ping_id;
 
     struct http_user user;
     struct db_player db;
@@ -152,6 +153,7 @@ struct network_packet {
         struct {
             double distributed_time;
             double player_lag;
+            int ping_id;
         } ping;
         struct {
             char server_name[64];

@@ -230,9 +230,11 @@ void ui_end_panel(struct ui_data* ui)
 {
     if(ui->current_panel)
     {
+        struct ui_panel* old_panel = ui->current_panel;
         glm_vec4_copy(ui->current_panel->oldfg, ui->foreground_color);
         glm_vec4_copy(ui->current_panel->oldbg, ui->background_color);
         ui->current_panel = ui->current_panel->parent_panel;
+        free2(old_panel);
     }
 }
 
@@ -247,7 +249,7 @@ void ui_draw_panel(struct ui_data* ui, float position_x, float position_y, float
 
     ADJUST_POSITION(ui);
 
-    struct ui_panel* new_panel = (struct ui_panel*)malloc(sizeof(struct ui_panel));    
+    struct ui_panel* new_panel = (struct ui_panel*)malloc2(sizeof(struct ui_panel));    
     new_panel->parent_panel = ui->current_panel;
 
     ui->current_panel = new_panel;
@@ -337,7 +339,7 @@ void ui_draw_panel(struct ui_data* ui, float position_x, float position_y, float
     sglc(glUniformMatrix4fv(glGetUniformLocation(ui->ui_panel_program,"transform"), 1, GL_FALSE, ui->transform[0])); 
     sglc(glUniform3fv(glGetUniformLocation(ui->ui_panel_program,"offset"), 1, offset));
     //sglc(glUniform4fv(glGetUniformLocation(ui->ui_panel_program,"foreground_color"), 1, ui->current_panel->top_color));
-    //sglc(glUniform4fv(glGetUniformLocation(ui->ui_panel_program,"background_color"), 1, ui->current_panel->bottom_color));
+    sglc(glUniform4fv(glGetUniformLocation(ui->ui_panel_program,"background_color"), 1, ui->panel_background_color));
     sglc(glDrawArrays(GL_TRIANGLES, 0, 6));
 
     profiler_end();
@@ -479,6 +481,12 @@ void ui_init(struct ui_data* ui)
     ui->foreground_color[1] = 1.0f;
     ui->foreground_color[2] = 1.0f;
     ui->foreground_color[3] = 1.0f;
+    
+    ui->panel_background_color[0] = 0.0f;
+    ui->panel_background_color[1] = 0.0f;
+    ui->panel_background_color[2] = 0.0f;
+    ui->panel_background_color[3] = 0.8f;
+
     ui->waviness = 0.f;
     ui->silliness = 0.f;
     ui->silliness_speed = 5.f;
@@ -539,7 +547,7 @@ struct ui_font* ui_load_font(char* file, float cx, float cy, float cw, float ch)
     int font_texture = get_texture(file);
     if(font_texture)
     {
-        struct ui_font* new_font = malloc(sizeof(struct ui_font));
+        struct ui_font* new_font = malloc2(sizeof(struct ui_font));
 
         new_font->font_texture = font_texture;
         new_font->cx = cx;
@@ -600,7 +608,7 @@ struct ui_font2* ui_load_font2(struct ui_data* ui, char* file, int font_w, int f
             return NULL;
         }
 
-        struct ui_font2* font = (struct ui_font2*)malloc(sizeof(struct ui_font2));
+        struct ui_font2* font = (struct ui_font2*)malloc2(sizeof(struct ui_font2));
         font->face = font_face;
         font->size_x = font_w;
         font->size_y = font_h;

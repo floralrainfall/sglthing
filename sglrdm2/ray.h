@@ -42,6 +42,6 @@ struct ray_cast_info
     struct rdm_player* player;
 };
 
-struct ray_cast_info ray_cast(struct network* network, vec3 starting_position, versor direction, double length, int ignore);
+struct ray_cast_info ray_cast(struct network* network, vec3 starting_position, versor direction, double length, int ignore, bool client, bool voxel_side);
 
 #endif

@@ -33,7 +33,13 @@ struct rdm2_state
     int object_shader;
     int skybox_shader;
     int cloud_layer_shader;
+    int stencil_shader;
     
+    int mouse_block_x;
+    int mouse_block_y;
+    int mouse_block_z;
+    bool mouse_block_v;
+
     struct gamemode_data gamemode;
 
     vec3 player_velocity;
@@ -45,6 +51,8 @@ struct rdm2_state
 
     GArray* chunk_packets_pending;
     double next_pending;
+
+    bool client_stencil;
 
     vec3 last_position;
     float mouse_update_diff;

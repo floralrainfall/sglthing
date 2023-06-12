@@ -216,7 +216,6 @@ static void model_parse_mesh(struct model_vertex* vtx_array, int* vtx_count, uns
         struct aiFace face = mesh->mFaces[i];
         for(unsigned int j = 0; j < face.mNumIndices; j++)
         {
-            printf("%i, %i\n",*idx_count, (*idx_count) * sizeof(int));
             idx_array[*idx_count] = face.mIndices[j];
             (*idx_count)++;
         }
@@ -236,7 +235,6 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
         for(int i = 0; i < mesh->mNumFaces; i++)
             idx_num += mesh->mFaces[i].mNumIndices;
         int* idx_array = (int*)malloc2(idx_num * sizeof(int));
-        printf("%i, thus %i bytes alloc\n",idx_num, idx_num * sizeof(int));
         int idx_count = 0, vtx_count = 0;
 
         model_parse_mesh(vtx_array, &vtx_count, idx_array, &idx_count, mesh, scene);

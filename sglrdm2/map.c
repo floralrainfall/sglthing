@@ -5,7 +5,6 @@
 #include "rdm_net.h"
 #include "rdm2.h"
 
-
 static int last_render_chunk_id;
 
 struct __render_chunk_block
@@ -49,7 +48,7 @@ static void __map_render_chunk_init(struct __render_chunk* chunk)
                 
                 glm_vec3_copy(t_position,chunk->x[x].y[y].z[z].position);
 
-                chunk->x[x].y[y].z[z].obscure = 1;
+                chunk->x[x].y[y].z[z].obscure = 0;
                 chunk->x[x].y[y].z[z].r = 255;
                 chunk->x[x].y[y].z[z].g = 0;
                 chunk->x[x].y[y].z[z].b = 255;
@@ -114,6 +113,8 @@ void __map_render_chunk(struct world* world, struct map_manager* map, struct __r
     sglc(glVertexAttribPointer(8, 3, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(struct __render_chunk_block), (void*)(offsetof(struct __render_chunk_block,r)))); // char[3]: color
     sglc(glVertexAttribDivisor(8, 1));  
 
+    if(world->gfx.shadow_pass)
+        glUniform1i(glGetUniformLocation(map->cube_program_light,"sel_map"), world->gfx.current_map);
     sglc(glBindBuffer(GL_ARRAY_BUFFER, 0)); 
 
     sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_mesh->element_buffer));
@@ -131,6 +132,7 @@ void map_render_chunks(struct world* world, struct map_manager* map)
 void map_update_chunks(struct map_manager* map, struct world* world)
 {
     profiler_event("map_update_chunks");
+    float chunk_render_distance = RENDER_CHUNK_SIZE * CUBE_SIZE * 4;
     for(int i = 0; i < map->chunk_list->len; i++)
     {
         struct __render_chunk* chunk = g_array_index(map->chunk_list, struct __render_chunk*, i);
@@ -140,7 +142,7 @@ void map_update_chunks(struct map_manager* map, struct world* world)
             chunk->chunk_z * (RENDER_CHUNK_SIZE * CUBE_SIZE),
         };
         float chunk_distance = glm_vec3_distance(chunk_position, (vec3){world->cam.position[0],0.f,world->cam.position[2]});
-        if(chunk_distance > 8 * (RENDER_CHUNK_SIZE * CUBE_SIZE))
+        if(chunk_distance > chunk_render_distance)
         {
             if(chunk->vbo)
                 sglc(glDeleteBuffers(1, &chunk->vbo));
@@ -153,7 +155,7 @@ void map_update_chunks(struct map_manager* map, struct world* world)
     int p_c_y = floorf(world->cam.position[1]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
     int p_c_z = floorf(world->cam.position[2]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
 
-    int request_range = 2;
+    int request_range = map->map_request_range;
 
     if(client_state.local_player && world->time > map->next_map_rq)
     {
@@ -183,7 +185,6 @@ void map_update_chunks(struct map_manager* map, struct world* world)
                     _data->update_chunk.chunk_y = 0;
                     _data->update_chunk.chunk_z = MAX(p_c_z + y, 0);
 
-                    // printf("rdm2: requesting chunk %ix%i\n", p_c_x + x, p_c_z + y);
                     network_transmit_packet(client_state.local_player->client->owner, &client_state.local_player->client->owner->client, &_pak);
                 }
             }
@@ -215,54 +216,13 @@ void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_
             struct __render_chunk_block* block = &new_chunk->x[d_x].y[y].z[z];
             char data = chunk_data[y*RENDER_CHUNK_SIZE+z];
             block->air = false;
-            switch(data)
-            {
-                default:
-                case 0:
-                    block->air = true; 
-                    break;
-                case 1:
-                    block->r = 255;
-                    block->g = 255;
-                    block->b = 255;
-                    break;
-                case 2:
-                    block->r = 127;
-                    block->g = 127;
-                    block->b = 127;
-                    break;
-                case 3:
-                    block->r = 32;
-                    block->g = 32;
-                    block->b = 32;
-                    break;
-                case 4:
-                    block->r = 64;
-                    block->g = 64;
-                    block->b = 64;
-                    break;
-                case 5:
-                    block->r = 32;
-                    block->g = 255;
-                    block->b = 32;
-                    break;
-                case 6:
-                    block->r = 255;
-                    block->g = 32;
-                    block->b = 255;
-                    break;
-                case 7:
-                    block->r = 255;
-                    block->g = 32;
-                    block->b = 32;
-                    break;
-                case 8:
-                    block->r = 32;
-                    block->g = 32;
-                    block->b = 255;
-                    break;
-                
-            }
+            if(data == 0)
+                block->air = true;
+            vec3 block_color;
+            map_color_to_rgb(data,block_color);
+            block->r = block_color[0] * 255.f;
+            block->g = block_color[1] * 255.f;
+            block->b = block_color[2] * 255.f;
             block->obscure = chunk_data[y*RENDER_CHUNK_SIZE+z];
         }
 
@@ -284,6 +244,7 @@ void map_init(struct map_manager* map)
     map->chunk_list = g_array_new(true, true, sizeof(struct __render_chunk*));
 
     map->next_map_rq = 0.f;
+    map->map_request_range = 2;
 }
 
 void map_server_init(struct map_server* map)
@@ -303,8 +264,8 @@ void map_server_init(struct map_server* map)
             if(x == 0 || x == MAP_SIZE-1 || y == 0 || y == MAP_SIZE-1)
                 selector = 0.67f;
             float city_value = (selector2 * (RENDER_CHUNK_SIZE));
-            int pavement_color = 3;
-            int ground_color = 1;
+            int pavement_color = MAP_PAL(1,1,1);
+            int ground_color = MAP_PAL(3,3,3);
             bool city_tile = false;
             int underground_color = ground_color;
             for(int _x = 0; _x < RENDER_CHUNK_SIZE; _x++)
@@ -325,13 +286,13 @@ void map_server_init(struct map_server* map)
                     city_tile = false;
                     if(selector < 0.58f)
                     {
-                        ground_color = 5;
+                        ground_color = MAP_PAL(0,3,0);
                         is_road = false;
                         value = gnoise_2;
                     }
                     else if(selector > 0.78f)
                     {
-                        pavement_color = floorf(selector * 3 + 3);
+                        pavement_color = MAP_PAL(0,2,0);
                         is_road = true;
                     }
                     else
@@ -345,17 +306,17 @@ void map_server_init(struct map_server* map)
                     if(x == 0 && y == 0)
                     {
                         is_road = true;
-                        pavement_color = 7;
+                        pavement_color = MAP_PAL(3,0,0);
                     }
                     if(x == MAP_SIZE - 1 && y == MAP_SIZE - 1)
                     {
                         is_road = true;
-                        pavement_color = 8;
+                        pavement_color = MAP_PAL(0,0,3);
                     }
                     if(x == highway_pos || y == highway_pos)
                     {
                         is_road = true;
-                        pavement_color = 3;
+                        pavement_color = MAP_PAL(1,1,1);
                     }
 
                     for(int _y = 0; _y < RENDER_CHUNK_SIZE; _y++)
@@ -447,4 +408,14 @@ bool map_determine_collision_server(struct map_server* map, vec3 position)
         profiler_end();
         return false;
     }
+}
+
+void map_color_to_rgb(char color_id, vec3 output)
+{
+    int data_r = abs((color_id / 16) + 1);
+    int data_g = abs((color_id / 4 % 4) + 1);
+    int data_b = abs((color_id % 4) + 1);
+    output[0] = (((float)data_r)/4.f);
+    output[1] = (((float)data_g)/4.f);
+    output[2] = (((float)data_b)/4.f);
 }

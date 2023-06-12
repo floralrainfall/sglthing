@@ -98,6 +98,9 @@ uniform vec3 ambient = vec3(30.0/255.0,26.0/255.0,117.0/255.0);
 uniform vec3 diffuse = vec3(227.0/255.0,168.0/255.0,87.0/255.0);
 uniform vec3 specular = vec3(255.0/255.0,204.0/255.0,51.0/255.0); 
 
+uniform vec2 normal_lsm_bias = vec2(0.05, 0.0002);
+uniform vec2 far_lsm_bias = vec2(0.05, 0.0002);
+
 vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_light, vec4 f_pos_light_far)
 {
         // ambient lighting
@@ -116,9 +119,9 @@ vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_lig
     vec3 specular = 0.5 * spec * specular;
 
     // calculate shadow lighting
-    float shadow = shadow_calculate(camera_position, 0.05, 0.0002, depth_map, frag_pos, f_pos_light, normal, (sun_direction*50.0));   
+    float shadow = shadow_calculate(camera_position, normal_lsm_bias.x, normal_lsm_bias.y, depth_map, frag_pos, f_pos_light, normal, (sun_direction*50.0));   
     if(shadow == -1)   
-        shadow = shadow_calculate(camera_position, 0.5, 0.005, depth_map_far, frag_pos, f_pos_light_far, normal, (sun_direction*100.0));      
+        shadow = shadow_calculate(camera_position, far_lsm_bias.x, far_lsm_bias.y, depth_map_far, frag_pos, f_pos_light_far, normal, (sun_direction*50.0));      
     if(shadow == -1)
         shadow = 0.0;
     //shadow = mix(shadow,shadow_far,distance(frag_pos, camera_position)/64.0);

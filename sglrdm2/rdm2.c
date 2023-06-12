@@ -10,32 +10,85 @@ struct rdm2_state server_state;
 
 static void rdm_frame(struct world* world)
 {
-    world->gfx.fog_maxdist = 24.f + world->cam.position[1];
+    world->gfx.fog_maxdist = client_state.map_manager->map_request_range * RENDER_CHUNK_SIZE * CUBE_SIZE;
 
     if(client_state.local_player)
     {
         vec3 player_move = {0};
         vec3 expected_position;
         vec3 ground_test;
-        glm_vec3_sub(client_state.local_player->position, (vec3){0.f,0.2f,0.f}, ground_test);
+        glm_vec3_sub(client_state.local_player->position, (vec3){0.f,0.1f,0.f}, ground_test);
 
         client_state.player_grounded = map_determine_collision_client(client_state.map_manager, ground_test);
+        vec3 velocity_frame, velocity_frame_p;
+        glm_vec3_copy(client_state.player_velocity, velocity_frame_p);
+        glm_vec3_mul(velocity_frame_p, (vec3){world->delta_time, world->delta_time, world->delta_time}, velocity_frame);
+        glm_vec3_add(velocity_frame, player_move, player_move);
+
+        float rooftest_height = 1.5f;
+        vec3 player_move_x = {0};
+        vec3 player_move_x_rooftest = {0};
+        vec3 player_move_y = {0};
+        vec3 player_move_y_rooftest = {0};
+        vec3 player_move_z = {0};
+        vec3 player_move_z_rooftest = {0};
+        player_move_x[0] = player_move[0];
+        player_move_x_rooftest[0] = player_move[0];
+        player_move_x_rooftest[1] = rooftest_height;
+        player_move_y[1] = player_move[1];
+        player_move_y_rooftest[1] = player_move[1] + rooftest_height;
+        player_move_z[2] = player_move[2];
+        player_move_z_rooftest[2] = player_move[2];
+        player_move_z_rooftest[1] = rooftest_height;
+
+        glm_vec3_add(player_move_x, client_state.local_player->position, expected_position);
+        glm_vec3_add(player_move_x_rooftest, client_state.local_player->position, ground_test);
+        if(map_determine_collision_client(client_state.map_manager, expected_position) ||
+           map_determine_collision_client(client_state.map_manager, ground_test))
+        {
+            client_state.player_velocity[0] = 0.f;      
+        }
+        else
+            glm_vec3_copy(expected_position, client_state.local_player->position);
+
+        glm_vec3_add(player_move_z, client_state.local_player->position, expected_position);
+        glm_vec3_add(player_move_z_rooftest, client_state.local_player->position, ground_test);
+        if(map_determine_collision_client(client_state.map_manager, expected_position) ||
+           map_determine_collision_client(client_state.map_manager, ground_test))
+        {
+            client_state.player_velocity[2] = 0.f;        
+        }
+        else
+            glm_vec3_copy(expected_position, client_state.local_player->position);
+
+        glm_vec3_add(player_move_y, client_state.local_player->position, expected_position);
+        glm_vec3_add(player_move_y_rooftest, client_state.local_player->position, ground_test);
+        if(map_determine_collision_client(client_state.map_manager, expected_position) ||
+           map_determine_collision_client(client_state.map_manager, ground_test))
+        {
+            client_state.player_velocity[1] = 0.f;        
+        }
+        else
+            glm_vec3_copy(expected_position, client_state.local_player->position);
+
+        vec3 vel_loss;
+        float vel_loss_scalar = 5.f, vel_loss_scalar_y = 0.1f;
+        glm_vec3_mul(client_state.player_velocity, (vec3){vel_loss_scalar * world->delta_time, vel_loss_scalar_y * world->delta_time, vel_loss_scalar * world->delta_time}, vel_loss);
+        glm_vec3_sub(client_state.player_velocity, vel_loss, client_state.player_velocity);
+        float vel_min = 0.01f;
+        if(fabsf(client_state.player_velocity[0]) < vel_min)
+            client_state.player_velocity[0] = 0.f;
+        if(fabsf(client_state.player_velocity[2]) < vel_min)
+            client_state.player_velocity[2] = 0.f;
+
         if(!client_state.player_grounded)
         {
-            vec3 velocity_frame, velocity_frame_p;
-            glm_vec3_copy(client_state.player_velocity, velocity_frame_p);
-            glm_vec3_mul(velocity_frame_p, (vec3){world->delta_time, world->delta_time, world->delta_time}, velocity_frame);
-            glm_vec3_add(velocity_frame, player_move, player_move);
             if(client_state.player_velocity[1] > -5.0)
                 client_state.player_velocity[1] -= world->delta_time * 5.f;
-
-            glm_vec3_add(player_move, client_state.local_player->position, expected_position);
-            if(!map_determine_collision_client(client_state.map_manager, expected_position) )
-                glm_vec3_copy(expected_position, client_state.local_player->position);
         }
         else
         {
-            glm_vec3_zero(client_state.player_velocity);
+            client_state.player_velocity[1] = 0.f;
 
             bool player_submerged = map_determine_collision_client(client_state.map_manager, client_state.local_player->position);
             while(player_submerged)
@@ -46,10 +99,29 @@ static void rdm_frame(struct world* world)
 
             if(get_focus() && keys_down[GLFW_KEY_SPACE])
             {
-                glm_vec3_add(client_state.player_velocity, (vec3){0.f,3.0f,0.f}, client_state.player_velocity);         
+                glm_vec3_add(client_state.player_velocity, (vec3){0.f,5.0f,0.f}, client_state.player_velocity);         
                 glm_vec3_add(client_state.local_player->position, (vec3){0.f,0.1f,0.f}, client_state.local_player->position);
             }            
         }
+
+        if(client_state.local_player->active_weapon == WEAPON_BLOCK || client_state.local_player->active_weapon == WEAPON_SHOVEL)
+        {
+            vec3 eye_position;
+            glm_vec3_copy(client_state.local_player->position, eye_position);
+            eye_position[1] += 1.0f;
+            struct ray_cast_info ray = ray_cast(&world->client, eye_position, client_state.local_player->direction, 16.f, 0, true, client_state.local_player->active_weapon == WEAPON_BLOCK);
+            if(ray.object == RAYCAST_VOXEL)
+            {
+                client_state.mouse_block_x = ray.real_voxel_x;
+                client_state.mouse_block_y = ray.real_voxel_y;
+                client_state.mouse_block_z = ray.real_voxel_z;
+                client_state.mouse_block_v = true;
+            }
+            else
+                client_state.mouse_block_v = false;
+        }
+        else
+            client_state.mouse_block_v = false;
 
         if(get_focus())
         {
@@ -58,8 +130,8 @@ static void rdm_frame(struct world* world)
             else if(mouse_state.mouse_button_r)
                 weapon_trigger_fire(world, true);
 
-            float cam_yaw = mouse_position[0] * world->delta_time * 4.f;
-            float cam_pitch = mouse_position[1] * world->delta_time * 4.f;
+            float cam_yaw = mouse_position[0] * world->delta_time * g_key_file_get_double(world->config.key_file, "rdm2", "mouse_sensitivity", NULL);
+            float cam_pitch = mouse_position[1] * world->delta_time * g_key_file_get_double(world->config.key_file, "rdm2", "mouse_sensitivity", NULL);
 
             world->cam.yaw += cam_yaw;
             world->cam.pitch -= cam_pitch;
@@ -83,19 +155,11 @@ static void rdm_frame(struct world* world)
 
             glm_vec3_zero(player_move); // fall
 
-            player_move[0] += cosf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * 5.f;
-            player_move[2] += sinf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * 5.f;
+            client_state.player_velocity[0] += cosf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * 25.f;
+            client_state.player_velocity[2] += sinf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * 25.f;
 
-            player_move[0] += cosf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * 5.f;
-            player_move[2] += sinf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * 5.f;
-
-            vec3 eye_position;
-            glm_vec3_add(player_move, client_state.local_player->position, expected_position);
-            glm_vec3_add(expected_position, (vec3){0.f,1.25f,0.f}, eye_position);
-            if(!map_determine_collision_client(client_state.map_manager, expected_position) && !map_determine_collision_client(client_state.map_manager, eye_position))
-            {
-                glm_vec3_copy(expected_position, client_state.local_player->position);
-            }
+            client_state.player_velocity[0] += cosf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * 25.f;
+            client_state.player_velocity[2] += sinf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * 25.f;
         }
 
         if(world->client.pung)
@@ -151,9 +215,21 @@ static void rdm_frame(struct world* world)
                 network_transmit_packet(&world->server, packet.client, packet.packet);
                 g_array_remove_index(server_state.chunk_packets_pending, 0);
                 free2(packet.packet);
-                server_state.next_pending = world->time + 0.001f;
+                server_state.next_pending = world->time + 0.005f;
             }
             profiler_end();
+        }
+
+        // packet limit
+        if(server_state.chunk_packets_pending->len > 600) 
+        {
+            printf("rdm2[server]: clearing chunk packet queue (%i packets in queue)\n",server_state.chunk_packets_pending->len);
+            while(server_state.chunk_packets_pending->len != 0)
+            {
+                struct pending_packet packet = g_array_index(server_state.chunk_packets_pending, struct pending_packet, 0);
+                free2(packet.packet);
+                g_array_remove_index(server_state.chunk_packets_pending, 0);
+            }
         }
     }
 }
@@ -226,16 +302,49 @@ static void rdm_frame_ui(struct world* world)
     }
     else
     {
-        if(client_state.local_player)
+        if(client_state.gamemode.started && client_state.local_player)
         {
-            snprintf(dbginfo,64,"%i/100", client_state.local_player->health);
-            ui_font2_text(world->ui, 64.f, 64.f, client_state.big_font, dbginfo, 1.f);
+            float health_pctg = (float)client_state.local_player->health / (float)client_state.local_player->max_health;
+            float health_max_sz = world->gfx.screen_width / 4.f;
+            float health_sz = health_pctg * health_max_sz;
+
+            vec4 oldbg_kys;
+            glm_vec4_copy(world->ui->panel_background_color, oldbg_kys);
+            world->ui->panel_background_color[0] = 0.25f;
+            world->ui->panel_background_color[1] = 0.f;
+            world->ui->panel_background_color[2] = 0.f;
+            world->ui->panel_background_color[3] = 1.f;
+
+            ui_draw_panel(world->ui, 64.f, 88.f, health_max_sz, 24.f, 1.1f);
+
+            world->ui->panel_background_color[0] = 0.f;
+            world->ui->panel_background_color[1] = 0.25f;
+            world->ui->panel_background_color[2] = 0.f;
+            world->ui->panel_background_color[3] = 1.f;
+            ui_draw_panel(world->ui, 0.f, 0.f, health_sz, 24.f, 1.f);
+            snprintf(dbginfo,64,"%0.0f%%", health_pctg * 100.f);
+            ui_font2_text(world->ui, health_sz / 2.f - ui_font2_text_len(client_state.normal_font, dbginfo) / 2.f, 16.f, client_state.normal_font, dbginfo, 0.7f);
+            ui_end_panel(world->ui);            
+            ui_end_panel(world->ui);
+
+            glm_vec4_copy(oldbg_kys, world->ui->panel_background_color);
 
             int img_size = 32;
             if(client_state.local_player->weapon_ammos[client_state.local_player->active_weapon] != -1)
             {
                 snprintf(dbginfo,64,"%i", client_state.local_player->weapon_ammos[client_state.local_player->active_weapon]);
                 ui_font2_text(world->ui, world->gfx.screen_width - 64.f - ui_font2_text_len(client_state.big_font, dbginfo), 64.f + img_size, client_state.big_font, dbginfo, 1.f);
+            }
+
+            if(client_state.local_player->active_weapon == WEAPON_BLOCK)
+            {
+                vec4 oldbg_kys;
+                world->ui->panel_background_color[3] = 1.f;
+                int c = client_state.local_player->weapon_block_color;
+                map_color_to_rgb(c, world->ui->panel_background_color);
+                ui_draw_panel(world->ui, world->gfx.screen_width - 32, 32, 32, 32, 1.f);
+                ui_end_panel(world->ui);
+                glm_vec4_copy(oldbg_kys, world->ui->panel_background_color);
             }
 
             for(int i = 1; i < __WEAPON_MAX; i++)
@@ -249,6 +358,7 @@ static void rdm_frame_ui(struct world* world)
                     _pak.meta.acknowledge = false;
                     _pak.meta.packet_size = sizeof(union rdm_packet_data);
                     _data->update_weapon.weapon = i;
+                    _data->update_weapon.block_color = client_state.local_player->weapon_block_color;
 
                     network_transmit_packet(&world->client, &world->client.client, &_pak);
                 }
@@ -337,7 +447,7 @@ static void rdm_frame_ui(struct world* world)
             {
                 struct network_client* client = &g_array_index(world->server.server_clients, struct network_client, i);
                 struct rdm_player* player = (struct rdm_player*)client->user_data;
-                snprintf(dbginfo,64,"%i - %s, ping %f, pd %p", i, client->client_name, client->lag, player);
+                snprintf(dbginfo,64,"%i - %s, ping %fmsec, pd %p", i, client->client_name, client->lag * 1000.0, player);
                 ui_font2_text(world->ui, 8.f, 24.f + 48.f + (i * 12.f), client_state.normal_font, dbginfo, 0.2f);
                 if(player)
                 {
@@ -384,6 +494,14 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
     struct network_client* client = (struct network_client*)value;
     struct rdm_player* player = (struct rdm_player*)client->user_data;
 
+    vec4 team_colors[__TEAM_MAX] = {
+        { 0.5f, 0.5f, 0.5f, 0.5f }, // neutral
+        { 1.0f, 0.2f, 0.2f, 0.5f }, // red
+        { 0.2f, 0.2f, 1.0f, 0.5f }, // blue
+        { 0.5f, 0.5f, 0.5f, 0.5f }, // n/a
+        { 0.2f, 0.2f, 0.2f, 0.5f }, // spectator
+    };
+
     mat4 player_matrix, player_rotated_matrix;
     glm_mat4_identity(player_matrix);
     glm_translate(player_matrix, player->position);
@@ -391,7 +509,20 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
     glm_quat_rotate(player_matrix, player->direction, player_rotated_matrix);
 
     if(client->player_id != client_state.local_player_id || world->gfx.shadow_pass)
-        world_draw_model(world, client_state.rdm_guy, client_state.object_shader, player_rotated_matrix, true);
+    {
+        if(client_state.client_stencil)
+        {
+            vec4* team_color = &team_colors[player->team];
+            glm_scale(player_rotated_matrix, (vec3){1.1f,1.1f,1.1f});
+            glUniform4fv(glGetUniformLocation(client_state.stencil_shader,"stencil_color"), 1, *team_color);
+            glGetError(); // pop possible error
+            world_draw_model(world, client_state.rdm_guy, client_state.stencil_shader, player_rotated_matrix, true);            
+        }
+        else
+        {
+            world_draw_model(world, client_state.rdm_guy, client_state.object_shader, player_rotated_matrix, true);
+        }
+    }
     struct model* weapon_model = client_state.weapons[player->active_weapon];
     if(weapon_model)
     {
@@ -401,7 +532,27 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
         glm_quat_rotate(weapon_matrix, player->direction, weapon_matrix);
         glm_translate(weapon_matrix, (vec3){-0.3f,0.5f,0.1f});
 
-        world_draw_model(world, weapon_model, client_state.object_shader, weapon_matrix, true);
+        if(client_state.client_stencil)
+        {
+            vec4* team_color = &team_colors[player->team];
+            glm_scale(weapon_matrix, (vec3){1.1f,1.1f,1.1f});
+            glUniform4fv(glGetUniformLocation(client_state.stencil_shader,"stencil_color"), 1, *team_color);
+            glGetError(); // pop possible error
+            world_draw_model(world, weapon_model, client_state.stencil_shader, weapon_matrix, true);            
+        }
+        else
+        {
+            if(!world->gfx.shadow_pass && player->active_weapon == WEAPON_BLOCK)
+            {
+                vec3 block_color;
+                map_color_to_rgb(player->weapon_block_color, block_color);
+                sglc(glUseProgram(client_state.object_shader));
+                sglc(glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), block_color[0], block_color[1], block_color[2], 1.0f));
+            }
+            world_draw_model(world, weapon_model, client_state.object_shader, weapon_matrix, true);
+            if(!world->gfx.shadow_pass)
+                sglc(glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), 1.0f, 1.0f, 1.0f, 1.0f));
+        }
     }
 }
 
@@ -423,14 +574,41 @@ static void rdm_frame_render(struct world* world)
         glDepthMask(GL_LESS);  
     }
 
-    mat4 test_cube;
-    glm_mat4_identity(test_cube);
-    glm_translate(test_cube,server_state.last_position);
-    world_draw_model(world, client_state.map_manager->cube, client_state.object_shader, test_cube, false);
+    // mat4 test_cube;
+    // glm_mat4_identity(test_cube);
+    // glm_translate(test_cube,server_state.last_position);
+    // world_draw_model(world, client_state.map_manager->cube, client_state.object_shader, test_cube, false);
 
     map_render_chunks(world, client_state.map_manager);
 
     g_hash_table_foreach(world->client.players, __player_render, world);
+
+    if(!world->gfx.shadow_pass)
+    {
+        if(client_state.mouse_block_v)
+        {
+            mat4 block_selection_matrix;
+            glm_mat4_identity(block_selection_matrix);
+            glm_translate(block_selection_matrix, (vec3){
+                client_state.mouse_block_x,
+                client_state.mouse_block_y,
+                client_state.mouse_block_z,
+            });
+            if(client_state.local_player->active_weapon == WEAPON_SHOVEL)
+            {
+                glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), 0.f, 0.f, 0.f, 0.5f);
+                glm_scale(block_selection_matrix, (vec3){1.1f,1.1f,1.1f});
+            }
+            else
+            {
+                vec3 block_color;
+                map_color_to_rgb(client_state.local_player->weapon_block_color, block_color);
+                glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), block_color[0], block_color[1], block_color[2], fabsf(sinf(world->time*5.f)));
+            }
+            world_draw_model(world, client_state.map_manager->cube, client_state.object_shader, block_selection_matrix, false);
+            glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), 1.f, 1.f, 1.f, 1.f);
+        }
+    }
 }
 
 void sglthing_init_api(struct world* world)
@@ -485,6 +663,10 @@ void sglthing_init_api(struct world* world)
         f = compile_shader("rdm2/shaders/cloud.fs", GL_FRAGMENT_SHADER);
         client_state.cloud_layer_shader = link_program(v, f);
 
+        v = compile_shader("shaders/normal.vs", GL_VERTEX_SHADER);
+        f = compile_shader("rdm2/shaders/stencil.fs", GL_FRAGMENT_SHADER);
+        client_state.stencil_shader = link_program(v, f);
+
         client_state.lobby_music = load_snd("rdm2/music/lobby0.mp3");
         client_state.lobby_music->loop = false;
         client_state.lobby_music->multiplier = 0.1f;
@@ -522,8 +704,10 @@ void sglthing_init_api(struct world* world)
     world->cam.position[2] = 0.f;
     world->cam.position[1] = 32.f;
     world->cam.lock = true;
-    world->gfx.fog_maxdist = 32.f;
-    world->gfx.fog_mindist = 15.f;
+    world->gfx.far_boundary = 1000.f;
+    world->gfx.fog_mindist = RENDER_CHUNK_SIZE * CUBE_SIZE;
+
+    glm_vec3_zero(client_state.player_velocity);
 
     input_lock_tab = true;
 

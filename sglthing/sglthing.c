@@ -50,8 +50,6 @@ static void sighandler(int sig)
         case SIGSEGV: // segmentation fault
             printf("sglthing: segmentation fault\n");
             __sglthing_assert_failed();
-            if(world->client_on)
-                network_disconnect_player(&world->client,true,"Segmentation fault",&world->client.client);
             world_deinit(world);
             exit(-1);
             break;
@@ -60,6 +58,8 @@ static void sighandler(int sig)
     }
 }
 
+#define YES_WSL
+
 int main(int argc, char** argv)
 {
     char v_name[32];
@@ -67,12 +67,16 @@ int main(int argc, char** argv)
     printf("%s\n",v_name);
     #ifndef HEADLESS
     GLFWwindow* window = NULL;
+
+#ifndef YES_WSL
     FILE* wsl_test = fopen("/proc/sys/fs/binfmt_misc/WSLInterop", "r");
     if(wsl_test)
     {
         printf("sglthing: cannot run in a mangled environment\n"); // teehee
         exit(-1);
     }
+#endif
+
     #else
     void* window = NULL;
     #endif

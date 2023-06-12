@@ -30,7 +30,7 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
             case WEAPON_HOLSTER:
                 break;
             case WEAPON_AK47:
-                ray = ray_cast(network, eye_position, player->direction, 100.f, client->player_id);
+                ray = ray_cast(network, eye_position, player->direction, 100.f, client->player_id, false, false);
                 net_play_g_sound(network, "rdm2/sound/ak47_shoot.ogg", player->position);
                 if(ray.player)
                 {
@@ -46,7 +46,7 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
                 break;
             case WEAPON_BLOCK:
                 eye_position[1] += 0.50; // magical number
-                ray = ray_cast(network, eye_position, player->direction, 16.f, client->player_id);
+                ray = ray_cast(network, eye_position, player->direction, 16.f, client->player_id, false, true);
                 player->primary_next_fire = network->time + 0.5;
                 if(ray.object == RAYCAST_VOXEL)
                 {
@@ -57,56 +57,22 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
                     int c_x = ray.chunk_x;
                     int c_y = ray.chunk_y;
                     int c_z = ray.chunk_z;
-                    switch(ray.voxel_hit_side)
-                    {
-                        case RAYCAST_HIT_TOP:
-                            v_y++;
-                            break;
-                        case RAYCAST_HIT_BOTTOM:
-                            v_y--;
-                            break;
-                        case RAYCAST_HIT_BACK:
-                            v_z++;
-                            break;
-                        case RAYCAST_HIT_FORWARD:
-                            v_z--;
-                            break;
-                        case RAYCAST_HIT_LEFT:
-                            v_x++;
-                            break;
-                        case RAYCAST_HIT_RIGHT:
-                            v_x--;
-                            break;
-                    }
-
-#define C_SZ(x)                                       \
-    if(v_ ## x == -1) { c_ ## x--; v_ ## x = RENDER_CHUNK_SIZE-1; } \
-    if(v_ ## x == RENDER_CHUNK_SIZE) { c_ ## x++; v_ ## x = 0; }
-
-                    C_SZ(x);
-                    C_SZ(y);
-                    C_SZ(z);
                     
                     if(server_state.map_server->chunk_x[c_x].chunk_y[c_z].x[v_x].y[v_y].z[v_z] != 0)
                         return false;
 
-                    switch(player->team)
-                    {
-                        case TEAM_NEUTRAL:
-                            server_state.map_server->chunk_x[c_x].chunk_y[c_z].x[v_x].y[v_y].z[v_z] = 1;
-                            break;
-                        case TEAM_NA:
-                            server_state.map_server->chunk_x[c_x].chunk_y[c_z].x[v_x].y[v_y].z[v_z] = 3;
-                            break;
-                        case TEAM_RED:
-                            server_state.map_server->chunk_x[c_x].chunk_y[c_z].x[v_x].y[v_y].z[v_z] = 7;
-                            break;
-                        case TEAM_BLUE:
-                            server_state.map_server->chunk_x[c_x].chunk_y[c_z].x[v_x].y[v_y].z[v_z] = 8;
-                            break;
-                        default:
-                            break;
-                    }
+                    if(ray.chunk_x < 0)
+                        break;
+                    if(ray.chunk_x > MAP_SIZE)
+                        break;
+                    if(ray.chunk_y != 0)
+                        break;
+                    if(ray.chunk_z < 0)
+                        break;
+                    if(ray.chunk_z > MAP_SIZE)
+                        break;
+
+                    server_state.map_server->chunk_x[c_x].chunk_y[c_z].x[v_x].y[v_y].z[v_z] = player->weapon_block_color;
 
                     struct network_packet _pak;
                     union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;                 
@@ -127,7 +93,7 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
                 break;
             case WEAPON_SHOVEL:
                 eye_position[1] += 0.50; // magical number
-                ray = ray_cast(network, eye_position, player->direction, 16.f, client->player_id);
+                ray = ray_cast(network, eye_position, player->direction, 16.f, client->player_id, false, false);
                 if(ray.object == RAYCAST_VOXEL)
                 {
                     if(ray.chunk_x < 0)
@@ -196,6 +162,8 @@ void weapon_trigger_fire(struct world* world, bool secondary)
     _pak.meta.packet_size = sizeof(union rdm_packet_data);
     _data->weapon_fire.player_id = client_state.local_player_id,
     _data->weapon_fire.secondary = secondary;
+    if(client_state.local_player)
+        glm_quat_copy(client_state.local_player->direction, _data->weapon_fire.direction);
 
     network_transmit_packet(&world->client, &world->client.client, &_pak);
 }

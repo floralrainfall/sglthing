@@ -11,6 +11,7 @@ uniform float time;
 uniform vec3 camera_position;
 uniform int banding_effect = 0xf8;
 uniform vec4 viewport;
+uniform vec3 vig_color;
 
 #define FXAA_SPAN_MAX 8.0
 #define FXAA_REDUCE_MUL   (1.0/FXAA_SPAN_MAX)
@@ -112,6 +113,14 @@ void main()
 
     // tone mapping
     result = vec3(1.0) - exp(-hdrColor * exposure);
+
+    vec2 uv_vig = gl_FragCoord.xy / viewport.zw;
+    uv_vig *= 1.0 - uv_vig.yx;   //vec2(1.0)- uv.yx; -> 1.-u.yx; Thanks FabriceNeyret !
+    
+    float vig = uv_vig.x*uv_vig.y * 15.0; // multiply with sth for intensity
+    vig = pow(vig, 0.15); // change pow for modifying the extend of the  vignette
+
+    result = mix(vig_color, result, vig);
 
     FragColor = vec4(result, 1.0);
 }  

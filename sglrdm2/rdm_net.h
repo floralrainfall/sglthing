@@ -36,6 +36,7 @@ union rdm_packet_data
     {
         enum weapon_type weapon;
         int player_id;
+        int block_color;
     } update_weapon;
     struct 
     {
@@ -68,6 +69,7 @@ union rdm_packet_data
     {
         int player_id;
         bool secondary;
+        versor direction;
     } weapon_fire;
     struct
     {
@@ -92,6 +94,8 @@ struct rdm_player
     enum rdm_team team;
     enum weapon_type active_weapon;
     int weapon_ammos[__WEAPON_MAX];
+    char weapon_block_color;
+    
     versor direction;
 
     struct antagonist antagonist_data;
@@ -99,6 +103,8 @@ struct rdm_player
     double secondary_next_fire;
 
     int health;
+    int max_health;
+
 };
 
 struct pending_packet

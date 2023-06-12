@@ -147,7 +147,7 @@ void network_start_download(struct network_downloader* network, char* ip, int po
         send(network->socket, &client_info, sizeof(client_info), 0);
     }
 #else
-        sendto(network->socket, &client_info, sizeof(client_info), MSG_NOSIGNAL, &network->dest, sizeof(network->dest));
+    sendto(network->socket, &client_info, sizeof(client_info), MSG_NOSIGNAL, &network->dest, sizeof(network->dest));
 #endif
 }
 
@@ -387,6 +387,8 @@ int network_transmit_packet(struct network* network, struct network_client* clie
     packet->meta.packet_version = CR_PACKET_VERSION;
     packet->meta.magic_number = MAGIC_NUMBER;
     packet->meta.network_frames = network->network_frames;
+    if(packet->meta.packet_type == PACKETTYPE_CLIENTINFO)
+        printf("sglthing: sending clientinfo packet (attempt %i)\n",packet->meta.acknowledge_tries);
     if(!client->connected)
         return -1;
     if(packet->meta.acknowledge && packet->meta.acknowledge_tries == 0)
@@ -503,13 +505,18 @@ static void network_manage_packet(struct network* network, struct network_client
                 ZERO(response);
                 response.meta.packet_type = PACKETTYPE_PING;
                 response.meta.packet_size = sizeof(response.packet.ping);
+                response.packet.ping.ping_id = client->last_ping_id++;
                 response.packet.ping.distributed_time = network->distributed_time;
                 network_transmit_packet(network, client, &response);
             }
             else
             {
-                client->last_ping_time = network->distributed_time;
-                client->lag = network->distributed_time - in_packet->packet.ping.distributed_time;
+                if(in_packet->packet.ping.ping_id > client->last_ping_id)
+                {
+                    client->last_ping_time = network->distributed_time;
+                    client->lag = network->distributed_time - in_packet->packet.ping.distributed_time;
+                    client->last_ping_id = in_packet->packet.ping.ping_id;
+                }
             }
             break;
         case PACKETTYPE_CLIENTINFO:
@@ -579,10 +586,11 @@ static void network_manage_packet(struct network* network, struct network_client
                     client->player_id = last_given_player_id++;
                     client->client_version = in_packet->packet.clientinfo.sglthing_revision;
                     client->owner = network;
+                    client->last_ping_id = 0;
                     if(client->client_version != GIT_COMMIT_COUNT)
                         printf("sglthing: WARN: new client '%s' is on sglthing r%i, while server is on sglthing r%i\n", in_packet->packet.clientinfo.client_name, client->client_version, GIT_COMMIT_COUNT);
 
-                    printf("sglthing: client '%s' authenticated\n", in_packet->packet.clientinfo.client_name);
+                    printf("sglthing: client '%s' authenticated (%i)\n", in_packet->packet.clientinfo.client_name, client->player_id);
 
                     struct network_packet response;
                     ZERO(response);
@@ -645,7 +653,7 @@ static void network_manage_packet(struct network* network, struct network_client
                 }
                 else
                 {
-                    printf("sglthing: client '%s' failed password (%s)\n", in_packet->packet.clientinfo.client_name, in_packet->packet.clientinfo.server_pass);
+                    printf("sglthing: client '%s' failed connect password (%s)\n", in_packet->packet.clientinfo.client_name, in_packet->packet.clientinfo.server_pass);
                     network_disconnect_player(network, true, "Bad password", client);
                 }
             }
@@ -838,14 +846,16 @@ void network_manage_socket(struct network* network, struct network_client* clien
                     new_client.connection_id = last_connection_id++;
                     new_client.connected = true;
                     new_client.last_ping_time = network->distributed_time;
-                    new_client.ping_time_interval = 5.0;
+                    new_client.ping_time_interval = 0.5f;
                     new_client.next_ping_time = network->distributed_time + new_client.ping_time_interval;
                     new_client.dl_data = NULL;
                     new_client.owner = network;                    
                     new_client.user_data = 0;
                     g_array_append_val(network->server_clients, new_client);
                     sender = &g_array_index(network->server_clients, struct network_client, new_client.connection_id);
-                    printf("sglthing: server: udp connection sockaddr: %x:%i (%p)\n", new_client.sockaddr.sin_addr.s_addr, new_client.sockaddr.sin_port, sender);
+                    char sock_str[INET_ADDRSTRLEN];
+                    inet_ntop(AF_INET, &sockaddr.sin_addr, sock_str, INET_ADDRSTRLEN);
+                    printf("sglthing: server: udp connection sockaddr: %s:%i (%p)\n", sock_str, new_client.sockaddr.sin_port, sender);
                 }
                 else
                 {
@@ -936,9 +946,11 @@ void network_frame(struct network* network, float delta_time, double time)
                     struct network_packet response;
                     ZERO(response);
                     response.meta.packet_type = PACKETTYPE_PING;
+                    response.meta.acknowledge = false;
                     response.meta.packet_size = sizeof(response.packet.ping);
                     response.packet.ping.distributed_time = network->distributed_time;
                     response.packet.ping.player_lag = cli->lag;
+                    response.packet.ping.ping_id = -1;
                     network_transmit_packet(network, cli, &response);
                     cli->next_ping_time = network->time + cli->ping_time_interval;
                     if(cli->dl_data)
@@ -1120,7 +1132,7 @@ void network_dbg_ui(struct network* network, struct ui_data* ui)
             ui->background_color[0] = cli->player_color_b;
             ui->background_color[1] = cli->player_color_r;
             ui->background_color[2] = cli->player_color_g;
-            snprintf(tx,256,"Client '%s' %i %i %i, ping %fs, dtd %fs, %c%c%c%c%c", cli->client_name, i, cli->player_id, cli->connection_id, cli->lag, network->distributed_time - cli->last_ping_time,
+            snprintf(tx,256,"Client '%s' %i %i %i, ping %fmsec, dtd %fmsec, %c%c%c%c%c", cli->client_name, i, cli->player_id, cli->connection_id, cli->lag * 1000.0, (network->distributed_time - cli->last_ping_time) * 1000.0,
                 cli->authenticated?'A':'-',cli->connected?'C':'-',cli->debugger?'D':'-',cli->observer?'O':'-',cli->verified?'V':'-');
             ui_draw_text(ui,pos_base[0],pos_base[1]+((1+i)*16.f),tx,1.f);
         }

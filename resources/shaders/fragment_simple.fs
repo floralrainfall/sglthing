@@ -50,7 +50,7 @@ void main()
 
     out_color = mix(fog_color, out_color, fog_factor);
 
-    FragColor = vec4(out_color.xyz, min(out_color.w,fog_factor));
+    FragColor = out_color;
 
     float brightness = dot(FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
     BrightColor = vec4(FragColor.rgb * max(brightness-0.5,0.0), 1.0);

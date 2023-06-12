@@ -58,9 +58,11 @@ void m2_frame()
     profiler_end();
 }
 
+#define ALIGN 8
+
 void* _malloc2(size_t len, char* caller, int line)
 {
-    void* entry_offset = malloc(len + (sizeof(alloc_guard_type) * 2));
+    void* entry_offset = malloc(len + (sizeof(alloc_guard_type) * 2) + ALIGN);
     memset(entry_offset, len, 0);
     if(!entry_offset)
     {
@@ -77,7 +79,7 @@ void* _malloc2(size_t len, char* caller, int line)
         snprintf(new_entry->caller, 64, "%s:%i", caller, line);
     else
         strncpy(new_entry->caller, "unknown_alloc", 64);
-    new_entry->mem_base_off = sizeof(alloc_guard_type);
+    new_entry->mem_base_off = sizeof(alloc_guard_type) + ALIGN;
     new_entry->guard_byte_1 = new_entry->offset;
     new_entry->guard_byte_2 = new_entry->offset + len + new_entry->mem_base_off; 
     *new_entry->guard_byte_1 = SGL_MEMORY_GUARD_BYTE;

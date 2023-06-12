@@ -20,6 +20,8 @@ enum rdm_team
     TEAM_BLUE,
     TEAM_NA,
     TEAM_SPECTATOR,
+
+    __TEAM_MAX,
 };
 
 struct gamemode_data

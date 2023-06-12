@@ -6,10 +6,8 @@
 
 #define RAY_FRACTION 0.25f
 
-struct ray_cast_info ray_cast(struct network* network, vec3 starting_position, versor direction, double length, int ignore)
+struct ray_cast_info ray_cast(struct network* network, vec3 starting_position, versor direction, double length, int ignore, bool client, bool side)
 {
-    if(network->mode != NETWORKMODE_SERVER)
-        return;
     struct ray_cast_info info;
     profiler_event("ray_cast");
 
@@ -31,7 +29,8 @@ struct ray_cast_info ray_cast(struct network* network, vec3 starting_position, v
     info.player = 0;
     while(distance_traversed < length)
     {
-        if(map_determine_collision_server(server_state.map_server, ray_position))
+        if(client ? map_determine_collision_client(client_state.map_manager, ray_position) : 
+                    map_determine_collision_server(server_state.map_server, ray_position))
         {
             info.real_voxel_x = floorf((ray_position[0]+0.5f) / CUBE_SIZE);
             info.real_voxel_y = floorf((ray_position[1]) / CUBE_SIZE);
@@ -58,22 +57,66 @@ struct ray_cast_info ray_cast(struct network* network, vec3 starting_position, v
             else if(forward[2] < -0.5)
                 info.voxel_hit_side = RAYCAST_HIT_BACK;
 
+            if(side)
+            {
+                    switch(info.voxel_hit_side)
+                    {
+                        case RAYCAST_HIT_TOP:
+                            info.voxel_y++;
+                            info.real_voxel_y++;
+                            break;
+                        case RAYCAST_HIT_BOTTOM:
+                            info.voxel_y--;
+                            info.real_voxel_y--;
+                            break;
+                        case RAYCAST_HIT_BACK:
+                            info.voxel_z++;
+                            info.real_voxel_y++;
+                            break;
+                        case RAYCAST_HIT_FORWARD:
+                            info.voxel_z--;
+                            info.real_voxel_z--;
+                            break;
+                        case RAYCAST_HIT_LEFT:
+                            info.voxel_x++;
+                            info.real_voxel_x++;
+                            break;
+                        case RAYCAST_HIT_RIGHT:
+                            info.voxel_x--;
+                            info.real_voxel_x--;
+                            break;
+                    }
+
+
+
+#define C_SZ(x)                                       \
+    if(info.voxel_ ## x == -1) { info.chunk_ ## x--; info.voxel_ ## x = RENDER_CHUNK_SIZE-1; } \
+    if(info.voxel_ ## x == RENDER_CHUNK_SIZE) { info.chunk_ ## x++; info.voxel_ ## x = 0; }
+
+                    C_SZ(x);
+                    C_SZ(y);
+                    C_SZ(z);
+            }
+
             info.object = RAYCAST_VOXEL;
             break;
         }
         else {
-            for(int i = 0; i < network->server_clients->len; i++)
+            if(!client)
             {
-                struct network_client* client = &g_array_index(network->server_clients, struct network_client, i);
-                struct rdm_player* player = (struct rdm_player*)client->user_data;
-                if(client && player && client->player_id != ignore)
+                for(int i = 0; i < network->server_clients->len; i++)
                 {
-                    // FIXME: distance based, should be a cuboid around player/hitboxes on model
-                    if(glm_vec3_distance(ray_position, player->replicated_position) < 1.f)
+                    struct network_client* client = &g_array_index(network->server_clients, struct network_client, i);
+                    struct rdm_player* player = (struct rdm_player*)client->user_data;
+                    if(client && player && client->player_id != ignore)
                     {
-                        info.object = RAYCAST_PLAYER;
-                        info.player = player;
-                        break;
+                        // FIXME: distance based, should be a cuboid around player/hitboxes on model
+                        if(glm_vec3_distance(ray_position, player->replicated_position) < 1.f)
+                        {
+                            info.object = RAYCAST_PLAYER;
+                            info.player = player;
+                            break;
+                        }
                     }
                 }
             }

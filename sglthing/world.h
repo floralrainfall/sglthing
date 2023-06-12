@@ -41,6 +41,8 @@ struct world {
     } cam;
 
     struct {
+        float far_boundary;
+        float near_boundary;
         float fog_maxdist;
         float fog_mindist;
         vec4 fog_color;

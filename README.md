@@ -7,6 +7,10 @@ Estimated Requirements
 
 ![The last screenshot in this repo](https://github.com/floralrainfall/sglthing/raw/trunk/screenshot.png)
 
+## Warning
+
+This engine and its deritative games may potentially have visuals that may trigger seizures for those with photosensitive epilepsy. Viewer discretion is advised.
+
 ## Requirements/Libraries
 
 - Assimp

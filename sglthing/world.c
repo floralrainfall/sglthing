@@ -128,7 +128,7 @@ struct world* world_init(char** argv, int argc, void* p)
     add_input((struct keyboard_mapping){.key_positive = GLFW_KEY_W, .key_negative = GLFW_KEY_S, .name = "z_axis"});
 #endif
 
-    world->ui = (struct ui_data*)malloc(sizeof(struct ui_data));
+    world->ui = (struct ui_data*)malloc2(sizeof(struct ui_data));
     ui_init(world->ui);
     world->viewport[0] = 0.f;
     world->viewport[1] = 0.f;
@@ -142,14 +142,16 @@ struct world* world_init(char** argv, int argc, void* p)
     world->gfx.clear_color[0] = 250.f/255.f;
     world->gfx.clear_color[1] = 214.f/255.f;
     world->gfx.clear_color[2] = 165.f/255.f; 
-    world->gfx.clear_color[3] = 0.f;
+    world->gfx.clear_color[3] = 1.f;
 
     world->gfx.fog_color[0] = world->gfx.clear_color[0];
     world->gfx.fog_color[1] = world->gfx.clear_color[1];
     world->gfx.fog_color[2] = world->gfx.clear_color[2];
     world->gfx.fog_color[3] = world->gfx.clear_color[3];
 
+    world->gfx.far_boundary = 100.f;
     world->gfx.fog_maxdist = 100.f;
+    world->gfx.near_boundary = 0.1f;
     world->gfx.fog_mindist = 50.f;
     world->gfx.banding_effect = 0xff8;
 
@@ -375,6 +377,7 @@ void world_frame(struct world* world)
     sglc(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));  
     sglc(glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO));
     sglc(glEnable(GL_DEPTH_TEST));
+    sglc(glEnable(GL_STENCIL_TEST));    
 #ifdef FBO_ENABLED
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
     if(world->client.status == NETWORKSTATUS_CONNECTED)
@@ -401,6 +404,7 @@ void world_frame(struct world* world)
     sglc(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));  
     sglc(glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO));
     sglc(glEnable(GL_DEPTH_TEST));
+    sglc(glEnable(GL_STENCIL_TEST));
 
 #else
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
@@ -421,7 +425,7 @@ void world_frame(struct world* world)
             world->cam.pitch = -85.f;
     }
 
-    glm_perspective(world->cam.fov * M_PI_180f, MAX(world->gfx.screen_height,world->gfx.screen_width)/MIN(world->gfx.screen_width,world->gfx.screen_height), 0.1f, world->gfx.fog_maxdist, world->p);
+    glm_perspective(world->cam.fov * M_PI_180f, MAX(world->gfx.screen_height,world->gfx.screen_width)/MIN(world->gfx.screen_width,world->gfx.screen_height), world->gfx.near_boundary, world->gfx.far_boundary, world->p);
     glm_ortho(0.f, world->viewport[2], 0.f, world->viewport[3], 0.1f, 1000.f, world->ui->projection);
     world->ui->screen_size[0] = world->viewport[2];
     world->ui->screen_size[1] = world->viewport[3];
@@ -528,8 +532,7 @@ void world_frame(struct world* world)
             profiler_event("gfx: gaussian blur");
             sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_pingpong_fbos[bloom_blur_horiz]));
             sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur_shader,"horizontal"), bloom_blur_horiz)); 
-            //sglc(glUniform2f(glGetUniformLocation(world->gfx.hdr_blur_shader,"size"), 1.0f, 1.0f)); 
-            //sglc(glUniform2f(glGetUniformLocation(world->gfx.hdr_blur_shader,"offset"), 0.0f, 0.0f)); 
+            sglc(glUniform2f(glGetUniformLocation(world->gfx.hdr_blur_shader,"size"), 1.0f, 1.0f)); 
             sglc(glActiveTexture(GL_TEXTURE0));
             sglc(glBindTexture(GL_TEXTURE_2D, first_bloom_iter ? world->gfx.hdr_color_buffers[1] : world->gfx.hdr_pingpong_buffers[!bloom_blur_horiz]));
             sglc(glUniform1i(glGetUniformLocation(world->gfx.hdr_blur_shader,"image"), 0));

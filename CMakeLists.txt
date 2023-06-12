@@ -122,6 +122,19 @@ if(GAMES_COMPILE)
         sglrdm2/ray.c
         sglrdm2/ray.h
     )
+    set_target_properties(RDM2 PROPERTIES OUTPUT_NAME "rdm2-ng")
+    project(YittlePeople)
+    add_executable(YittlePeople
+        yittlepeople/yittlepeople.c
+        yittlepeople/yittlepeople.h
+        yittlepeople/building.c
+        yittlepeople/building.h
+        yittlepeople/civ.c
+        yittlepeople/civ.h
+        yittlepeople/guy.c
+        yittlepeople/guy.h
+    )
+    set_target_properties(YittlePeople PROPERTIES OUTPUT_NAME "theyittlepeople")
     project(Yaal)
     add_executable(Yaal
         yaal/netmgr.c
@@ -255,6 +268,10 @@ if(GAMES_COMPILE)
         sglthing
     )
     target_link_libraries(RDM2 PUBLIC
+        ${GLAD_LIBRARY}
+        sglthing
+    )
+    target_link_libraries(YittlePeople PUBLIC
         ${GLAD_LIBRARY}
         sglthing
     )

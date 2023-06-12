@@ -74,6 +74,8 @@ struct ui_data
 
     vec4 background_color;
     vec4 foreground_color;
+    vec4 panel_background_color;
+    
     float waviness;
     float silliness;
     float silliness_speed;

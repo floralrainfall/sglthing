@@ -78,7 +78,6 @@ void net_send_chunk(struct network* network, struct network_client* client, int 
 {
     profiler_event("net_send_chunk");
 
-
     for(int x = 0; x < RENDER_CHUNK_SIZE; x++)
     {
         struct pending_packet pending;
@@ -172,14 +171,15 @@ static void net_new_player(struct network* network, struct network_client* clien
     player->client = client;
 
     glm_vec3_zero(player->position);
-    player->position[0] = 16.f;
-    player->position[1] = 64.f;
-    player->position[2] = 16.f;
+    player->position[0] = 1.f;
+    player->position[1] = 16.f;
+    player->position[2] = 1.f;
     glm_vec3_copy(player->position, player->replicated_position);
     glm_quat_identity(player->direction);
     player->active_weapon = WEAPON_BLOCK;
     player->team = TEAM_NEUTRAL;
-    player->health = 100;
+    player->health = 2;
+    player->max_health = 3;
     player->primary_next_fire = 0.f;
     player->secondary_next_fire = 0.f;
     for(int i = 0; i < __WEAPON_MAX; i++)
@@ -187,6 +187,7 @@ static void net_new_player(struct network* network, struct network_client* clien
     player->weapon_ammos[WEAPON_AK47] = 200;
     player->weapon_ammos[WEAPON_SHOVEL] = -1;
     player->weapon_ammos[WEAPON_BLOCK] = 60;
+    player->weapon_block_color = MAP_PAL(2,2,2);
 
     if(network->mode == NETWORKMODE_CLIENT)
     {
@@ -201,6 +202,7 @@ static void net_new_player(struct network* network, struct network_client* clien
         gamemode_player_add(&server_state.gamemode, player);
         net_player_syncinfo(network, player);
     }
+
 }
 
 static bool net_receive_packet(struct network* network, struct network_client* client, struct network_packet* packet)
@@ -357,6 +359,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                 if(remote_player->weapon_ammos[remote_player->active_weapon] == 0)
                     return false;
                 bool fired = false;
+                glm_quat_copy(packet_data->weapon_fire.direction, remote_player->direction);
                 if(packet_data->weapon_fire.secondary)
                     fired = weapon_fire_secondary(network, client->player_id, true);
                 else
@@ -376,6 +379,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                     _pak.meta.packet_size = sizeof(union rdm_packet_data);
                     _data->weapon_fire.player_id = client->player_id,
                     _data->weapon_fire.secondary = packet_data->weapon_fire.secondary;
+                    glm_quat_copy(packet_data->weapon_fire.direction, _data->weapon_fire.direction);
 
                     network_transmit_packet_all(network, &_pak);
                 }
@@ -424,6 +428,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                 _data->update_weapon.player_id = client->player_id,
                 _data->update_weapon.weapon = packet_data->update_weapon.weapon;
                 remote_player->active_weapon = packet_data->update_weapon.weapon;
+                remote_player->weapon_block_color = packet_data->update_weapon.block_color;
 
                 network_transmit_packet_all(network, &_pak);
             }
@@ -439,6 +444,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                 if(moved_player)
                 {
                     moved_player->active_weapon = packet_data->update_weapon.weapon;
+                    moved_player->weapon_block_color = packet_data->update_weapon.block_color;
                 }
                 else
                     printf("rdm2[%s]: RDM_PACKET_UPDATE_WEAPON on unreg player id (%i)\n", net_name_manager(network), packet_data->update_position.player_id);

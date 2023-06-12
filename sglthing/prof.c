@@ -3,6 +3,8 @@
 #include "ui.h"
 #include "world.h"
 
+#define PROFILER_ENABLE
+
 static int event_id_last = 0;
 
 struct profiler_event
@@ -43,8 +45,8 @@ void profiler_global_init()
 
 void profiler_end_frame()
 {
-    if(global_profiler.current_event != 0)
-        printf("sglthing: prof current_event = %p\n", global_profiler.current_event);
+//    if(global_profiler.current_event != 0)
+//        printf("sglthing: prof current_event = %p\n", global_profiler.current_event);
 }
 
 void profiler_event(char* name)
@@ -97,7 +99,7 @@ void profiler_end()
 
     // printf("event %s lasted %f seconds\n", old_event->name, g_timer_elapsed(global_profiler.timer, NULL) - old_event->start_time);
 
-    free(old_event);
+    free2(old_event);
 #endif
 }
 
