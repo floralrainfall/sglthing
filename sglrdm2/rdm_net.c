@@ -427,6 +427,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                 _pak.meta.packet_size = sizeof(union rdm_packet_data);
                 _data->update_weapon.player_id = client->player_id,
                 _data->update_weapon.weapon = packet_data->update_weapon.weapon;
+                _data->update_weapon.block_color = packet_data->update_weapon.block_color;
                 remote_player->active_weapon = packet_data->update_weapon.weapon;
                 remote_player->weapon_block_color = packet_data->update_weapon.block_color;
 

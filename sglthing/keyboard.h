@@ -23,6 +23,8 @@ struct mouse_state
     bool mouse_button_r;
     bool mouse_button_m;
     bool mouse_button_l;
+    double scroll_x;
+    double scroll_y;
 };
 
 #ifdef HEADLESS

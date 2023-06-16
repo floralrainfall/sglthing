@@ -16,6 +16,13 @@ bool input_lock_tab = false;
 int input_cursor = 0;
 
 #ifndef HEADLESS
+
+static void __scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    mouse_state.scroll_x = xoffset;
+    mouse_state.scroll_y = yoffset;
+}
+
 static void __mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
     mouse_position[0] = xpos;
@@ -97,6 +104,7 @@ void init_kbd(GLFWwindow* window)
     glfwSetMouseButtonCallback(window, __click_callback);
     glfwSetCursorPosCallback(window, __mouse_callback);
     glfwSetCharCallback(window, __chara_callback);
+    glfwSetScrollCallback(window, __scroll_callback);
     input_disable = false;
 }
 #endif
@@ -143,6 +151,8 @@ void kbd_frame_end()
 {
     mouse_position[0] = 0.f;
     mouse_position[1] = 0.f;
+    mouse_state.scroll_x = 0.f;
+    mouse_state.scroll_y = 0.f;
 }
 
 void start_text_input()

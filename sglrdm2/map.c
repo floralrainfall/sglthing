@@ -151,9 +151,9 @@ void map_update_chunks(struct map_manager* map, struct world* world)
         }
     }
 
-    int p_c_x = floorf(world->cam.position[0]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
+    int p_c_x = floorf((world->cam.position[0]+0.5f)/(RENDER_CHUNK_SIZE * CUBE_SIZE));
     int p_c_y = floorf(world->cam.position[1]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
-    int p_c_z = floorf(world->cam.position[2]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
+    int p_c_z = floorf((world->cam.position[2]+0.5f)/(RENDER_CHUNK_SIZE * CUBE_SIZE));
 
     int request_range = map->map_request_range;
 
@@ -193,7 +193,7 @@ void map_update_chunks(struct map_manager* map, struct world* world)
     profiler_end();
 }
 
-void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_x, char* chunk_data)
+void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_x, unsigned char* chunk_data)
 {
     struct __render_chunk* new_chunk = __map_chunk_position(map, c_x, c_y, c_z);
     if(!new_chunk)
@@ -214,7 +214,7 @@ void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_
         for(int z = 0; z < RENDER_CHUNK_SIZE; z++)
         {
             struct __render_chunk_block* block = &new_chunk->x[d_x].y[y].z[z];
-            char data = chunk_data[y*RENDER_CHUNK_SIZE+z];
+            unsigned char data = chunk_data[y*RENDER_CHUNK_SIZE+z];
             block->air = false;
             if(data == 0)
                 block->air = true;
@@ -410,7 +410,7 @@ bool map_determine_collision_server(struct map_server* map, vec3 position)
     }
 }
 
-void map_color_to_rgb(char color_id, vec3 output)
+void map_color_to_rgb(unsigned char color_id, vec3 output)
 {
     int data_r = abs((color_id / 16) + 1);
     int data_g = abs((color_id / 4 % 4) + 1);

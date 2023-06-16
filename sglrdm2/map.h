@@ -17,7 +17,7 @@ struct map_chunk
 {
     struct {
         struct {
-            char z[RENDER_CHUNK_SIZE];
+            unsigned char z[RENDER_CHUNK_SIZE];
         } y[RENDER_CHUNK_SIZE];
     } x[RENDER_CHUNK_SIZE];
 };
@@ -54,8 +54,8 @@ void map_server_init(struct map_server* map);
 void map_init(struct map_manager* map);
 void map_render_chunks(struct world* world, struct map_manager* map);
 void map_update_chunks(struct map_manager* map, struct world* world);
-void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_x, char* chunk_data);
-void map_color_to_rgb(char color_id, vec3 output);
+void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_x, unsigned char* chunk_data);
+void map_color_to_rgb(unsigned char color_id, vec3 output);
 
 bool map_determine_collision_client(struct map_manager* map, vec3 position);
 bool map_determine_collision_server(struct map_server* map, vec3 position);

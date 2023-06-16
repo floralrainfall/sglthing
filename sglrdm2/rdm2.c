@@ -23,7 +23,7 @@ static void rdm_frame(struct world* world)
         vec3 velocity_frame, velocity_frame_p;
         glm_vec3_copy(client_state.player_velocity, velocity_frame_p);
         glm_vec3_mul(velocity_frame_p, (vec3){world->delta_time, world->delta_time, world->delta_time}, velocity_frame);
-        glm_vec3_add(velocity_frame, player_move, player_move);
+        glm_vec3_sub(velocity_frame, player_move, player_move);
 
         float rooftest_height = 1.5f;
         vec3 player_move_x = {0};
@@ -72,7 +72,7 @@ static void rdm_frame(struct world* world)
             glm_vec3_copy(expected_position, client_state.local_player->position);
 
         vec3 vel_loss;
-        float vel_loss_scalar = 5.f, vel_loss_scalar_y = 0.1f;
+        float vel_loss_scalar = client_state.player_grounded ? 5.f : 1.f, vel_loss_scalar_y = 0.1f;
         glm_vec3_mul(client_state.player_velocity, (vec3){vel_loss_scalar * world->delta_time, vel_loss_scalar_y * world->delta_time, vel_loss_scalar * world->delta_time}, vel_loss);
         glm_vec3_sub(client_state.player_velocity, vel_loss, client_state.player_velocity);
         float vel_min = 0.01f;
@@ -99,7 +99,7 @@ static void rdm_frame(struct world* world)
 
             if(get_focus() && keys_down[GLFW_KEY_SPACE])
             {
-                glm_vec3_add(client_state.player_velocity, (vec3){0.f,5.0f,0.f}, client_state.player_velocity);         
+                glm_vec3_add(client_state.player_velocity, (vec3){0.f,3.5f,0.f}, client_state.player_velocity);         
                 glm_vec3_add(client_state.local_player->position, (vec3){0.f,0.1f,0.f}, client_state.local_player->position);
             }            
         }
@@ -125,6 +125,23 @@ static void rdm_frame(struct world* world)
 
         if(get_focus())
         {
+            if(client_state.local_player->active_weapon == WEAPON_BLOCK)
+            {
+                if(floorf(mouse_state.scroll_y) != 0)
+                {
+                    struct network_packet _pak; 
+                    union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
+
+                    _pak.meta.packet_type = RDM_PACKET_UPDATE_WEAPON;
+                    _pak.meta.acknowledge = false;
+                    _pak.meta.packet_size = sizeof(union rdm_packet_data);
+                    _data->update_weapon.weapon = WEAPON_BLOCK;
+                    _data->update_weapon.block_color = client_state.local_player->weapon_block_color + floorf(mouse_state.scroll_y);
+
+                    network_transmit_packet(&world->client, &world->client.client, &_pak);
+                }
+            }
+
             if(mouse_state.mouse_button_l)
                 weapon_trigger_fire(world, false);
             else if(mouse_state.mouse_button_r)
@@ -155,11 +172,13 @@ static void rdm_frame(struct world* world)
 
             glm_vec3_zero(player_move); // fall
 
-            client_state.player_velocity[0] += cosf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * 25.f;
-            client_state.player_velocity[2] += sinf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * 25.f;
+            float move_speed = client_state.player_grounded ? 25.f : 7.f;
 
-            client_state.player_velocity[0] += cosf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * 25.f;
-            client_state.player_velocity[2] += sinf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * 25.f;
+            client_state.player_velocity[0] += cosf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * move_speed;
+            client_state.player_velocity[2] += sinf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * move_speed;
+
+            client_state.player_velocity[0] += cosf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * move_speed;
+            client_state.player_velocity[2] += sinf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * move_speed;
         }
 
         if(world->client.pung)
@@ -340,9 +359,12 @@ static void rdm_frame_ui(struct world* world)
             {
                 vec4 oldbg_kys;
                 world->ui->panel_background_color[3] = 1.f;
-                int c = client_state.local_player->weapon_block_color;
+                unsigned char c = client_state.local_player->weapon_block_color;
                 map_color_to_rgb(c, world->ui->panel_background_color);
                 ui_draw_panel(world->ui, world->gfx.screen_width - 32, 32, 32, 32, 1.f);
+                char col_tx[16];
+                snprintf(col_tx,16,"%u",c);
+                ui_font2_text(world->ui, 0.f, 12.f, client_state.normal_font, col_tx, 0.5f);
                 ui_end_panel(world->ui);
                 glm_vec4_copy(oldbg_kys, world->ui->panel_background_color);
             }

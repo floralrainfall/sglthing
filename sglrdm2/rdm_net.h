@@ -94,8 +94,8 @@ struct rdm_player
     enum rdm_team team;
     enum weapon_type active_weapon;
     int weapon_ammos[__WEAPON_MAX];
-    char weapon_block_color;
-    
+    unsigned char weapon_block_color;
+
     versor direction;
 
     struct antagonist antagonist_data;
