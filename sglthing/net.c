@@ -10,6 +10,7 @@
 #include "io.h"
 #endif
 #include "sglthing.h"
+#include "keyboard.h"
 
 #ifdef __WIN32
 #define MSG_DONTWAIT 0 // not supported on Winsock
@@ -96,6 +97,7 @@ void network_init(struct network* network, struct script_system* script)
     network->packet_unacknowledged = g_array_new(true, true, sizeof(struct unacknowledged_packet));
     network->packet_id = 0;
     network->server_open = true;
+    network->client_capabilities = CAPABILITY_OPUS_VOICE_CHAT;
 }
 
 void network_start_download(struct network_downloader* network, char* ip, int port, char* rqname, char* pass)
@@ -137,6 +139,7 @@ void network_start_download(struct network_downloader* network, char* ip, int po
         client_info.meta.packet_type = PACKETTYPE_CLIENTINFO;
         client_info.packet.clientinfo.observer = true;
         client_info.packet.clientinfo.sglthing_revision = GIT_COMMIT_COUNT;
+        client_info.packet.clientinfo.capabilities = 0;
 
         strncpy(client_info.packet.clientinfo.client_name, "DownloaderClient", 64);
         strncpy(client_info.packet.clientinfo.session_key, network->http_client.sessionkey, 64);
@@ -307,7 +310,31 @@ void network_connect(struct network* network, char* ip, int port)
         client_info.packet.clientinfo.color_r = network->client.player_color_r;
         client_info.packet.clientinfo.color_g = network->client.player_color_g;
         client_info.packet.clientinfo.color_b = network->client.player_color_b;
+        client_info.packet.clientinfo.capabilities = network->client_capabilities;
         network_transmit_packet(network, &network->client, &client_info);
+
+#ifdef OPUS_ENABLED
+        int channels = OPUS_VOICE_CHANNELS;
+        int buf_size = OPUS_VOICE_BUFSIZE;
+        int sample_rate = OPUS_VOICE_SAMPLERATE;
+
+
+        if(Pa_OpenDefaultStream(&network->voice_chat_stream, channels, channels, paInt16, sample_rate, buf_size, NULL, NULL) != paNoError)
+        {
+            printf("sglthing: unable to open voice chat stream\n");   
+        }
+        else
+        {
+            Pa_StartStream(network->voice_chat_stream);         
+            network->voice_chat_captured_buf = malloc2(buf_size * channels * sizeof(uint16_t));
+            network->voice_chat_decoded_buf = malloc2(buf_size * channels * sizeof(uint16_t));
+            network->voice_chat_encoded_buf = malloc2(buf_size * channels * sizeof(uint16_t));
+
+            network->voice_chat_encoder = opus_encoder_create(sample_rate, channels, OPUS_APPLICATION_AUDIO, NULL);
+            network->voice_chat_decoder = opus_decoder_create(sample_rate, channels, NULL);
+            printf("sglthing: using libopus voice chat\n");
+        }
+#endif
 
         network->next_tick = network->distributed_time + 0.01;
 #ifdef NETWORK_TCP
@@ -797,6 +824,40 @@ static void network_manage_packet(struct network* network, struct network_client
                 }
             }
             break;      
+        case PACKETTYPE_OPUS_PACKET:
+            if(network->mode == NETWORKMODE_SERVER)
+            {
+                bool can_hear = true; // TODO: callback function for this
+                if(can_hear)
+                {
+                    in_packet->packet.opus_packet.player_id = client->player_id;
+                    network_transmit_packet_all(network, in_packet);
+                }
+            }
+#ifdef OPUS_ENABLED
+            else
+            {
+                struct network_client* client = g_hash_table_lookup(network->players, &in_packet->packet.opus_packet.player_id);
+                client->last_voice_packet = network->time;
+                int dec_bytes = opus_decode(network->voice_chat_decoder, in_packet->packet.opus_packet.buf_data, in_packet->packet.opus_packet.buf_size, network->voice_chat_decoded_buf, OPUS_VOICE_BUFSIZE, 0);
+                client->last_voice_packet_avg = 0.f;
+                for(int i = 0; i < dec_bytes; i++)
+                    client->last_voice_packet_avg += network->voice_chat_decoded_buf[i];
+                client->last_voice_packet_avg /= dec_bytes;
+                client->last_voice_packet_avg -= 32767;
+                client->last_voice_packet_avg /= 32767;
+                client->last_voice_packet_avg *= 10.f;
+                client->last_voice_packet_avg = fabsf(client->last_voice_packet_avg);
+#ifdef OPUS_VOICE_DISALLOW_SELF
+                if(in_packet->packet.opus_packet.player_id != client->player_id)
+#endif
+                    if(dec_bytes > 0)
+                        Pa_WriteStream(network->voice_chat_stream, network->voice_chat_decoded_buf, dec_bytes);
+                    else
+                        printf("sglthing: unable to decode voice packet (%i, b: %i)\n", dec_bytes, in_packet->packet.opus_packet.buf_size);
+            }
+            break;
+#endif
         default:            
             printf("sglthing: cli:%s unknown packet %i\n", network->mode?"true":"false", (int)in_packet->meta.packet_type);
             break;
@@ -1030,6 +1091,26 @@ void network_frame(struct network* network, float delta_time, double time)
     }
     else
     {
+#ifdef OPUS_ENABLED
+        if(Pa_GetStreamReadAvailable(network->voice_chat_stream) > OPUS_VOICE_BUFSIZE && keys_down[GLFW_KEY_V])
+        {
+            struct network_packet response; // for sizeof, probably bad
+            Pa_ReadStream(network->voice_chat_stream, network->voice_chat_captured_buf, OPUS_VOICE_BUFSIZE);
+            int buf_size = (OPUS_VOICE_BUFSIZE * OPUS_VOICE_CHANNELS);
+            struct network_packet* voice_packet = malloc2(buf_size + sizeof(response.packet.opus_packet) + sizeof(response.meta));
+            voice_packet->meta.packet_type = PACKETTYPE_OPUS_PACKET;
+            voice_packet->meta.packet_size = sizeof(response.packet.opus_packet) + buf_size;
+            int enc_bytes = opus_encode(network->voice_chat_encoder, network->voice_chat_captured_buf, OPUS_VOICE_BUFSIZE, voice_packet->packet.opus_packet.buf_data, buf_size);
+            voice_packet->packet.opus_packet.buf_size = buf_size;
+            if(enc_bytes < 0)
+            {
+                printf("sglthing: unable to encode voice packet (%i)\n", enc_bytes);
+            }
+            else
+                network_transmit_packet(network, &network->client, voice_packet);
+            free2(voice_packet);
+        }
+#endif
         network_manage_socket(network, &network->client);
     }
     profiler_end();

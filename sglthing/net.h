@@ -12,12 +12,24 @@
 
 // TODO: completely remove the legacy TCP code as it makes the source look ugly
 
-#define CR_PACKET_VERSION 200
+#define CR_PACKET_VERSION 201
 #define NO_DATAPACKETS_TICK 512
 
 #define MAGIC_NUMBER 0x7930793179327934
 #define DATA_PACKET_SIZE 256
 #define NETWORK_PACKET_SIZE 512
+
+#ifdef OPUS_ENABLED
+#include <opus.h>
+#include "snd.h"
+#define CAPABILITY_OPUS_VOICE_CHAT (1<<0)
+
+#define OPUS_VOICE_CHANNELS 1
+#define OPUS_VOICE_SAMPLERATE 24000
+#define OPUS_VOICE_BUFSIZE 240
+#else
+#define CAPABILITY_OPUS_VOICE_CHAT 0
+#endif
 
 typedef uint64_t checksum_t;
 
@@ -32,6 +44,7 @@ struct db_player
 
 struct network_client {
     int socket;
+    uint64_t capabilities; 
     char client_name[64];
     int player_id;
     int web_player_id;
@@ -59,6 +72,8 @@ struct network_client {
     struct network* owner;
     void* user_data;
     int last_ping_id;
+    float last_voice_packet;
+    float last_voice_packet_avg;
 
     struct http_user user;
     struct db_player db;
@@ -115,6 +130,8 @@ struct network_packet_header {
         PACKETTYPE_DEBUGGER_QUIT,       // C-->S
         PACKETTYPE_DEBUGGER_KICK,       // C-->S
 
+        PACKETTYPE_OPUS_PACKET,
+
         PACKETTYPE_LAST_ID,
     } packet_type;
     int packet_version;
@@ -140,6 +157,8 @@ struct network_packet {
             char server_pass[64];
             char debugger_pass[64];
             int sglthing_revision;
+
+            uint64_t capabilities; 
 
             float color_r;
             float color_g;
@@ -214,6 +233,11 @@ struct network_packet {
             int player_id;
             char reason[32];
         } dbg_kick;
+        struct {
+            int player_id;
+            int buf_size;
+            char buf_data[];
+        } opus_packet;
     } packet;
 };
 
@@ -264,6 +288,17 @@ struct network {
     int packet_time;
 
     struct world* world;
+
+    uint64_t client_capabilities; 
+
+#ifdef OPUS_ENABLED
+    PaStream* voice_chat_stream;
+    OpusEncoder* voice_chat_encoder;
+    OpusDecoder* voice_chat_decoder;
+    uint16_t* voice_chat_captured_buf;
+    uint16_t* voice_chat_decoded_buf;
+    uint16_t* voice_chat_encoded_buf;
+#endif
 
     sqlite3 *database;    
 };

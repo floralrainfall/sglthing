@@ -279,6 +279,7 @@ struct world* world_init(char** argv, int argc, void* p)
     }
 #endif
 
+    snd_init(&world->s_mgr);
     if(strcmp(net_mode,"server")==0)
     {
 #ifndef HEADLESS
@@ -301,8 +302,6 @@ struct world* world_init(char** argv, int argc, void* p)
         world->client_on = true;
         world->server_on = true;
     }
-
-    snd_init(&world->s_mgr);
 
     world->world_frame_user = NULL;
     world->world_frame_ui_user = NULL;

@@ -104,12 +104,12 @@ static void rdm_frame(struct world* world)
             }            
         }
 
-        if(client_state.local_player->active_weapon == WEAPON_BLOCK || client_state.local_player->active_weapon == WEAPON_SHOVEL)
+        if(client_state.local_player->active_weapon_type == WEAPON_BLOCK || client_state.local_player->active_weapon_type == WEAPON_SHOVEL)
         {
             vec3 eye_position;
             glm_vec3_copy(client_state.local_player->position, eye_position);
-            eye_position[1] += 1.0f;
-            struct ray_cast_info ray = ray_cast(&world->client, eye_position, client_state.local_player->direction, 16.f, 0, true, client_state.local_player->active_weapon == WEAPON_BLOCK);
+            eye_position[1] += 0.75f;
+            struct ray_cast_info ray = ray_cast(&world->client, eye_position, client_state.local_player->direction, 16.f, 0, true, client_state.local_player->active_weapon_type == WEAPON_BLOCK);
             if(ray.object == RAYCAST_VOXEL)
             {
                 client_state.mouse_block_x = ray.real_voxel_x;
@@ -125,7 +125,7 @@ static void rdm_frame(struct world* world)
 
         if(get_focus())
         {
-            if(client_state.local_player->active_weapon == WEAPON_BLOCK)
+            if(client_state.local_player->active_weapon_type == WEAPON_BLOCK)
             {
                 if(floorf(mouse_state.scroll_y) != 0)
                 {
@@ -135,7 +135,7 @@ static void rdm_frame(struct world* world)
                     _pak.meta.packet_type = RDM_PACKET_UPDATE_WEAPON;
                     _pak.meta.acknowledge = false;
                     _pak.meta.packet_size = sizeof(union rdm_packet_data);
-                    _data->update_weapon.weapon = WEAPON_BLOCK;
+                    _data->update_weapon.hotbar_id = client_state.local_player->active_hotbar_id;
                     _data->update_weapon.block_color = client_state.local_player->weapon_block_color + floorf(mouse_state.scroll_y);
 
                     network_transmit_packet(&world->client, &world->client.client, &_pak);
@@ -253,6 +253,27 @@ static void rdm_frame(struct world* world)
     }
 }
 
+static int __pvc_v_id = 0;
+static void __player_voice_chat_ui(gpointer key, gpointer value, gpointer user_data)
+{
+    struct world* world = (struct world*)user_data;
+    struct network_client* client = (struct network_client*)value;
+    struct rdm_player* player = (struct rdm_player*)client->user_data;
+
+    if(world->time - client->last_voice_packet < 0.1f)
+    {
+        vec4 oldbg_kys;
+        glm_vec4_copy(world->ui->panel_background_color, oldbg_kys);
+        glm_vec4_mix((vec4){0.25f,0.f,0.f,0.9f},(vec4){0.f,0.25f,0.f,0.9f},client->last_voice_packet_avg,world->ui->panel_background_color);
+        ui_draw_panel(world->ui, world->gfx.screen_width - 128.f - 8.f, 255.f - (__pvc_v_id * 24.f), 128.f, 24.f, 1.f);
+        ui_font2_text(world->ui, 8.f, 24.f/2.f + client_state.normal_font2->size_y/2.f, client_state.normal_font2, client->client_name, 0.5f);
+        ui_end_panel(world->ui);
+        glm_vec4_copy(oldbg_kys, world->ui->panel_background_color);
+
+        __pvc_v_id++;
+    }
+}
+
 static void rdm_frame_ui(struct world* world)
 {
     char gamemode_txt[64];
@@ -349,15 +370,14 @@ static void rdm_frame_ui(struct world* world)
             glm_vec4_copy(oldbg_kys, world->ui->panel_background_color);
 
             int img_size = 32;
-            if(client_state.local_player->weapon_ammos[client_state.local_player->active_weapon] != -1)
+            if(client_state.local_player->weapon_ammos[client_state.local_player->active_weapon_type] != -1)
             {
-                snprintf(dbginfo,64,"%i", client_state.local_player->weapon_ammos[client_state.local_player->active_weapon]);
+                snprintf(dbginfo,64,"%i", client_state.local_player->weapon_ammos[client_state.local_player->active_weapon_type]);
                 ui_font2_text(world->ui, world->gfx.screen_width - 64.f - ui_font2_text_len(client_state.big_font, dbginfo), 64.f + img_size, client_state.big_font, dbginfo, 1.f);
             }
 
-            if(client_state.local_player->active_weapon == WEAPON_BLOCK)
+            if(client_state.local_player->active_weapon_type == WEAPON_BLOCK)
             {
-                vec4 oldbg_kys;
                 world->ui->panel_background_color[3] = 1.f;
                 unsigned char c = client_state.local_player->weapon_block_color;
                 map_color_to_rgb(c, world->ui->panel_background_color);
@@ -368,10 +388,17 @@ static void rdm_frame_ui(struct world* world)
                 ui_end_panel(world->ui);
                 glm_vec4_copy(oldbg_kys, world->ui->panel_background_color);
             }
+            
+            glm_vec4_copy(oldbg_kys, world->ui->panel_background_color);
 
-            for(int i = 1; i < __WEAPON_MAX; i++)
-            {
-                if(keys_down[GLFW_KEY_0 + i])
+            for(int i = 0; i < 9; i++)
+            {   
+                if(client_state.local_player->weapon_hotbar[i] == -1)
+                    continue;             
+                enum weapon_type weapon_type = client_state.local_player->inventory[client_state.local_player->weapon_hotbar[i]];
+                if(weapon_type == -1)
+                    continue;
+                if(keys_down[GLFW_KEY_0 + i + 1])
                 {
                     struct network_packet _pak; 
                     union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
@@ -379,19 +406,22 @@ static void rdm_frame_ui(struct world* world)
                     _pak.meta.packet_type = RDM_PACKET_UPDATE_WEAPON;
                     _pak.meta.acknowledge = false;
                     _pak.meta.packet_size = sizeof(union rdm_packet_data);
-                    _data->update_weapon.weapon = i;
+                    _data->update_weapon.hotbar_id = i;
                     _data->update_weapon.block_color = client_state.local_player->weapon_block_color;
 
                     network_transmit_packet(&world->client, &world->client.client, &_pak);
                 }
                 float pos_off = 0.f;
-                if(client_state.local_player->active_weapon == i)
+                float pos_sep = 0.f;
+                if(client_state.local_player->active_hotbar_id == i)
                     pos_off += sinf(world->time * 4.f) * 4.f;
-                ui_draw_image(world->ui, world->gfx.screen_width - 64.f - (__WEAPON_MAX * img_size) + (i * img_size), 64.f + img_size + pos_off, img_size, img_size, client_state.weapon_icon_textures[i], 1.f);
-                if(client_state.local_player->weapon_ammos[i] != -1)
+                ui_draw_image(world->ui, world->gfx.screen_width - 64.f - (9 * img_size) + (i * (img_size + pos_sep)), 64.f + img_size + pos_off, img_size, img_size, client_state.weapon_icon_textures[weapon_type], 1.f);
+                snprintf(dbginfo,64,"%i", i + 1);
+                ui_font2_text(world->ui, world->gfx.screen_width - 64.f - (9 * img_size) + (i * (img_size + pos_sep)) + (img_size - 12.f), 64.f + img_size + pos_off - 12.f, client_state.normal_font, dbginfo, 0.8f);
+                if(client_state.local_player->weapon_ammos[weapon_type] != -1)
                 {
-                    snprintf(dbginfo,64,"%i", client_state.local_player->weapon_ammos[i]);
-                    ui_font2_text(world->ui, world->gfx.screen_width - 64.f - (__WEAPON_MAX * img_size) + (i * img_size), 64.f + pos_off, client_state.normal_font, dbginfo, 0.8f);
+                    snprintf(dbginfo,64,"%i", client_state.local_player->weapon_ammos[weapon_type]);
+                    ui_font2_text(world->ui, world->gfx.screen_width - 64.f - (9 * img_size) + (i * img_size), 64.f + pos_off, client_state.normal_font, dbginfo, 0.8f);
                 }
             }
         }
@@ -413,7 +443,8 @@ static void rdm_frame_ui(struct world* world)
         ui_font2_text(world->ui, 0.f, world->gfx.screen_height-48.f, client_state.big_font, dbg_stuff, 1.f);
 
         if(client_state.context_mode)
-        {            ui_draw_panel(world->ui, world->gfx.screen_width / 2 - 128.f, world->gfx.screen_height / 2 + 150.f, 255.f, 300.f, 1.f);
+        {            
+            ui_draw_panel(world->ui, world->gfx.screen_width / 2 - 128.f, world->gfx.screen_height / 2 + 150.f, 255.f, 300.f, 1.f);
             ui_font2_text(world->ui, 8.f, 24.f, client_state.big_font, "Context Menu", 0.7f);
 
             bool button = ui_draw_button(world->ui, 0.f, world->ui->current_panel->size_y - 12.f, world->ui->current_panel->size_x, 12.f, world->gfx.white_texture, 1.2f);
@@ -500,6 +531,9 @@ static void rdm_frame_ui(struct world* world)
             ui_end_panel(world->ui);
         }
     }
+
+    __pvc_v_id = 0;
+    g_hash_table_foreach(world->client.players, __player_voice_chat_ui, world);
 }
 
 static void __player_frame(gpointer key, gpointer value, gpointer user_data)
@@ -545,7 +579,7 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
             world_draw_model(world, client_state.rdm_guy, client_state.object_shader, player_rotated_matrix, true);
         }
     }
-    struct model* weapon_model = client_state.weapons[player->active_weapon];
+    struct model* weapon_model = client_state.weapons[player->active_weapon_type];
     if(weapon_model)
     {
         mat4 weapon_matrix;
@@ -564,7 +598,7 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
         }
         else
         {
-            if(!world->gfx.shadow_pass && player->active_weapon == WEAPON_BLOCK)
+            if(!world->gfx.shadow_pass && player->active_weapon_type == WEAPON_BLOCK)
             {
                 vec3 block_color;
                 map_color_to_rgb(player->weapon_block_color, block_color);
@@ -616,7 +650,7 @@ static void rdm_frame_render(struct world* world)
                 client_state.mouse_block_y,
                 client_state.mouse_block_z,
             });
-            if(client_state.local_player->active_weapon == WEAPON_SHOVEL)
+            if(client_state.local_player->active_weapon_type == WEAPON_SHOVEL)
             {
                 glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), 0.f, 0.f, 0.f, 0.5f);
                 glm_scale(block_selection_matrix, (vec3){1.1f,1.1f,1.1f});
@@ -650,6 +684,7 @@ void sglthing_init_api(struct world* world)
 
         client_state.big_font = ui_load_font2(world->ui, "uiassets/impact.ttf",0,24);
         client_state.normal_font = ui_load_font2(world->ui, "uiassets/arial.ttf",0,12);
+        client_state.normal_font2 = ui_load_font2(world->ui, "uiassets/arialbd.ttf",0,12);
 
         char mdlname[64];
         for(int i = 0; i < __WEAPON_MAX; i++)

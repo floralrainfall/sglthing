@@ -14,6 +14,8 @@ enum rdm_packet_type
     RDM_PACKET_UPDATE_WEAPON,
     RDM_PACKET_UPDATE_TEAM,
     RDM_PACKET_UPDATE_CHUNK,
+    RDM_PACKET_UPDATE_HOTBAR,
+    RDM_PACKET_UPDATE_INVENTORY,
     RDM_PACKET_REQUEST_CHUNK,
     RDM_PACKET_DESTROY_CHUNK,
     RDM_PACKET_UPDATE_GAMEMODE,
@@ -34,6 +36,7 @@ union rdm_packet_data
     } update_position;
     struct 
     {
+        int hotbar_id;
         enum weapon_type weapon;
         int player_id;
         int block_color;
@@ -68,6 +71,17 @@ union rdm_packet_data
     struct
     {
         int player_id;
+        int hotbar_slot;
+        int inventory_id;
+    } update_hotbar;
+    struct
+    {
+        int inventory_id;
+        int item_id;
+    } update_inventory;
+    struct
+    {
+        int player_id;
         bool secondary;
         versor direction;
     } weapon_fire;
@@ -92,7 +106,12 @@ struct rdm_player
     vec3 position;
     vec3 replicated_position;
     enum rdm_team team;
-    enum weapon_type active_weapon;
+
+    enum weapon_type active_weapon_type;
+    int active_hotbar_id;
+    int weapon_hotbar[9];
+    int inventory[128];
+
     int weapon_ammos[__WEAPON_MAX];
     unsigned char weapon_block_color;
 
@@ -104,7 +123,6 @@ struct rdm_player
 
     int health;
     int max_health;
-
 };
 
 struct pending_packet
@@ -123,5 +141,7 @@ void net_sync_gamemode(struct network* network, struct gamemode_data* gamemode);
 void net_play_sound(struct network* network, struct rdm_player* player, char* snd_name, vec3 position);
 void net_play_g_sound(struct network* network, char* snd_name, vec3 position);
 void net_init(struct world* world);
+
+enum weapon_type net_player_get_weapon(struct rdm_player* player);
 
 #endif

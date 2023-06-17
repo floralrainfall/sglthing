@@ -176,7 +176,22 @@ static void net_new_player(struct network* network, struct network_client* clien
     player->position[2] = 1.f;
     glm_vec3_copy(player->position, player->replicated_position);
     glm_quat_identity(player->direction);
-    player->active_weapon = WEAPON_BLOCK;
+    for(int i = 0; i < 9; i++)
+        player->weapon_hotbar[i] = -1;
+    for(int i = 0; i < sizeof(player->inventory) / sizeof(int); i++)
+        player->inventory[i] = -1;
+    player->active_hotbar_id = 0;
+    player->active_weapon_type = WEAPON_SHOVEL;
+    player->inventory[0] = WEAPON_SHOVEL;
+    player->inventory[1] = WEAPON_BLOCK;
+    player->inventory[2] = WEAPON_AK47;
+    player->weapon_hotbar[0] = 0;
+    player->weapon_hotbar[1] = 1;
+    player->weapon_hotbar[2] = 2;
+    player->weapon_hotbar[3] = 2;
+    player->weapon_hotbar[4] = 2;
+    player->weapon_hotbar[5] = 2;
+    player->weapon_hotbar[6] = 2;
     player->team = TEAM_NEUTRAL;
     player->health = 2;
     player->max_health = 3;
@@ -356,7 +371,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
         case RDM_PACKET_WEAPON_FIRE:
             if(network->mode == NETWORKMODE_SERVER)
             {
-                if(remote_player->weapon_ammos[remote_player->active_weapon] == 0)
+                if(remote_player->weapon_ammos[net_player_get_weapon(remote_player)] == 0)
                     return false;
                 bool fired = false;
                 glm_quat_copy(packet_data->weapon_fire.direction, remote_player->direction);
@@ -366,8 +381,8 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                     fired = weapon_fire_primary(network, client->player_id, true);
                 if(fired)
                 {
-                    if(remote_player->weapon_ammos[remote_player->active_weapon] != -1)
-                        remote_player->weapon_ammos[remote_player->active_weapon]--;
+                    if(remote_player->weapon_ammos[net_player_get_weapon(remote_player)] != -1)
+                        remote_player->weapon_ammos[net_player_get_weapon(remote_player)]--;
 
                     net_player_syncinfo(network, remote_player);
 
@@ -421,14 +436,18 @@ static bool net_receive_packet(struct network* network, struct network_client* c
             {
                 struct network_packet _pak;
                 union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
+
+                remote_player->active_hotbar_id = packet_data->update_weapon.hotbar_id;
+                enum weapon_type weapon_type = net_player_get_weapon(remote_player);
+                remote_player->active_weapon_type = weapon_type;
                 
                 _pak.meta.packet_type = RDM_PACKET_UPDATE_WEAPON;
                 _pak.meta.acknowledge = false;
                 _pak.meta.packet_size = sizeof(union rdm_packet_data);
                 _data->update_weapon.player_id = client->player_id,
-                _data->update_weapon.weapon = packet_data->update_weapon.weapon;
+                _data->update_weapon.weapon = weapon_type;
+                _data->update_weapon.hotbar_id = packet_data->update_weapon.hotbar_id;
                 _data->update_weapon.block_color = packet_data->update_weapon.block_color;
-                remote_player->active_weapon = packet_data->update_weapon.weapon;
                 remote_player->weapon_block_color = packet_data->update_weapon.block_color;
 
                 network_transmit_packet_all(network, &_pak);
@@ -444,7 +463,8 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                 struct rdm_player* moved_player = (struct rdm_player*)moved->user_data;
                 if(moved_player)
                 {
-                    moved_player->active_weapon = packet_data->update_weapon.weapon;
+                    moved_player->active_hotbar_id = packet_data->update_weapon.hotbar_id;
+                    moved_player->active_weapon_type = packet_data->update_weapon.weapon;
                     moved_player->weapon_block_color = packet_data->update_weapon.block_color;
                 }
                 else
@@ -481,4 +501,9 @@ void net_init(struct world* world)
     world->server.new_player_callback = net_new_player;
     world->server.del_player_callback = net_del_player;
     world->server.old_player_add_callback = net_info_player;
+}
+
+enum weapon_type net_player_get_weapon(struct rdm_player* player)
+{
+    return player->inventory[player->weapon_hotbar[player->active_hotbar_id]];
 }

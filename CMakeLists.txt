@@ -16,6 +16,10 @@ option(USE_ODE "Use ODE library" OFF)
 option(USE_PKGCONFIG "Use PkgConfig to find packages" ON)
 option(HEADLESS "Compile without windowing support" OFF)
 option(GAMES_COMPILE "Compile the games" ON)
+option(SOUND_ENABLED "Enable sound using PortAudio and libsndfile" ON)
+if(SOUND_ENABLED)
+    option(OPUS_ENABLED "Enable libopus voice chat" ON)
+endif()
 
 if(NOT HEADLESS)
     option(SOUND_ENABLED "Enable sound" ON)
@@ -71,6 +75,12 @@ if(NOT HEADLESS)
             portaudio-2.0 sndfile
         )
         set(PKGCONFIG_LIBRARIES ${PKGCONFIG_LIBRARIES} PkgConfig::sound_deps)
+        if(OPUS_ENABLED)
+            pkg_check_modules(opus_deps REQUIRED IMPORTED_TARGET 
+                opus
+            )
+            set(PKGCONFIG_LIBRARIES ${PKGCONFIG_LIBRARIES} PkgConfig::opus_deps)
+        endif()
     endif()
 endif()
 
@@ -229,6 +239,9 @@ if(HEADLESS)
 endif()
 if(SOUND_ENABLED)
     target_compile_definitions(sglthing PUBLIC SOUND_ENABLED)
+endif()
+if(OPUS_ENABLED)
+    target_compile_definitions(sglthing PUBLIC OPUS_ENABLED)
 endif()
 
 configure_file(sglthing/_sglthing.h.in _sglthing.h @ONLY)

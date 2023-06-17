@@ -16,6 +16,7 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
     vec3 eye_position;
     struct ray_cast_info ray;
     struct rdm_player* player = (struct rdm_player*)client->user_data;
+    enum weapon_type weapon_type = player->active_weapon_type;
 
     if(server && player)
     {
@@ -25,7 +26,7 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
         glm_vec3_copy(player->replicated_position, eye_position);
         eye_position[1] += 0.75;
 
-        switch(player->active_weapon)
+        switch(weapon_type)
         {
             case WEAPON_HOLSTER:
                 break;
@@ -132,7 +133,7 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
             return false;
                     
 
-        switch(player->active_weapon)
+        switch(weapon_type)
         {
             case WEAPON_AK47:
 

@@ -22,6 +22,8 @@ struct ray_cast_info ray_cast(struct network* network, vec3 starting_position, v
     glm_quat_mat4(direction, rotation);
     glm_mat4_mulv(rotation, front, forward);
 
+    ray_position[1] += client ? 0.5f : 0.0f;
+
     glm_vec3_mul(forward, (vec3){RAY_FRACTION,RAY_FRACTION,RAY_FRACTION}, _forward);
 
     double distance_traversed = 0.f;

@@ -195,7 +195,7 @@ void ui_draw_text(struct ui_data* ui, float position_x, float position_y, char* 
 bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, int image, float depth)
 {
     #ifndef HEADLESS
-    if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
+    if(ui->ui_elements > MAX_UI_ELEMENTS)
         return false;
     #endif    
 
@@ -241,7 +241,7 @@ void ui_end_panel(struct ui_data* ui)
 void ui_draw_panel(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, float depth)
 {
     #ifndef HEADLESS
-    if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
+    if(ui->ui_elements > MAX_UI_ELEMENTS)
         return false;
     #endif
 
@@ -348,7 +348,7 @@ void ui_draw_panel(struct ui_data* ui, float position_x, float position_y, float
 void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float size_x, float size_y, int image, float depth)
 {
     #ifndef HEADLESS
-    if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
+    if(ui->ui_elements > MAX_UI_ELEMENTS)
         return false;
     #endif
 

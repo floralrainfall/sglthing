@@ -18,6 +18,7 @@ struct rdm2_state
     int weapon_icon_textures[__WEAPON_MAX];
 
     struct ui_font2* big_font;
+    struct ui_font2* normal_font2;
     struct ui_font2* normal_font;
 
     struct snd* lobby_music;
