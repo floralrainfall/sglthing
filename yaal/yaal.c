@@ -926,4 +926,6 @@ void sglthing_init_api(struct world* world)
     load_snd("yaal/snd/mus/theme_0.mp3");
     yaal_state.current_song = NULL;
     yaal_update_song();
+    
+    world_start_game(world); // i added the mainmenu/game modes before the world_state system
 }

@@ -22,10 +22,10 @@
 #ifdef OPUS_ENABLED
 #include <opus.h>
 #include "snd.h"
-#define CAPABILITY_OPUS_VOICE_CHAT (1<<0)
+#define CAPABILITY_OPUS_VOICE_CHAT (1<<1)
 
 #define OPUS_VOICE_CHANNELS 1
-#define OPUS_VOICE_SAMPLERATE 24000
+#define OPUS_VOICE_SAMPLERATE 12000
 #define OPUS_VOICE_BUFSIZE 240
 #else
 #define CAPABILITY_OPUS_VOICE_CHAT 0
@@ -253,6 +253,8 @@ struct network {
     char server_name[64];
     char server_pass[64];
     char debugger_pass[64];
+    char server_ip[64];
+    int server_port;
     struct network_client client;
     struct http_client http_client;
 #ifdef SGLTHING_COMPILE
@@ -267,6 +269,8 @@ struct network {
     double client_default_tick;
     GArray* packet_unacknowledged;
     int packet_id;
+
+    float next_punch;
 
     bool server_open;
     bool security;

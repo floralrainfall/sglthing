@@ -10,206 +10,213 @@ struct rdm2_state server_state;
 
 static void rdm_frame(struct world* world)
 {
-    world->gfx.fog_maxdist = client_state.map_manager->map_request_range * RENDER_CHUNK_SIZE * CUBE_SIZE;
-
-    if(client_state.local_player)
+    if(world->state == WORLD_STATE_GAME)
     {
-        vec3 player_move = {0};
-        vec3 expected_position;
-        vec3 ground_test;
-        glm_vec3_sub(client_state.local_player->position, (vec3){0.f,0.1f,0.f}, ground_test);
-
-        client_state.player_grounded = map_determine_collision_client(client_state.map_manager, ground_test);
-        vec3 velocity_frame, velocity_frame_p;
-        glm_vec3_copy(client_state.player_velocity, velocity_frame_p);
-        glm_vec3_mul(velocity_frame_p, (vec3){world->delta_time, world->delta_time, world->delta_time}, velocity_frame);
-        glm_vec3_sub(velocity_frame, player_move, player_move);
-
-        float rooftest_height = 1.5f;
-        vec3 player_move_x = {0};
-        vec3 player_move_x_rooftest = {0};
-        vec3 player_move_y = {0};
-        vec3 player_move_y_rooftest = {0};
-        vec3 player_move_z = {0};
-        vec3 player_move_z_rooftest = {0};
-        player_move_x[0] = player_move[0];
-        player_move_x_rooftest[0] = player_move[0];
-        player_move_x_rooftest[1] = rooftest_height;
-        player_move_y[1] = player_move[1];
-        player_move_y_rooftest[1] = player_move[1] + rooftest_height;
-        player_move_z[2] = player_move[2];
-        player_move_z_rooftest[2] = player_move[2];
-        player_move_z_rooftest[1] = rooftest_height;
-
-        glm_vec3_add(player_move_x, client_state.local_player->position, expected_position);
-        glm_vec3_add(player_move_x_rooftest, client_state.local_player->position, ground_test);
-        if(map_determine_collision_client(client_state.map_manager, expected_position) ||
-           map_determine_collision_client(client_state.map_manager, ground_test))
+        if(client_state.local_player)
         {
-            client_state.player_velocity[0] = 0.f;      
-        }
-        else
-            glm_vec3_copy(expected_position, client_state.local_player->position);
+            world->gfx.fog_maxdist = client_state.map_manager->map_request_range * RENDER_CHUNK_SIZE * CUBE_SIZE;
 
-        glm_vec3_add(player_move_z, client_state.local_player->position, expected_position);
-        glm_vec3_add(player_move_z_rooftest, client_state.local_player->position, ground_test);
-        if(map_determine_collision_client(client_state.map_manager, expected_position) ||
-           map_determine_collision_client(client_state.map_manager, ground_test))
-        {
-            client_state.player_velocity[2] = 0.f;        
-        }
-        else
-            glm_vec3_copy(expected_position, client_state.local_player->position);
+            vec3 player_move = {0};
+            vec3 expected_position;
+            vec3 ground_test;
+            glm_vec3_sub(client_state.local_player->position, (vec3){0.f,0.1f,0.f}, ground_test);
 
-        glm_vec3_add(player_move_y, client_state.local_player->position, expected_position);
-        glm_vec3_add(player_move_y_rooftest, client_state.local_player->position, ground_test);
-        if(map_determine_collision_client(client_state.map_manager, expected_position) ||
-           map_determine_collision_client(client_state.map_manager, ground_test))
-        {
-            client_state.player_velocity[1] = 0.f;        
-        }
-        else
-            glm_vec3_copy(expected_position, client_state.local_player->position);
+            client_state.player_grounded = map_determine_collision_client(client_state.map_manager, ground_test);
+            vec3 velocity_frame, velocity_frame_p;
+            glm_vec3_copy(client_state.player_velocity, velocity_frame_p);
+            glm_vec3_mul(velocity_frame_p, (vec3){world->delta_time, world->delta_time, world->delta_time}, velocity_frame);
+            glm_vec3_sub(velocity_frame, player_move, player_move);
 
-        vec3 vel_loss;
-        float vel_loss_scalar = client_state.player_grounded ? 5.f : 1.f, vel_loss_scalar_y = 0.1f;
-        glm_vec3_mul(client_state.player_velocity, (vec3){vel_loss_scalar * world->delta_time, vel_loss_scalar_y * world->delta_time, vel_loss_scalar * world->delta_time}, vel_loss);
-        glm_vec3_sub(client_state.player_velocity, vel_loss, client_state.player_velocity);
-        float vel_min = 0.01f;
-        if(fabsf(client_state.player_velocity[0]) < vel_min)
-            client_state.player_velocity[0] = 0.f;
-        if(fabsf(client_state.player_velocity[2]) < vel_min)
-            client_state.player_velocity[2] = 0.f;
+            float rooftest_height = 1.5f;
+            vec3 player_move_x = {0};
+            vec3 player_move_x_rooftest = {0};
+            vec3 player_move_y = {0};
+            vec3 player_move_y_rooftest = {0};
+            vec3 player_move_z = {0};
+            vec3 player_move_z_rooftest = {0};
+            player_move_x[0] = player_move[0];
+            player_move_x_rooftest[0] = player_move[0];
+            player_move_x_rooftest[1] = rooftest_height;
+            player_move_y[1] = player_move[1];
+            player_move_y_rooftest[1] = player_move[1] + rooftest_height;
+            player_move_z[2] = player_move[2];
+            player_move_z_rooftest[2] = player_move[2];
+            player_move_z_rooftest[1] = rooftest_height;
 
-        if(!client_state.player_grounded)
-        {
-            if(client_state.player_velocity[1] > -5.0)
-                client_state.player_velocity[1] -= world->delta_time * 5.f;
-        }
-        else
-        {
-            client_state.player_velocity[1] = 0.f;
-
-            bool player_submerged = map_determine_collision_client(client_state.map_manager, client_state.local_player->position);
-            while(player_submerged)
+            glm_vec3_add(player_move_x, client_state.local_player->position, expected_position);
+            glm_vec3_add(player_move_x_rooftest, client_state.local_player->position, ground_test);
+            if(map_determine_collision_client(client_state.map_manager, expected_position) ||
+            map_determine_collision_client(client_state.map_manager, ground_test))
             {
-                client_state.local_player->position[1] += 0.1f * world->delta_time;
-                player_submerged = map_determine_collision_client(client_state.map_manager, client_state.local_player->position);
+                client_state.player_velocity[0] = 0.f;      
+            }
+            else
+                glm_vec3_copy(expected_position, client_state.local_player->position);
+
+            glm_vec3_add(player_move_z, client_state.local_player->position, expected_position);
+            glm_vec3_add(player_move_z_rooftest, client_state.local_player->position, ground_test);
+            if(map_determine_collision_client(client_state.map_manager, expected_position) ||
+            map_determine_collision_client(client_state.map_manager, ground_test))
+            {
+                client_state.player_velocity[2] = 0.f;        
+            }
+            else
+                glm_vec3_copy(expected_position, client_state.local_player->position);
+
+            glm_vec3_add(player_move_y, client_state.local_player->position, expected_position);
+            glm_vec3_add(player_move_y_rooftest, client_state.local_player->position, ground_test);
+            if(map_determine_collision_client(client_state.map_manager, expected_position) ||
+            map_determine_collision_client(client_state.map_manager, ground_test))
+            {
+                client_state.player_velocity[1] = 0.f;        
+            }
+            else
+                glm_vec3_copy(expected_position, client_state.local_player->position);
+
+            vec3 vel_loss;
+            float vel_loss_scalar = client_state.player_grounded ? 5.f : 1.f, vel_loss_scalar_y = 0.1f;
+            glm_vec3_mul(client_state.player_velocity, (vec3){vel_loss_scalar * world->delta_time, vel_loss_scalar_y * world->delta_time, vel_loss_scalar * world->delta_time}, vel_loss);
+            glm_vec3_sub(client_state.player_velocity, vel_loss, client_state.player_velocity);
+            float vel_min = 0.01f;
+            if(fabsf(client_state.player_velocity[0]) < vel_min)
+                client_state.player_velocity[0] = 0.f;
+            if(fabsf(client_state.player_velocity[2]) < vel_min)
+                client_state.player_velocity[2] = 0.f;
+
+            if(!client_state.player_grounded)
+            {
+                if(client_state.player_velocity[1] > -5.0)
+                    client_state.player_velocity[1] -= world->delta_time * 5.f;
+            }
+            else
+            {
+                client_state.player_velocity[1] = 0.f;
+
+                bool player_submerged = map_determine_collision_client(client_state.map_manager, client_state.local_player->position);
+                while(player_submerged)
+                {
+                    client_state.local_player->position[1] += 0.1f * world->delta_time;
+                    player_submerged = map_determine_collision_client(client_state.map_manager, client_state.local_player->position);
+                }
+
+                if(get_focus() && keys_down[GLFW_KEY_SPACE])
+                {
+                    glm_vec3_add(client_state.player_velocity, (vec3){0.f,3.5f,0.f}, client_state.player_velocity);         
+                    glm_vec3_add(client_state.local_player->position, (vec3){0.f,0.1f,0.f}, client_state.local_player->position);
+                }            
             }
 
-            if(get_focus() && keys_down[GLFW_KEY_SPACE])
+            if(client_state.local_player->active_weapon_type == WEAPON_BLOCK || client_state.local_player->active_weapon_type == WEAPON_SHOVEL)
             {
-                glm_vec3_add(client_state.player_velocity, (vec3){0.f,3.5f,0.f}, client_state.player_velocity);         
-                glm_vec3_add(client_state.local_player->position, (vec3){0.f,0.1f,0.f}, client_state.local_player->position);
-            }            
-        }
-
-        if(client_state.local_player->active_weapon_type == WEAPON_BLOCK || client_state.local_player->active_weapon_type == WEAPON_SHOVEL)
-        {
-            vec3 eye_position;
-            glm_vec3_copy(client_state.local_player->position, eye_position);
-            eye_position[1] += 0.75f;
-            struct ray_cast_info ray = ray_cast(&world->client, eye_position, client_state.local_player->direction, 16.f, 0, true, client_state.local_player->active_weapon_type == WEAPON_BLOCK);
-            if(ray.object == RAYCAST_VOXEL)
-            {
-                client_state.mouse_block_x = ray.real_voxel_x;
-                client_state.mouse_block_y = ray.real_voxel_y;
-                client_state.mouse_block_z = ray.real_voxel_z;
-                client_state.mouse_block_v = true;
+                vec3 eye_position;
+                glm_vec3_copy(client_state.local_player->position, eye_position);
+                eye_position[1] += 0.75f;
+                struct ray_cast_info ray = ray_cast(&world->client, eye_position, client_state.local_player->direction, 16.f, 0, true, client_state.local_player->active_weapon_type == WEAPON_BLOCK);
+                if(ray.object == RAYCAST_VOXEL)
+                {
+                    client_state.mouse_block_x = ray.real_voxel_x;
+                    client_state.mouse_block_y = ray.real_voxel_y;
+                    client_state.mouse_block_z = ray.real_voxel_z;
+                    client_state.mouse_block_v = true;
+                }
+                else
+                    client_state.mouse_block_v = false;
             }
             else
                 client_state.mouse_block_v = false;
-        }
-        else
-            client_state.mouse_block_v = false;
 
-        if(get_focus())
-        {
-            if(client_state.local_player->active_weapon_type == WEAPON_BLOCK)
+            if(get_focus())
             {
-                if(floorf(mouse_state.scroll_y) != 0)
+                if(client_state.local_player->active_weapon_type == WEAPON_BLOCK)
+                {
+                    if(floorf(mouse_state.scroll_y) != 0)
+                    {
+                        struct network_packet _pak; 
+                        union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
+
+                        _pak.meta.packet_type = RDM_PACKET_UPDATE_WEAPON;
+                        _pak.meta.acknowledge = false;
+                        _pak.meta.packet_size = sizeof(union rdm_packet_data);
+                        _data->update_weapon.hotbar_id = client_state.local_player->active_hotbar_id;
+                        _data->update_weapon.block_color = client_state.local_player->weapon_block_color + floorf(mouse_state.scroll_y);
+
+                        network_transmit_packet(&world->client, &world->client.client, &_pak);
+                    }
+                }
+
+                if(mouse_state.mouse_button_l)
+                    weapon_trigger_fire(world, false);
+                else if(mouse_state.mouse_button_r)
+                    weapon_trigger_fire(world, true);
+
+                float cam_yaw = mouse_position[0] * world->delta_time * g_key_file_get_double(world->config.key_file, "rdm2", "mouse_sensitivity", NULL);
+                float cam_pitch = mouse_position[1] * world->delta_time * g_key_file_get_double(world->config.key_file, "rdm2", "mouse_sensitivity", NULL);
+
+                world->cam.yaw += cam_yaw;
+                world->cam.pitch -= cam_pitch;
+                client_state.mouse_update_diff += fabsf(cam_yaw);
+                client_state.mouse_update_diff += fabsf(cam_pitch);
+
+                mat4 rot, rot1, rot2;
+                glm_euler((vec3){
+                    0.f,
+                    glm_rad(-world->cam.yaw) + M_PI_2f,
+                    0.f
+                }, rot1);
+                glm_euler((vec3){
+                    glm_rad(-world->cam.pitch),
+                    0.f,
+                    0.f
+                }, rot2);
+                glm_mat4_mul(rot1, rot2, rot);
+                
+                glm_mat4_quat(rot, client_state.local_player->direction);
+
+                glm_vec3_zero(player_move); // fall
+
+                float move_speed = client_state.player_grounded ? 25.f : 7.f;
+
+                client_state.player_velocity[0] += cosf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * move_speed;
+                client_state.player_velocity[2] += sinf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * move_speed;
+
+                client_state.player_velocity[0] += cosf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * move_speed;
+                client_state.player_velocity[2] += sinf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * move_speed;
+            }
+
+            if(world->client.pung)
+            {
+                float distance = glm_vec3_distance(client_state.local_player->position, client_state.local_player->replicated_position);
+                if(distance > 0.5f || client_state.mouse_update_diff > 1.f)
                 {
                     struct network_packet _pak; 
                     union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
 
-                    _pak.meta.packet_type = RDM_PACKET_UPDATE_WEAPON;
+                    _pak.meta.packet_type = RDM_PACKET_UPDATE_POSITION;
                     _pak.meta.acknowledge = false;
                     _pak.meta.packet_size = sizeof(union rdm_packet_data);
-                    _data->update_weapon.hotbar_id = client_state.local_player->active_hotbar_id;
-                    _data->update_weapon.block_color = client_state.local_player->weapon_block_color + floorf(mouse_state.scroll_y);
+                    glm_vec3_copy(client_state.local_player->position, _data->update_position.position);
+                    glm_quat_copy(client_state.local_player->direction, _data->update_position.direction);
+                    _data->update_position.player_id = client_state.local_player_id;
 
                     network_transmit_packet(&world->client, &world->client.client, &_pak);
+
+                    client_state.mouse_update_diff = 0.f;
                 }
+                world->client.pung = false;
             }
 
-            if(mouse_state.mouse_button_l)
-                weapon_trigger_fire(world, false);
-            else if(mouse_state.mouse_button_r)
-                weapon_trigger_fire(world, true);
-
-            float cam_yaw = mouse_position[0] * world->delta_time * g_key_file_get_double(world->config.key_file, "rdm2", "mouse_sensitivity", NULL);
-            float cam_pitch = mouse_position[1] * world->delta_time * g_key_file_get_double(world->config.key_file, "rdm2", "mouse_sensitivity", NULL);
-
-            world->cam.yaw += cam_yaw;
-            world->cam.pitch -= cam_pitch;
-            client_state.mouse_update_diff += fabsf(cam_yaw);
-            client_state.mouse_update_diff += fabsf(cam_pitch);
-
-            mat4 rot, rot1, rot2;
-            glm_euler((vec3){
-                0.f,
-                glm_rad(-world->cam.yaw) + M_PI_2f,
-                0.f
-            }, rot1);
-            glm_euler((vec3){
-                glm_rad(-world->cam.pitch),
-                0.f,
-                0.f
-            }, rot2);
-            glm_mat4_mul(rot1, rot2, rot);
-            
-            glm_mat4_quat(rot, client_state.local_player->direction);
-
-            glm_vec3_zero(player_move); // fall
-
-            float move_speed = client_state.player_grounded ? 25.f : 7.f;
-
-            client_state.player_velocity[0] += cosf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * move_speed;
-            client_state.player_velocity[2] += sinf(world->cam.yaw*M_PI_180f) * get_input("z_axis") * world->delta_time * move_speed;
-
-            client_state.player_velocity[0] += cosf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * move_speed;
-            client_state.player_velocity[2] += sinf(world->cam.yaw*M_PI_180f+M_PI_2f) * get_input("x_axis") * world->delta_time * move_speed;
+            glm_vec3_copy(client_state.local_player->position, world->cam.position);
+            glm_vec3_copy(client_state.local_player->position, world->gfx.sun_position);
+            world->cam.position[1] += 0.75f;
         }
 
-        if(world->client.pung)
-        {
-            float distance = glm_vec3_distance(client_state.local_player->position, client_state.local_player->replicated_position);
-            if(distance > 0.5f || client_state.mouse_update_diff > 1.f)
-            {
-                struct network_packet _pak; 
-                union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
-
-                _pak.meta.packet_type = RDM_PACKET_UPDATE_POSITION;
-                _pak.meta.acknowledge = false;
-                _pak.meta.packet_size = sizeof(union rdm_packet_data);
-                glm_vec3_copy(client_state.local_player->position, _data->update_position.position);
-                glm_quat_copy(client_state.local_player->direction, _data->update_position.direction);
-                _data->update_position.player_id = client_state.local_player_id;
-
-                network_transmit_packet(&world->client, &world->client.client, &_pak);
-
-                client_state.mouse_update_diff = 0.f;
-            }
-            world->client.pung = false;
-        }
-
-        glm_vec3_copy(client_state.local_player->position, world->cam.position);
-        glm_vec3_copy(client_state.local_player->position, world->gfx.sun_position);
-        world->cam.position[1] += 0.75f;
+        //world->cam.position[2] = sinf(world->time/2.f)*64.f;
+        //world->cam.position[0] = cosf(world->time/2.f)*64.f;
     }
-
-    //world->cam.position[2] = sinf(world->time/2.f)*64.f;
-    //world->cam.position[0] = cosf(world->time/2.f)*64.f;
+    else
+    {
+        world->cam.pitch = 35.f;
+    }
 
     if(world->client_on)
     {
@@ -264,9 +271,9 @@ static void __player_voice_chat_ui(gpointer key, gpointer value, gpointer user_d
     {
         vec4 oldbg_kys;
         glm_vec4_copy(world->ui->panel_background_color, oldbg_kys);
-        glm_vec4_mix((vec4){0.25f,0.f,0.f,0.9f},(vec4){0.f,0.25f,0.f,0.9f},client->last_voice_packet_avg,world->ui->panel_background_color);
+        glm_vec4_mix((vec4){0.25f,0.f,0.f,0.25f},(vec4){0.f,0.25f,0.f,0.25f},client->last_voice_packet_avg,world->ui->panel_background_color);
         ui_draw_panel(world->ui, world->gfx.screen_width - 128.f - 8.f, 255.f - (__pvc_v_id * 24.f), 128.f, 24.f, 1.f);
-        ui_font2_text(world->ui, 8.f, 24.f/2.f + client_state.normal_font2->size_y/2.f, client_state.normal_font2, client->client_name, 0.5f);
+        ui_font2_text(world->ui, 8.f, (24.f/2.f) + (client_state.normal_font2->size_y/2.f), client_state.normal_font2, client->client_name, 0.5f);
         ui_end_panel(world->ui);
         glm_vec4_copy(oldbg_kys, world->ui->panel_background_color);
 
@@ -276,44 +283,47 @@ static void __player_voice_chat_ui(gpointer key, gpointer value, gpointer user_d
 
 static void rdm_frame_ui(struct world* world)
 {
-    char gamemode_txt[64];
-    char gamemode2_txt[64] = { 0 };
-    double time_left = client_state.gamemode.gamemode_end - client_state.gamemode.network_time;
-    snprintf(gamemode_txt,64,"%01i:%02i", 
-        (int)floor(time_left / 60.0),
-        (int)fmod(time_left, 60.0)
-    );
-    if(!client_state.gamemode.started)
-        snprintf(gamemode2_txt,64,"The round will start in");
-    float _text_len =  ui_font2_text_len(client_state.normal_font, gamemode2_txt);
-    float text_len = ui_font2_text_len(client_state.big_font, gamemode_txt) + _text_len;
-    ui_font2_text(world->ui, world->gfx.screen_width / 2.0 - (text_len / 2.0), world->gfx.screen_height - 24, client_state.normal_font, gamemode2_txt, 1.f);
-    ui_font2_text(world->ui, world->gfx.screen_width / 2.0 - ((text_len) / 2.0) + _text_len + 8, world->gfx.screen_height - 24, client_state.big_font, gamemode_txt, 1.f);
-
-    snprintf(gamemode_txt,64,"The gamemode is: %s", 
-        gamemode_name(client_state.gamemode.gamemode)
-    );
-    ui_font2_text(world->ui, world->gfx.screen_width / 2.0 - (ui_font2_text_len(client_state.normal_font, gamemode_txt) / 2.0), world->gfx.screen_height - 42, client_state.normal_font, gamemode_txt, 1.f);
-
-    char dbginfo[64];
-    snprintf(dbginfo,64,"%i player(s) online",g_hash_table_size(world->client.players));
-    ui_font2_text(world->ui, 0.f, 0.f, client_state.big_font, "RDM2 ALPHA", 1.f);
-    ui_font2_text(world->ui, 128.f, 0.f, client_state.normal_font, dbginfo, 1.f);
-
-    if(client_state.local_player)
-        snprintf(dbginfo,64,"%fx%fx%f %fx%fx%f",
-            client_state.local_player->position[0], client_state.local_player->position[1], client_state.local_player->position[2],
-            client_state.player_velocity[0], client_state.player_velocity[1], client_state.player_velocity[2]);
-    else
-        snprintf(dbginfo,64,"waiting for player");
-    
-    ui_draw_text(world->ui, 0.f, 24.f, dbginfo, 1.f);
-
     if(world->client_on)
     {
         if(world->client.client.lag > 1)
             ui_font2_text(world->ui, world->gfx.screen_width/1.5, world->gfx.screen_height-24, client_state.big_font, "LAG", 1.f);
     }
+
+    ui_font2_text(world->ui, 0.f, 0.f, client_state.big_font, "RDM2 ALPHA", 1.f);
+
+    char dbginfo[64] = { 0 };
+    if(client_state.local_player && world->state != WORLD_STATE_MAINMENU)
+    {
+        char gamemode_txt[64];
+        char gamemode2_txt[64] = { 0 };
+        double time_left = client_state.gamemode.gamemode_end - client_state.gamemode.network_time;
+        snprintf(gamemode_txt,64,"%01i:%02i", 
+            (int)floor(time_left / 60.0),
+            (int)fmod(time_left, 60.0)
+        );
+        if(!client_state.gamemode.started)
+            snprintf(gamemode2_txt,64,"The round will start in");
+        float _text_len =  ui_font2_text_len(client_state.normal_font, gamemode2_txt);
+        float text_len = ui_font2_text_len(client_state.big_font, gamemode_txt) + _text_len;
+        ui_font2_text(world->ui, world->gfx.screen_width / 2.0 - (text_len / 2.0), world->gfx.screen_height - 24, client_state.normal_font, gamemode2_txt, 1.f);
+        ui_font2_text(world->ui, world->gfx.screen_width / 2.0 - ((text_len) / 2.0) + _text_len + 8, world->gfx.screen_height - 24, client_state.big_font, gamemode_txt, 1.f);
+
+        snprintf(gamemode_txt,64,"The gamemode is: %s", 
+            gamemode_name(client_state.gamemode.gamemode)
+        );
+        ui_font2_text(world->ui, world->gfx.screen_width / 2.0 - (ui_font2_text_len(client_state.normal_font, gamemode_txt) / 2.0), world->gfx.screen_height - 42, client_state.normal_font, gamemode_txt, 1.f);
+
+        snprintf(dbginfo,64,"%i player(s) online",g_hash_table_size(world->client.players));
+        ui_font2_text(world->ui, 128.f, 0.f, client_state.normal_font, dbginfo, 1.f);
+
+        snprintf(dbginfo,64,"%fx%fx%f %fx%fx%f",
+            client_state.local_player->position[0], client_state.local_player->position[1], client_state.local_player->position[2],
+            client_state.player_velocity[0], client_state.player_velocity[1], client_state.player_velocity[2]);
+    }
+    else if(world->state != WORLD_STATE_MAINMENU)
+        snprintf(dbginfo,64,"waiting for player");
+    
+    ui_draw_text(world->ui, 0.f, 24.f, dbginfo, 1.f);
 
 
     if(client_state.local_player && !client_state.server_motd_dismissed)
@@ -340,7 +350,7 @@ static void rdm_frame_ui(struct world* world)
 
         ui_end_panel(world->ui);
     }
-    else
+    else if(world->state != WORLD_STATE_MAINMENU)
     {
         if(client_state.gamemode.started && client_state.local_player)
         {
@@ -532,6 +542,117 @@ static void rdm_frame_ui(struct world* world)
         }
     }
 
+    if(world->state == WORLD_STATE_MAINMENU)
+    {
+        if(client_state.server_selection_panel)
+        {            
+            ui_draw_panel(world->ui, 8.f, world->gfx.screen_height-8.f, world->gfx.screen_width-16.f, world->gfx.screen_height-16.f, 0.4f);
+            ui_font2_text(world->ui, 8.f, 24.f, client_state.big_font, "Multiplayer Servers", 0.2f);
+            snprintf(dbginfo, 64, "%i servers online", client_state.server_list->len);
+            ui_font2_text(world->ui, ui_font2_text_len(client_state.big_font, "Multiplayer Servers") + 8.f + 16.f, 24.f, client_state.normal_font, dbginfo, 0.2f);
+
+            bool ok_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 56.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
+            ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 32.f, client_state.big_font, "Close", 0.2f);
+
+            if(ok_button)
+                client_state.server_selection_panel = false;
+
+            bool last_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 72.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
+            ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 48.f, client_state.big_font, "Last", 0.2f);
+
+            if(last_button)
+            {
+                client_state.server_selection_panel = false;
+                network_connect(&world->client,
+                    g_key_file_get_string(world->config.key_file, "rdm2", "last_server_ip", NULL),
+                    g_key_file_get_integer(world->config.key_file, "rdm2", "last_server_port", NULL)
+                );
+
+                world_start_game(world);
+            }
+
+            bool local_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 88.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
+            ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 64.f, client_state.big_font, "Local", 0.2f);
+
+            if(local_button)
+            {
+                client_state.server_selection_panel = false;
+                network_connect(&world->client,
+                    "127.0.0.1",
+                    g_key_file_get_integer(world->config.key_file, "sglthing", "network_port", NULL)
+                );
+
+                world_start_game(world);
+            }
+
+            bool refresh_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 104.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
+            ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 80.f, client_state.big_font, "Refresh", 0.2f);
+
+            if(refresh_button)
+            {
+                http_get_servers(&world->client.http_client, "rdm2-ng", client_state.server_list);
+            }
+
+
+            vec4 oldbg_kys;
+            glm_vec4_copy(world->ui->panel_background_color, oldbg_kys);
+            world->ui->panel_background_color[3] = 1.0f;
+            ui_draw_panel(world->ui, 16.f, 32.f, world->ui->current_panel->size_x - 32.f, 12.f, 0.2f);
+            float half = world->ui->current_panel->size_x / 2.f;
+            ui_font2_text(world->ui, 0.f, 12.f, client_state.normal_font, "Server Name", 0.1f);
+            ui_font2_text(world->ui, half, 12.f, client_state.normal_font, "Server MOTD", 0.1f);
+            ui_end_panel(world->ui);
+
+            world->ui->panel_background_color[0] = 0.2f;
+            world->ui->panel_background_color[1] = 0.2f;
+            world->ui->panel_background_color[2] = 0.2f;
+
+            for(int i = 0; i < client_state.server_list->len; i++)
+            {
+                struct http_server server = g_array_index(client_state.server_list, struct http_server, i);
+                ui_draw_panel(world->ui, 16.f, (i * 13.f) + 44.f, world->ui->current_panel->size_x - 32.f, 12.f, 0.2f);
+                ui_font2_text(world->ui, 0.f, 12.f, client_state.normal_font, server.name, 0.1f);
+                ui_font2_text(world->ui, half, 12.f, client_state.normal_font, server.desc, 0.1f);
+                bool connect_button = ui_draw_button(world->ui, world->ui->current_panel->size_x - 64.f, 0.f, 64.f, 12.f, world->gfx.white_texture, 1.f);
+                ui_font2_text(world->ui, world->ui->current_panel->size_x - 64.f, 12.f, client_state.normal_font, "Connect", 0.1f);
+                ui_end_panel(world->ui);
+
+                if(connect_button)
+                {
+                    network_connect(&world->client,
+                        server.ip,
+                        server.port
+                    );
+
+                    world_start_game(world);
+                }
+            }
+
+            glm_vec4_copy(oldbg_kys, world->ui->panel_background_color);
+
+            ui_end_panel(world->ui);
+        }
+        else
+        {
+            float mm_y = world->gfx.screen_height / 2.f;
+    #define MAIN_MENU_ENTRY(f,e,c)                                                                                  \
+            {                                                                                                       \
+                float t_len = ui_font2_text_len(f, e);                                                              \
+                bool b = ui_draw_button(world->ui, 45.f, mm_y, t_len, f->size_y, world->gfx.alpha_texture, 1.f);    \
+                ui_font2_text(world->ui, 45.f, mm_y - f->size_y, f, e, 0.5f);                                       \
+                mm_y -= f->size_y;                                                                                  \
+                if(b) c;                                                                                            \
+            }
+            MAIN_MENU_ENTRY(client_state.big_font, "RDM2", {});
+            mm_y -= client_state.normal_font2->size_y;
+            MAIN_MENU_ENTRY(client_state.normal_font2, "Multiplayer", {
+                http_get_servers(&world->client.http_client, "rdm2-ng", client_state.server_list);
+                client_state.server_selection_panel = true;
+            });
+            MAIN_MENU_ENTRY(client_state.normal_font2, "Quit", glfwSetWindowShouldClose(world->gfx.window, 1));
+        }
+    }
+
     __pvc_v_id = 0;
     g_hash_table_foreach(world->client.players, __player_voice_chat_ui, world);
 }
@@ -549,6 +670,7 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
     struct world* world = (struct world*)user_data;
     struct network_client* client = (struct network_client*)value;
     struct rdm_player* player = (struct rdm_player*)client->user_data;
+    bool local_player = client->player_id == client_state.local_player_id;
 
     vec4 team_colors[__TEAM_MAX] = {
         { 0.5f, 0.5f, 0.5f, 0.5f }, // neutral
@@ -563,6 +685,9 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
     glm_translate(player_matrix, player->position);
     glm_translate(player_matrix, (vec3){0.f,-1.f,0.f});
     glm_quat_rotate(player_matrix, player->direction, player_rotated_matrix);
+
+    if(player->health == 0)
+        glm_rotate_x(player_rotated_matrix, 1.f, player_rotated_matrix);
 
     if(client->player_id != client_state.local_player_id || world->gfx.shadow_pass)
     {
@@ -609,6 +734,18 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
             if(!world->gfx.shadow_pass)
                 sglc(glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), 1.0f, 1.0f, 1.0f, 1.0f));
         }
+    }
+
+    if(world->time - client->last_voice_packet < 0.1f)
+    {
+        mat4 vc_bubble_mat;
+        glm_mat4_identity(vc_bubble_mat);
+        glm_translate(vc_bubble_mat, player->position);
+        glm_translate_y(vc_bubble_mat, 2.5f);
+        glm_scale(vc_bubble_mat, (vec3){0.5f,0.5f,0.5f});
+        glm_rotate_y(vc_bubble_mat, world->time, vc_bubble_mat);
+        glm_translate_x(vc_bubble_mat, 0.7f);
+        world_draw_model(world, client_state.vc_bubble, client_state.object_shader, vc_bubble_mat, true);
     }
 }
 
@@ -676,6 +813,14 @@ void sglthing_init_api(struct world* world)
 
     if(world->client_on)
     {
+        if(world->state == WORLD_STATE_MAINMENU)
+        {
+            world->client.http_client.server = false;
+            http_create(&world->client.http_client, SGLAPI_BASE);
+        }
+
+        client_state.server_list = g_array_new(true, true, sizeof(struct http_server));
+
         load_snd("rdm2/sound/ak47_shoot.ogg");
         load_snd("rdm2/sound/ricochet_ground.ogg");
         load_snd("rdm2/sound/ouch.ogg");
@@ -684,7 +829,7 @@ void sglthing_init_api(struct world* world)
 
         client_state.big_font = ui_load_font2(world->ui, "uiassets/impact.ttf",0,24);
         client_state.normal_font = ui_load_font2(world->ui, "uiassets/arial.ttf",0,12);
-        client_state.normal_font2 = ui_load_font2(world->ui, "uiassets/arialbd.ttf",0,12);
+        client_state.normal_font2 = ui_load_font2(world->ui, "uiassets/arialbd.ttf",0,18);
 
         char mdlname[64];
         for(int i = 0; i < __WEAPON_MAX; i++)
@@ -706,6 +851,9 @@ void sglthing_init_api(struct world* world)
         load_model("rdm2/sun.obj");
         client_state.sun = get_model("rdm2/sun.obj");
 
+        load_model("vcbubble.obj");
+        client_state.vc_bubble = get_model("vcbubble.obj");
+
         //load_model("rdm2/skybox.obj");
         //client_state.skybox = get_model("rdm2/skybox.obj");
 
@@ -725,9 +873,12 @@ void sglthing_init_api(struct world* world)
         client_state.stencil_shader = link_program(v, f);
 
         client_state.lobby_music = load_snd("rdm2/music/lobby0.mp3");
-        client_state.lobby_music->loop = false;
+        client_state.lobby_music->loop = true;
         client_state.lobby_music->multiplier = 0.1f;
-        client_state.playing_music = play_snd2(client_state.lobby_music);
+        if(world->state == WORLD_STATE_MAINMENU)
+            client_state.playing_music = play_snd2(client_state.lobby_music);
+        else
+            client_state.playing_music = 0;
         client_state.roundstart_sound = load_snd("rdm2/sound/round_start.ogg");
         client_state.roundstart_sound->loop = false;
     }

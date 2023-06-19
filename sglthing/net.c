@@ -98,6 +98,7 @@ void network_init(struct network* network, struct script_system* script)
     network->packet_id = 0;
     network->server_open = true;
     network->client_capabilities = CAPABILITY_OPUS_VOICE_CHAT;
+    network->http_client.easy = 0;
 }
 
 void network_start_download(struct network_downloader* network, char* ip, int port, char* rqname, char* pass)
@@ -261,8 +262,11 @@ void network_stop_download(struct network_downloader* network)
 
 void network_connect(struct network* network, char* ip, int port)
 {
-    network->http_client.server = false;
-    http_create(&network->http_client, SGLAPI_BASE);
+    if(!network->http_client.easy)
+    {
+        network->http_client.server = false;
+        http_create(&network->http_client, SGLAPI_BASE);
+    }
 
     int flags = 0;
 
@@ -281,6 +285,8 @@ void network_connect(struct network* network, char* ip, int port)
     inet_pton(AF_INET, ip, &network->client.sockaddr.sin_addr);   
     network->client.sockaddr.sin_port = htons(port);
     network->network_frames = 0;
+    strncpy(network->server_ip, ip, 64);
+    network->server_port = port;
     strncpy(network->debugger_pass, "debugger", 64);
 
     printf("sglthing: connecting to %s:%i...\n", ip, port);
@@ -342,6 +348,8 @@ void network_connect(struct network* network, char* ip, int port)
 #endif
 }
 
+extern const char *__progname;
+
 void network_open(struct network* network, char* ip, int port)
 {
     network->http_client.server = true;
@@ -388,10 +396,15 @@ void network_open(struct network* network, char* ip, int port)
     network->shutdown_ready = false;
     network->client_default_tick = 0.01;
 
+    strncpy(network->server_ip, ip, 64);
+    network->server_port = port;
+
     int rc = sqlite3_open("sglthing.db",&network->database);
     if(rc){
         printf("sglthing: cant open sqlite db (%s)\n", sqlite3_errmsg(network->database));
     }
+
+    network->next_punch = network->time + 5.0;
 
     printf("sglthing: server open on ip %s and port %i\n", ip, port);
 }
@@ -447,6 +460,8 @@ void network_transmit_packet_all(struct network* network, struct network_packet*
     for(int i = 0; i < network->server_clients->len; i++)
     {
         struct network_client *cli = &g_array_index(network->server_clients, struct network_client, i);
+        if(packet->meta.packet_type == PACKETTYPE_OPUS_PACKET && (cli->capabilities & CAPABILITY_OPUS_VOICE_CHAT) == 0)
+            continue;
         network_transmit_packet(network, cli, packet);
     }
 }
@@ -614,6 +629,7 @@ static void network_manage_packet(struct network* network, struct network_client
                     client->client_version = in_packet->packet.clientinfo.sglthing_revision;
                     client->owner = network;
                     client->last_ping_id = 0;
+                    client->capabilities = in_packet->packet.clientinfo.capabilities;
                     if(client->client_version != GIT_COMMIT_COUNT)
                         printf("sglthing: WARN: new client '%s' is on sglthing r%i, while server is on sglthing r%i\n", in_packet->packet.clientinfo.client_name, client->client_version, GIT_COMMIT_COUNT);
 
@@ -976,6 +992,12 @@ void network_frame(struct network* network, float delta_time, double time)
 
     if(network->mode == NETWORKMODE_SERVER)
     {
+        if(network->time > network->next_punch)
+        {
+            http_post_server(&network->http_client, __progname, network->server_name, network->server_motd, network->server_ip, network->server_port);
+            network->next_punch = network->time + 60.f;
+        }
+
         network->distributed_time = time;
         if(network->server_clients->len == 0 && network->shutdown_ready && network->shutdown_empty)
         {

@@ -363,7 +363,8 @@ static bool net_receive_packet(struct network* network, struct network_client* c
             if(network->mode == NETWORKMODE_CLIENT)
             {
                 printf("rdm2[%s]: mission started\n", net_name_manager(network));
-                stop_snd(client_state.playing_music);
+                if(client_state.playing_music)
+                    stop_snd(client_state.playing_music);
                 client_state.playing_music = 0;
                 play_snd2(client_state.roundstart_sound);
             }

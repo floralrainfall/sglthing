@@ -13,6 +13,17 @@
 #include "perlin.h"
 #include <sglthing/prof.h>
 
+enum chunk_attr
+{
+    CHUNK_RED_SPAWN,
+    CHUNK_BLUE_SPAWN,
+    CHUNK_NEUTRAL_SPAWN,
+    CHUNK_CITY,
+    CHUNK_HIGHWAY,
+    CHUNK_TERRAIN,
+    CHUNK_FLAT,
+};
+
 struct map_chunk
 {
     struct {
@@ -20,6 +31,7 @@ struct map_chunk
             unsigned char z[RENDER_CHUNK_SIZE];
         } y[RENDER_CHUNK_SIZE];
     } x[RENDER_CHUNK_SIZE];
+    enum chunk_attr attr;
 };
 
 struct map_manager

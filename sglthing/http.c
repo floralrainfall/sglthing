@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "model.h"
+#include <json.h>
 
 static bool curl_initialized = false;
 
@@ -12,6 +13,8 @@ typedef struct __http_rq_internal
     char *response;
     int size;
 } __http_rq;
+
+static bool p_init = false;
 
 // taken from libcurl doc
 static size_t http_write_data(void *buffer, size_t size, size_t nmemb, void *userp)
@@ -45,8 +48,8 @@ char* http_get(struct http_client* client, char* url)
 
 char* http_post(struct http_client* client, char* url, char* postdata)
 {
-    char _url[256];
-    snprintf(_url,256,"%s/%s",client->httpbase,url);
+    char _url[512];
+    snprintf(_url,512,"%s/%s",client->httpbase,url);
     curl_easy_setopt(client->easy, CURLOPT_URL, _url);
     curl_easy_setopt(client->easy, CURLOPT_WRITEFUNCTION, http_write_data);
     curl_easy_setopt(client->easy, CURLOPT_POSTFIELDS, postdata);
@@ -113,6 +116,7 @@ void http_create(struct http_client* client, char* http_base)
     {
         printf("sglthing: did not receive key\n");
     }
+
 }
 
 bool http_check_sessionkey(struct http_client* client, char* key)
@@ -166,4 +170,55 @@ struct http_user http_get_userdata(struct http_client* client, char* key)
     }
     
     return user;
+}
+
+void http_get_servers(struct http_client* client, char* game_name, GArray* servers_out)
+{
+    char url[256];
+    snprintf(url, 256, "netplay/serverlist?game=%s", game_name);
+    char* _server_list = http_get(client, url);
+    if(!_server_list)
+    {
+        printf("sglthing: couldnt get server list data\n");
+        return;
+    }
+    struct json_object* jobj = json_tokener_parse(_server_list);
+    int obj_len = json_object_array_length(jobj);
+    g_array_remove_range(servers_out, 0, servers_out->len);
+    for(int i = 0; i < obj_len; i++)
+    {
+        struct http_server server;
+        struct json_object* jserver = json_object_array_get_idx(jobj, i);
+
+        strncpy(server.ip, json_object_get_string(
+            json_object_object_get(jserver, "server_ip")
+        ), 64);
+        strncpy(server.name, json_object_get_string(
+            json_object_object_get(jserver, "server_name")
+        ), 64);
+        strncpy(server.desc, json_object_get_string(
+            json_object_object_get(jserver, "server_desc")
+        ), 128);
+        server.port = json_object_get_int(
+            json_object_object_get(jserver, "server_port")
+        );
+
+        g_array_append_val(servers_out, server);
+    }
+    free(_server_list);
+}
+
+void http_post_server(struct http_client* client, char* game_name, char* server_name, char* server_desc, char* server_ip, int server_port)
+{
+    char postdata[256];
+    snprintf(postdata, 256, "session_key=%s&game=%s&server_name=%s&server_desc=%s&server_ip=%s&server_port=%i", 
+        client->sessionkey,
+        game_name,
+        server_name,
+        server_desc,
+        server_ip,
+        server_port);
+    char* _heartbeat = http_post(client, "netplay/punch", postdata);
+    printf("sglthing: punched master server (%s)\n", _heartbeat);
+    free(_heartbeat);
 }

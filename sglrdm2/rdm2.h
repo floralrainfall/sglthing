@@ -13,6 +13,7 @@ struct rdm2_state
     struct model* cloud_layer;
     struct model* sun;
     struct model* rdm_guy;
+    struct model* vc_bubble;
     
     struct model* weapons[__WEAPON_MAX];
     int weapon_icon_textures[__WEAPON_MAX];
@@ -48,8 +49,10 @@ struct rdm2_state
 
     bool server_motd_dismissed;
     bool server_information_panel;
+    bool server_selection_panel;
     bool context_mode;
 
+    GArray* server_list;
     GArray* chunk_packets_pending;
     double next_pending;
 

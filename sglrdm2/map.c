@@ -289,11 +289,13 @@ void map_server_init(struct map_server* map)
                         ground_color = MAP_PAL(0,3,0);
                         is_road = false;
                         value = gnoise_2;
+                        chunk->attr = CHUNK_TERRAIN;
                     }
                     else if(selector > 0.78f)
                     {
                         pavement_color = MAP_PAL(0,2,0);
                         is_road = true;
+                        chunk->attr = CHUNK_FLAT;
                     }
                     else
                     {
@@ -302,21 +304,25 @@ void map_server_init(struct map_server* map)
                             is_road = true;
                         else if(floorf(fmodf(true_z/2,4)) == 0)
                             is_road = true;
+                        chunk->attr = CHUNK_CITY;
                     }
                     if(x == 0 && y == 0)
                     {
                         is_road = true;
                         pavement_color = MAP_PAL(3,0,0);
+                        chunk->attr = CHUNK_RED_SPAWN;
                     }
                     if(x == MAP_SIZE - 1 && y == MAP_SIZE - 1)
                     {
                         is_road = true;
-                        pavement_color = MAP_PAL(0,0,3);
+                        pavement_color = MAP_PAL(0,0,3);                        
+                        chunk->attr = CHUNK_BLUE_SPAWN;
                     }
                     if(x == highway_pos || y == highway_pos)
                     {
                         is_road = true;
                         pavement_color = MAP_PAL(1,1,1);
+                        chunk->attr = CHUNK_HIGHWAY;
                     }
 
                     for(int _y = 0; _y < RENDER_CHUNK_SIZE; _y++)

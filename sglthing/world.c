@@ -280,6 +280,8 @@ struct world* world_init(char** argv, int argc, void* p)
 #endif
 
     snd_init(&world->s_mgr);
+
+    world->state = WORLD_STATE_GAME;
     if(strcmp(net_mode,"server")==0)
     {
 #ifndef HEADLESS
@@ -291,9 +293,11 @@ struct world* world_init(char** argv, int argc, void* p)
         world->server_on = true;
     } else if(strcmp(net_mode,"client")==0)
     {        
+        if(config_number_get(&world->config,"skip_menu") == 1.0)
+            world_start_game(world);
+        else
+            world->state = WORLD_STATE_MAINMENU;
         world->client_on = true;
-        if(!network_download)
-            network_connect(&world->client, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
     } else if(strcmp(net_mode,"host")==0)
     {
         network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
@@ -312,6 +316,8 @@ struct world* world_init(char** argv, int argc, void* p)
 
     load_texture("uiassets/white.png");
     world->gfx.white_texture = get_texture("uiassets/white.png");
+    load_texture("uiassets/alpha.png");
+    world->gfx.alpha_texture = get_texture("uiassets/alpha.png");
 
     return world;
 }
@@ -364,7 +370,7 @@ void world_frame(struct world* world)
     world->viewport[3] = (float)world->gfx.screen_height;
 
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-    if(world->client.status == NETWORKSTATUS_CONNECTED)
+    if(world->client.status == NETWORKSTATUS_CONNECTED || world->state == WORLD_STATE_MAINMENU)
     {
         sglc(glClearColor(world->gfx.clear_color[0], world->gfx.clear_color[1], world->gfx.clear_color[2], world->gfx.clear_color[3]));
     }
@@ -379,7 +385,7 @@ void world_frame(struct world* world)
     sglc(glEnable(GL_STENCIL_TEST));    
 #ifdef FBO_ENABLED
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
-    if(world->client.status == NETWORKSTATUS_CONNECTED)
+    if(world->client.status == NETWORKSTATUS_CONNECTED || world->state == WORLD_STATE_MAINMENU)
     {
         unsigned int attachments[1] = { GL_COLOR_ATTACHMENT1 };
         sglc(glDrawBuffers(1, attachments));  
@@ -454,13 +460,13 @@ void world_frame(struct world* world)
     if(!world->assets_downloading)
         network_frame(&world->client, world->delta_time, world->time);
 
-    if(world->client.status != NETWORKSTATUS_CONNECTED)
+    if(world->client.status != NETWORKSTATUS_CONNECTED || world->state == WORLD_STATE_MAINMENU)
     {
         sglc(glBindFramebuffer(GL_FRAMEBUFFER,2));
     }
     if(!world->assets_downloading)
         script_frame(world->script);
-    if(world->client.status != NETWORKSTATUS_CONNECTED)
+    if(world->client.status != NETWORKSTATUS_CONNECTED || world->state == WORLD_STATE_MAINMENU)
     {
         sglc(glBindFramebuffer(GL_FRAMEBUFFER,0));
     }
@@ -500,7 +506,7 @@ void world_frame(struct world* world)
         glm_mat4_mul(light_projection_far, light_view_far, world->gfx.light_space_matrix_far);
     }
 
-    if(world->client.status == NETWORKSTATUS_CONNECTED && !world->assets_downloading)
+    if(world->client.status == NETWORKSTATUS_CONNECTED && !world->assets_downloading || world->state == WORLD_STATE_MAINMENU)
     {
         if(world->gfx.enable_sun)
         {
@@ -960,4 +966,11 @@ void world_updres(struct world* world)
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 #endif
 #endif
+}
+
+void world_start_game(struct world* world)
+{
+    world->state = WORLD_STATE_GAME;
+    if(world->client.status != NETWORKSTATUS_CONNECTED)
+        network_connect(&world->client, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
 }

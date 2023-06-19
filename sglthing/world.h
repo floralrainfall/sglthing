@@ -24,6 +24,11 @@
 #define SHADOW_HEIGHT 2048
 #define FBO_ENABLED
 
+enum world_state {
+    WORLD_STATE_MAINMENU,
+    WORLD_STATE_GAME,
+};
+
 struct world {
     struct {
         vec3 position;
@@ -55,6 +60,7 @@ struct world {
         int screen_width;
         int screen_height;
         int white_texture;
+        int alpha_texture;
 
         bool enable_sun;
         vec3 sun_position;
@@ -87,6 +93,8 @@ struct world {
         GLFWwindow *window;
 #endif
     } gfx;
+
+    enum world_state state;
 
     bool assets_downloading;
 
@@ -168,5 +176,6 @@ enum primitive_type
 void world_draw_primitive(struct world* world, int shader, int fill, enum primitive_type type, mat4 model_matrix, vec4 color);
 void world_uniforms(struct world* world, int shader_program, mat4 model_matrix);
 void world_updres(struct world* world);
+void world_start_game(struct world* world); // for clients that are in WORLD_STATE_MAINMENu
 
 #endif
