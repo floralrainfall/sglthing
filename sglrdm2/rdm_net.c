@@ -42,15 +42,30 @@ void net_player_syncinfo(struct network* network, struct rdm_player* player)
     _data->player_status.player_id = player->client->player_id;
     for(int i = 0; i < __WEAPON_MAX; i++)
         _data->player_status.weapon_ammos[i] = player->weapon_ammos[i];
+    _data->player_status.antagonist_data = player->antagonist_data;
 
     network_transmit_packet(network, player->client, &_pak);
 }
 
-void net_player_damage(struct network* network, struct rdm_player* player, int damage, int attacker_id)
+void net_player_damage(struct network* network, struct rdm_player* player, enum rdm_damage_type type, int damage, int attacker_id)
 {
-    player->health -= damage;
+    float damage_f = (float)damage;
+
+    player->health -= (int)roundf(damage_f);
     if(player->health <= 0)
     {
+        struct network_packet _pak;
+        union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
+
+        _pak.meta.packet_type = RDM_PACKET_PLAYER_DEATH;
+        _pak.meta.acknowledge = true;
+        _pak.meta.packet_size = sizeof(union rdm_packet_data);
+        _data->player_death.attacker_id = attacker_id;
+        _data->player_death.type = type;
+        _data->player_death.player_id = player->player_id;
+
+        network_transmit_packet_all(network,  &_pak);
+
         // die
         player->health = 0;
     }
@@ -203,6 +218,7 @@ static void net_new_player(struct network* network, struct network_client* clien
     player->weapon_ammos[WEAPON_SHOVEL] = -1;
     player->weapon_ammos[WEAPON_BLOCK] = 60;
     player->weapon_block_color = MAP_PAL(2,2,2);
+    player->antagonist_data.type = RDM_ANTAGONIST_NEUTRAL;
 
     if(network->mode == NETWORKMODE_CLIENT)
     {
@@ -217,7 +233,6 @@ static void net_new_player(struct network* network, struct network_client* clien
         gamemode_player_add(&server_state.gamemode, player);
         net_player_syncinfo(network, player);
     }
-
 }
 
 static bool net_receive_packet(struct network* network, struct network_client* client, struct network_packet* packet)
@@ -427,6 +442,13 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                     moved_player->health = packet_data->player_status.health;
                     for(int i = 0; i < __WEAPON_MAX; i++)
                         moved_player->weapon_ammos[i] = packet_data->player_status.weapon_ammos[i];                    
+                    if(moved->player_id == client_state.local_player_id)
+                    {
+                        enum antagonist_type old_type = moved_player->antagonist_data.type;
+                        moved_player->antagonist_data = packet_data->player_status.antagonist_data;
+                        if(moved_player->antagonist_data.type != old_type)
+                            client_state.server_motd_dismissed = false;
+                    }
                 }
                 else
                     printf("rdm2[%s]: RDM_PACKET_PLAYER_STATUS on unreg player id (%i)\n", net_name_manager(network), packet_data->update_position.player_id);
@@ -487,9 +509,50 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                     printf("rdm2[%s]: RDM_PACKET_REPLICATE_SOUND on non existent song (%s)\n", net_name_manager(network), packet_data->replicate_sound.sound_name);
             }
             return false;
+        case RDM_PACKET_PLAYER_DEATH:
+            if(network->mode == NETWORKMODE_CLIENT)
+            {
+                
+            }
+            return false;
         default:
             return true;
     }
+}
+
+static void net_tick(struct network* network)
+{
+    struct world* world = network->client.user_data;
+    if(server_state.chunk_packets_pending->len != 0)
+    {
+        profiler_event("net: send queued packets");
+        struct pending_packet packet = g_array_index(server_state.chunk_packets_pending, struct pending_packet, 0);
+        if(packet.giveup < network->time)
+        {
+            g_array_remove_index(server_state.chunk_packets_pending, 0);
+        }
+        else
+        {
+            network_transmit_packet(network, packet.client, packet.packet);
+            g_array_remove_index(server_state.chunk_packets_pending, 0);
+            free2(packet.packet);
+        }
+        profiler_end();
+    }
+
+    // packet limit
+    if(server_state.chunk_packets_pending->len > 600) 
+    {
+        printf("rdm2[server]: clearing chunk packet queue (%i packets in queue)\n",server_state.chunk_packets_pending->len);
+        while(server_state.chunk_packets_pending->len != 0)
+        {
+            struct pending_packet packet = g_array_index(server_state.chunk_packets_pending, struct pending_packet, 0);
+            free2(packet.packet);
+            g_array_remove_index(server_state.chunk_packets_pending, 0);
+        }
+    }
+        
+    gamemode_frame(&server_state.gamemode, world);
 }
 
 void net_init(struct world* world)
@@ -502,6 +565,8 @@ void net_init(struct world* world)
     world->server.new_player_callback = net_new_player;
     world->server.del_player_callback = net_del_player;
     world->server.old_player_add_callback = net_info_player;
+    world->server.network_tick_callback = net_tick;
+    world->server.client.user_data = (void*)world;
 }
 
 enum weapon_type net_player_get_weapon(struct rdm_player* player)

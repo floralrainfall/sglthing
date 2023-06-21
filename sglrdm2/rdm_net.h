@@ -23,6 +23,15 @@ enum rdm_packet_type
     RDM_PACKET_WEAPON_FIRE,
     RDM_PACKET_PLAYER_STATUS,
     RDM_PACKET_REPLICATE_SOUND,
+    RDM_PACKET_PLAYER_DEATH,
+};
+
+enum rdm_damage_type
+{
+    RDM_DAMAGE_UNKNOWN,
+    RDM_DAMAGE_SHOVEL,
+    RDM_DAMAGE_AK47,
+    RDM_DAMAGE_FALLING,
 };
 
 union rdm_packet_data
@@ -91,6 +100,7 @@ union rdm_packet_data
         bool urgent;
         int health;
         int weapon_ammos[__WEAPON_MAX];
+        struct antagonist antagonist_data;
     } player_status;
     struct
     {
@@ -98,6 +108,12 @@ union rdm_packet_data
         vec3 position;
         char sound_name[128];
     } replicate_sound;
+    struct
+    {
+        int player_id;
+        int attacker_id;
+        enum rdm_damage_type type;
+    } player_death;
 };
 
 struct rdm_player
@@ -123,6 +139,8 @@ struct rdm_player
 
     int health;
     int max_health;
+
+    int player_id;
 };
 
 struct pending_packet
@@ -134,7 +152,7 @@ struct pending_packet
 
 void net_player_syncinfo2(struct network* network, struct rdm_player* player);
 void net_player_syncinfo(struct network* network, struct rdm_player* player);
-void net_player_damage(struct network* network, struct rdm_player* player, int damage, int attacker_id);
+void net_player_damage(struct network* network, struct rdm_player* player, enum rdm_damage_type type, int damage, int attacker_id);
 void net_player_moveto(struct network* network, struct rdm_player* player, vec3 position);
 void net_send_chunk(struct network* network, struct network_client* client, int c_x, int c_y, int c_z, struct map_chunk* chunk);
 void net_sync_gamemode(struct network* network, struct gamemode_data* gamemode);

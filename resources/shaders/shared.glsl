@@ -98,8 +98,8 @@ uniform vec3 ambient = vec3(30.0/255.0,26.0/255.0,117.0/255.0);
 uniform vec3 diffuse = vec3(227.0/255.0,168.0/255.0,87.0/255.0);
 uniform vec3 specular = vec3(255.0/255.0,204.0/255.0,51.0/255.0); 
 
-uniform vec2 normal_lsm_bias = vec2(0.05, 0.0002);
-uniform vec2 far_lsm_bias = vec2(0.05, 0.0002);
+uniform vec2 normal_lsm_bias = vec2(0.05, 0.002);
+uniform vec2 far_lsm_bias = vec2(0.05, 0.002);
 
 vec3 calc_light(vec3 normal, vec3 frag_pos, vec3 camera_position, vec4 f_pos_light, vec4 f_pos_light_far)
 {

@@ -1,6 +1,8 @@
 #ifndef OBJECTIVE_H
 #define OBJECTIVE_H
 
+#include <glib.h>
+
 enum objective_type
 {
     RDM_OBJECTIVE_KILL_PLAYER,
@@ -35,5 +37,8 @@ struct antagonist
 };
 
 void objective_description(char* out, int len, struct objective objective);
+char* antagonist_name(enum antagonist_type type);
+void antagonist_set_objectives(struct antagonist* antag_data);
+void antagonist_select(GArray* server_clients);
 
 #endif

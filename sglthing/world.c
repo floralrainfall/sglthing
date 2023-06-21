@@ -519,7 +519,6 @@ void world_frame(struct world* world)
     #ifdef FBO_ENABLED
         sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
         sglc(glEnable(GL_DEPTH_TEST));  
-        sglc(glEnable(GL_CULL_FACE));  
         sglc(glEnable(GL_BLEND));   
         sglc(glClear(GL_DEPTH_BUFFER_BIT));
     #else
@@ -902,14 +901,17 @@ void world_deinit(struct world* world)
             http_get(&world->client.http_client,url);
     }
     network_stop_download(&world->downloader);
+#ifdef SOUND_ENABLED
+    snd_deinit(&world->s_mgr);
+#endif
 }
 
 void world_updres(struct world* world)
 {
 #ifndef HEADLESS
 #ifdef FBO_ENABLED
-    glDeleteTextures(1, &world->gfx.hdr_depth_buffer);
     glDeleteFramebuffers(1, &world->gfx.hdr_fbo);
+    glDeleteTextures(1, &world->gfx.hdr_depth_buffer);
     glDeleteTextures(2, world->gfx.hdr_color_buffers);
     glDeleteFramebuffers(2, world->gfx.hdr_pingpong_fbos);
     glDeleteTextures(2, world->gfx.hdr_pingpong_buffers);
@@ -921,7 +923,7 @@ void world_updres(struct world* world)
     sglc(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
     sglc(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
     sglc(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-    sglc(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, world->viewport[2], world->viewport[3], 0, GL_DEPTH_COMPONENT, GL_BYTE, NULL));
+    sglc(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, world->viewport[2], world->viewport[3], 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL));
 
     sglc(glGenFramebuffers(1, &world->gfx.hdr_fbo));
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
@@ -939,8 +941,12 @@ void world_updres(struct world* world)
         sglc(glFramebufferTexture2D(
             GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, world->gfx.hdr_color_buffers[i], 0
         ));
-        sglc(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, world->gfx.hdr_depth_buffer, 0));
     }  
+    sglc(glFramebufferTexture2D(
+        GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, world->gfx.hdr_depth_buffer, 0
+    ));
+    sglc(glEnable(GL_DEPTH_TEST));
+    sglc(glDepthMask(GL_TRUE));
     unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
     sglc(glDrawBuffers(2, attachments));  
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));

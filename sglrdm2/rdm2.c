@@ -14,7 +14,8 @@ static void rdm_frame(struct world* world)
     {
         if(client_state.local_player)
         {
-            world->gfx.fog_maxdist = client_state.map_manager->map_request_range * RENDER_CHUNK_SIZE * CUBE_SIZE;
+            world->gfx.fog_maxdist = client_state.map_manager->map_render_range * RENDER_CHUNK_SIZE * CUBE_SIZE;
+            world->gfx.fog_mindist = (float)(RENDER_CHUNK_SIZE * CUBE_SIZE)/2.f;
 
             vec3 player_move = {0};
             vec3 expected_position;
@@ -105,25 +106,23 @@ static void rdm_frame(struct world* world)
                     glm_vec3_add(client_state.local_player->position, (vec3){0.f,0.1f,0.f}, client_state.local_player->position);
                 }            
             }
-
-            if(client_state.local_player->active_weapon_type == WEAPON_BLOCK || client_state.local_player->active_weapon_type == WEAPON_SHOVEL)
+            vec3 eye_position;
+            glm_vec3_copy(client_state.local_player->position, eye_position);
+            eye_position[1] += 0.75f;
+            client_state.mouse_block_v = false;
+            client_state.mouse_player = 0;
+            struct ray_cast_info ray = ray_cast(&world->client, eye_position, client_state.local_player->direction, 16.f, client_state.local_player_id, true, client_state.local_player->active_weapon_type == WEAPON_BLOCK);
+            if(ray.object == RAYCAST_VOXEL)
             {
-                vec3 eye_position;
-                glm_vec3_copy(client_state.local_player->position, eye_position);
-                eye_position[1] += 0.75f;
-                struct ray_cast_info ray = ray_cast(&world->client, eye_position, client_state.local_player->direction, 16.f, 0, true, client_state.local_player->active_weapon_type == WEAPON_BLOCK);
-                if(ray.object == RAYCAST_VOXEL)
-                {
-                    client_state.mouse_block_x = ray.real_voxel_x;
-                    client_state.mouse_block_y = ray.real_voxel_y;
-                    client_state.mouse_block_z = ray.real_voxel_z;
-                    client_state.mouse_block_v = true;
-                }
-                else
-                    client_state.mouse_block_v = false;
+                client_state.mouse_block_x = ray.real_voxel_x;
+                client_state.mouse_block_y = ray.real_voxel_y;
+                client_state.mouse_block_z = ray.real_voxel_z;
+                client_state.mouse_block_v = true;
             }
-            else
-                client_state.mouse_block_v = false;
+            else if(ray.player == RAYCAST_PLAYER)
+            {
+                client_state.mouse_player = ray.player;
+            }            
 
             if(get_focus())
             {
@@ -215,48 +214,16 @@ static void rdm_frame(struct world* world)
     }
     else
     {
+        world->cam.yaw = -35.f;
         world->cam.pitch = 35.f;
     }
 
     if(world->client_on)
     {
-        map_update_chunks(client_state.map_manager, world);
+        if(client_state.gamemode.started)
+            map_update_chunks(client_state.map_manager, world);
 
         gamemode_frame(&client_state.gamemode, world);
-    }
-    if(world->server_on)
-    {
-        gamemode_frame(&server_state.gamemode, world);
-
-        if(server_state.next_pending < world->time && server_state.chunk_packets_pending->len != 0)
-        {
-            profiler_event("net: send queued packets");
-            struct pending_packet packet = g_array_index(server_state.chunk_packets_pending, struct pending_packet, 0);
-            if(packet.giveup < world->time)
-            {
-                g_array_remove_index(server_state.chunk_packets_pending, 0);
-            }
-            else
-            {
-                network_transmit_packet(&world->server, packet.client, packet.packet);
-                g_array_remove_index(server_state.chunk_packets_pending, 0);
-                free2(packet.packet);
-                server_state.next_pending = world->time + 0.005f;
-            }
-            profiler_end();
-        }
-
-        // packet limit
-        if(server_state.chunk_packets_pending->len > 600) 
-        {
-            printf("rdm2[server]: clearing chunk packet queue (%i packets in queue)\n",server_state.chunk_packets_pending->len);
-            while(server_state.chunk_packets_pending->len != 0)
-            {
-                struct pending_packet packet = g_array_index(server_state.chunk_packets_pending, struct pending_packet, 0);
-                free2(packet.packet);
-                g_array_remove_index(server_state.chunk_packets_pending, 0);
-            }
-        }
     }
 }
 
@@ -328,6 +295,8 @@ static void rdm_frame_ui(struct world* world)
 
     if(client_state.local_player && !client_state.server_motd_dismissed)
     {
+        set_focus(world->gfx.window, false);
+
         ui_draw_panel(world->ui, 8.f, world->gfx.screen_height-8.f, world->gfx.screen_width-16.f, world->gfx.screen_height-16.f, 0.4f);
         ui_font2_text(world->ui, 8.f, 24.f, client_state.big_font, "Welcome to RDM2", 0.2f);
         snprintf(dbginfo,64,"You are playing on '%s'.", world->client.server_name);
@@ -336,8 +305,26 @@ static void rdm_frame_ui(struct world* world)
         ui_font2_text(world->ui, 8.f, 24.f + 24.f + 12.f, client_state.normal_font, dbginfo, 0.2f);
         snprintf(dbginfo,64,"SGLSite Message of the Day: '%s'", world->client.http_client.motd);
         ui_font2_text(world->ui, 8.f, 24.f + 24.f + 24.f, client_state.normal_font, dbginfo, 0.2f);
+
         if(!client_state.local_player->client->verified)
             ui_font2_text(world->ui, 8.f, 24.f + 24.f + 48.f, client_state.normal_font, "You are not logged in, and connected as a guest.", 0.2f);
+
+        if(client_state.local_player->antagonist_data.type)
+        {
+            world->ui->foreground_color[1] = 0.f;
+            world->ui->foreground_color[2] = 0.f;
+            snprintf(dbginfo,64,"You are the %s", antagonist_name(client_state.local_player->antagonist_data.type));
+            ui_font2_text(world->ui, 8.f, world->ui->current_panel->size_y / 2.f, client_state.big_font, dbginfo, 0.2f);
+            world->ui->foreground_color[1] = 1.f;
+            world->ui->foreground_color[2] = 1.f;
+            for(int i = 0; i < sizeof(client_state.local_player->antagonist_data.objectives) / sizeof(struct objective); i++)
+            {
+                struct objective obj = client_state.local_player->antagonist_data.objectives[i];
+                char obj_desc[512];
+                objective_description(obj_desc, 512, obj);
+                ui_font2_text(world->ui, 8.f, (world->ui->current_panel->size_y / 2.f) + 24.f + (i * 12.f), client_state.normal_font, obj_desc, 0.2f);
+            }
+        }
 
         bool ok_button = ui_draw_button(world->ui, world->gfx.screen_width - 64.f, world->gfx.screen_height - 56.f, 40.f, 24.f, world->gfx.white_texture, 1.0f);
         ui_font2_text(world->ui, world->gfx.screen_width - 64.f, world->gfx.screen_height - 32.f, client_state.big_font, "Ok", 0.2f);
@@ -544,113 +531,164 @@ static void rdm_frame_ui(struct world* world)
 
     if(world->state == WORLD_STATE_MAINMENU)
     {
-        if(client_state.server_selection_panel)
+        if(client_state.logo_title > world->time)
+        {
+            float old_alpha = world->ui->foreground_color[3];
+            world->ui->foreground_color[3] = fabsf(world->time - client_state.logo_title);
+            ui_draw_image(world->ui, 0.f, world->gfx.screen_height, world->gfx.screen_width, world->gfx.screen_height, client_state.logo_title_tex, 0.5f);
+            world->ui->foreground_color[3] = old_alpha;
+        }
+        else
         {            
-            ui_draw_panel(world->ui, 8.f, world->gfx.screen_height-8.f, world->gfx.screen_width-16.f, world->gfx.screen_height-16.f, 0.4f);
-            ui_font2_text(world->ui, 8.f, 24.f, client_state.big_font, "Multiplayer Servers", 0.2f);
-            snprintf(dbginfo, 64, "%i servers online", client_state.server_list->len);
-            ui_font2_text(world->ui, ui_font2_text_len(client_state.big_font, "Multiplayer Servers") + 8.f + 16.f, 24.f, client_state.normal_font, dbginfo, 0.2f);
+            float old_alpha = world->ui->foreground_color[3];
+            world->ui->foreground_color[3] = MIN(1,fabsf(client_state.logo_title - world->time));
+            if(client_state.server_selection_panel)
+            {            
+                ui_draw_panel(world->ui, 8.f, world->gfx.screen_height-8.f, world->gfx.screen_width-16.f, world->gfx.screen_height-16.f, 0.4f);
+                ui_font2_text(world->ui, 8.f, 24.f, client_state.big_font, "Multiplayer Servers", 0.2f);
+                snprintf(dbginfo, 64, "%s", world->client.http_client.motd);
+                ui_font2_text(world->ui, ui_font2_text_len(client_state.big_font, "Multiplayer Servers") + 8.f + 16.f, 12.f, client_state.normal_font, dbginfo, 0.2f);
+                snprintf(dbginfo, 64, "%i servers online", client_state.server_list->len);
+                ui_font2_text(world->ui, ui_font2_text_len(client_state.big_font, "Multiplayer Servers") + 8.f + 16.f, 24.f, client_state.normal_font, dbginfo, 0.2f);
 
-            bool ok_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 56.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
-            ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 32.f, client_state.big_font, "Close", 0.2f);
+                bool ok_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 56.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
+                ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 32.f, client_state.big_font, "Close", 0.2f);
 
-            if(ok_button)
-                client_state.server_selection_panel = false;
+                if(ok_button)
+                    client_state.server_selection_panel = false;
 
-            bool last_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 72.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
-            ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 48.f, client_state.big_font, "Last", 0.2f);
+                bool last_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 72.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
+                ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 48.f, client_state.big_font, "Last", 0.2f);
 
-            if(last_button)
-            {
-                client_state.server_selection_panel = false;
-                network_connect(&world->client,
-                    g_key_file_get_string(world->config.key_file, "rdm2", "last_server_ip", NULL),
-                    g_key_file_get_integer(world->config.key_file, "rdm2", "last_server_port", NULL)
-                );
-
-                world_start_game(world);
-            }
-
-            bool local_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 88.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
-            ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 64.f, client_state.big_font, "Local", 0.2f);
-
-            if(local_button)
-            {
-                client_state.server_selection_panel = false;
-                network_connect(&world->client,
-                    "127.0.0.1",
-                    g_key_file_get_integer(world->config.key_file, "sglthing", "network_port", NULL)
-                );
-
-                world_start_game(world);
-            }
-
-            bool refresh_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 104.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
-            ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 80.f, client_state.big_font, "Refresh", 0.2f);
-
-            if(refresh_button)
-            {
-                http_get_servers(&world->client.http_client, "rdm2-ng", client_state.server_list);
-            }
-
-
-            vec4 oldbg_kys;
-            glm_vec4_copy(world->ui->panel_background_color, oldbg_kys);
-            world->ui->panel_background_color[3] = 1.0f;
-            ui_draw_panel(world->ui, 16.f, 32.f, world->ui->current_panel->size_x - 32.f, 12.f, 0.2f);
-            float half = world->ui->current_panel->size_x / 2.f;
-            ui_font2_text(world->ui, 0.f, 12.f, client_state.normal_font, "Server Name", 0.1f);
-            ui_font2_text(world->ui, half, 12.f, client_state.normal_font, "Server MOTD", 0.1f);
-            ui_end_panel(world->ui);
-
-            world->ui->panel_background_color[0] = 0.2f;
-            world->ui->panel_background_color[1] = 0.2f;
-            world->ui->panel_background_color[2] = 0.2f;
-
-            for(int i = 0; i < client_state.server_list->len; i++)
-            {
-                struct http_server server = g_array_index(client_state.server_list, struct http_server, i);
-                ui_draw_panel(world->ui, 16.f, (i * 13.f) + 44.f, world->ui->current_panel->size_x - 32.f, 12.f, 0.2f);
-                ui_font2_text(world->ui, 0.f, 12.f, client_state.normal_font, server.name, 0.1f);
-                ui_font2_text(world->ui, half, 12.f, client_state.normal_font, server.desc, 0.1f);
-                bool connect_button = ui_draw_button(world->ui, world->ui->current_panel->size_x - 64.f, 0.f, 64.f, 12.f, world->gfx.white_texture, 1.f);
-                ui_font2_text(world->ui, world->ui->current_panel->size_x - 64.f, 12.f, client_state.normal_font, "Connect", 0.1f);
-                ui_end_panel(world->ui);
-
-                if(connect_button)
+                if(last_button)
                 {
+                    client_state.server_selection_panel = false;
                     network_connect(&world->client,
-                        server.ip,
-                        server.port
+                        g_key_file_get_string(world->config.key_file, "rdm2", "last_server_ip", NULL),
+                        g_key_file_get_integer(world->config.key_file, "rdm2", "last_server_port", NULL)
                     );
 
                     world_start_game(world);
+
+                    if(client_state.playing_music)
+                        stop_snd(client_state.playing_music);
+                    client_state.playing_music = 0;
                 }
-            }
 
-            glm_vec4_copy(oldbg_kys, world->ui->panel_background_color);
+                bool local_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 88.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
+                ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 64.f, client_state.big_font, "Local", 0.2f);
 
-            ui_end_panel(world->ui);
-        }
-        else
-        {
-            float mm_y = world->gfx.screen_height / 2.f;
-    #define MAIN_MENU_ENTRY(f,e,c)                                                                                  \
-            {                                                                                                       \
-                float t_len = ui_font2_text_len(f, e);                                                              \
-                bool b = ui_draw_button(world->ui, 45.f, mm_y, t_len, f->size_y, world->gfx.alpha_texture, 1.f);    \
-                ui_font2_text(world->ui, 45.f, mm_y - f->size_y, f, e, 0.5f);                                       \
-                mm_y -= f->size_y;                                                                                  \
-                if(b) c;                                                                                            \
+                if(local_button)
+                {
+                    client_state.server_selection_panel = false;
+                    network_connect(&world->client,
+                        "127.0.0.1",
+                        g_key_file_get_integer(world->config.key_file, "sglthing", "network_port", NULL)
+                    );
+
+                    world_start_game(world);
+
+                    if(client_state.playing_music)
+                        stop_snd(client_state.playing_music);
+                    client_state.playing_music = 0;
+                }
+
+                bool refresh_button = ui_draw_button(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 104.f, 60.f, 24.f, world->gfx.white_texture, 1.0f);
+                ui_font2_text(world->ui, world->gfx.screen_width - 88.f, world->gfx.screen_height - 80.f, client_state.big_font, "Refresh", 0.2f);
+
+                if(refresh_button)
+                {
+                    http_get_servers(&world->client.http_client, "rdm2-ng", client_state.server_list);
+                }
+
+                vec4 oldbg_kys;
+                glm_vec4_copy(world->ui->panel_background_color, oldbg_kys);
+                world->ui->panel_background_color[3] = 1.0f;
+                ui_draw_panel(world->ui, 16.f, 32.f, world->ui->current_panel->size_x - 32.f, 12.f, 0.2f);
+                float half = world->ui->current_panel->size_x / 3.0f;
+                ui_font2_text(world->ui, 0.f, 12.f, client_state.normal_font, "Name", 0.1f);
+                ui_font2_text(world->ui, half, 12.f, client_state.normal_font, "Message of the Day", 0.1f);
+                ui_end_panel(world->ui);
+
+                world->ui->panel_background_color[0] = 0.2f;
+                world->ui->panel_background_color[1] = 0.2f;
+                world->ui->panel_background_color[2] = 0.2f;
+
+                for(int i = 0; i < client_state.server_list->len; i++)
+                {
+                    struct http_server server = g_array_index(client_state.server_list, struct http_server, i);
+                    ui_draw_panel(world->ui, 16.f, (i * 13.f) + 44.f, world->ui->current_panel->size_x - 32.f, 12.f, 0.2f);
+                    ui_font2_text(world->ui, 0.f, 12.f, client_state.normal_font, server.name, 0.1f);
+                    ui_font2_text(world->ui, half, 12.f, client_state.normal_font, server.desc, 0.1f);
+                    bool connect_button = ui_draw_button(world->ui, world->ui->current_panel->size_x - 64.f, 0.f, 64.f, 12.f, world->gfx.white_texture, 1.f);
+                    ui_font2_text(world->ui, world->ui->current_panel->size_x - 64.f, 12.f, client_state.normal_font, "Connect", 0.1f);
+                    ui_end_panel(world->ui);
+
+                    if(connect_button)
+                    {
+                        network_connect(&world->client,
+                            server.ip,
+                            server.port
+                        );
+
+                        world_start_game(world);
+
+                        if(client_state.playing_music)
+                            stop_snd(client_state.playing_music);
+                        client_state.playing_music = 0;
+                    }
+                }
+
+                glm_vec4_copy(oldbg_kys, world->ui->panel_background_color);
+
+                ui_end_panel(world->ui);
             }
-            MAIN_MENU_ENTRY(client_state.big_font, "RDM2", {});
-            mm_y -= client_state.normal_font2->size_y;
-            MAIN_MENU_ENTRY(client_state.normal_font2, "Multiplayer", {
-                http_get_servers(&world->client.http_client, "rdm2-ng", client_state.server_list);
-                client_state.server_selection_panel = true;
-            });
-            MAIN_MENU_ENTRY(client_state.normal_font2, "Quit", glfwSetWindowShouldClose(world->gfx.window, 1));
+            else
+            {
+                float mm_y = world->gfx.screen_height / 2.f;
+        #define MAIN_MENU_ENTRY(f,e,c)                                                                                  \
+                {                                                                                                       \
+                    float t_len = ui_font2_text_len(f, e);                                                              \
+                    bool b = ui_draw_button(world->ui, 45.f, mm_y, t_len, f->size_y, world->gfx.alpha_texture, 1.f);    \
+                    ui_font2_text(world->ui, 45.f, mm_y - f->size_y, f, e, 0.5f);                                       \
+                    mm_y -= f->size_y;                                                                                  \
+                    if(b) c;                                                                                            \
+                }
+                MAIN_MENU_ENTRY(client_state.big_font, "RDM2", {});
+                mm_y -= client_state.normal_font2->size_y;
+                MAIN_MENU_ENTRY(client_state.normal_font2, "Multiplayer", {
+                    http_get_servers(&world->client.http_client, "rdm2-ng", client_state.server_list);
+                    http_update_motd(&world->client.http_client);
+                    client_state.server_selection_panel = true;
+                });
+                MAIN_MENU_ENTRY(client_state.normal_font2, "Quit", glfwSetWindowShouldClose(world->gfx.window, 1));
+
+                if(!world->client.http_client.login)
+                {                    
+                    ui_font2_text(world->ui, world->gfx.screen_width / 2.f, 60.f, client_state.normal_font, "You are not logged in. Sign up at https://sgl.endoh.ca/", 1.f);
+                }
+                else
+                {
+                    ui_draw_panel(world->ui, world->gfx.screen_width / 2.f, world->gfx.screen_height / 3.f, world->gfx.screen_width / 2.f - 8.f, world->gfx.screen_height / 3.f - 8.f, 1.f);
+                    snprintf(dbginfo, 64, "Welcome to RDM2, %s.", client_state.local_http_user.user_username);
+                    ui_font2_text(world->ui, 8.f, 24.f, client_state.normal_font2, dbginfo, 0.5f);
+                    snprintf(dbginfo, 64, "%i coins", client_state.local_http_user.money);
+                    world->ui->foreground_color[2] = 0.f;
+                    ui_font2_text(world->ui, 8.f, 24.f + client_state.normal_font2->size_y, client_state.normal_font, dbginfo, 0.5f);
+                    world->ui->foreground_color[2] = 1.f;
+                    ui_end_panel(world->ui);
+                }
+            }            
+            world->ui->foreground_color[3] = old_alpha;
         }
+    }
+
+    if(client_state.mouse_player)
+    {
+        char player_hover[255];
+        float health_pctg = (float)client_state.mouse_player->health / (float)client_state.mouse_player->max_health;
+        snprintf(player_hover, 255, "%s (%.0f%%)", client_state.mouse_player->client->client_name, health_pctg * 100.f);
+        ui_font2_text(world->ui, (world->gfx.screen_width / 2.f) - (ui_font2_text_len(client_state.normal_font2, player_hover) / 2.f), (world->gfx.screen_height / 2.f) - 32.f, client_state.normal_font2, player_hover, 1.f);
     }
 
     __pvc_v_id = 0;
@@ -767,6 +805,15 @@ static void rdm_frame_render(struct world* world)
         glDepthMask(GL_LESS);  
     }
 
+    if(world->state == WORLD_STATE_MAINMENU)
+    {
+        mat4 menu_player_mat;
+        glm_mat4_identity(menu_player_mat);
+        glm_translate(menu_player_mat, (vec3){2.5f, 0.f, -1.0f});
+        glm_rotate_y(menu_player_mat, world->time / 2.f, menu_player_mat);
+        world_draw_model(world, client_state.rdm_guy, client_state.object_shader, menu_player_mat, true);
+    }
+
     // mat4 test_cube;
     // glm_mat4_identity(test_cube);
     // glm_translate(test_cube,server_state.last_position);
@@ -817,6 +864,7 @@ void sglthing_init_api(struct world* world)
         {
             world->client.http_client.server = false;
             http_create(&world->client.http_client, SGLAPI_BASE);
+            client_state.local_http_user = http_get_userdata(&world->client.http_client, world->client.http_client.sessionkey);
         }
 
         client_state.server_list = g_array_new(true, true, sizeof(struct http_server));
@@ -830,6 +878,9 @@ void sglthing_init_api(struct world* world)
         client_state.big_font = ui_load_font2(world->ui, "uiassets/impact.ttf",0,24);
         client_state.normal_font = ui_load_font2(world->ui, "uiassets/arial.ttf",0,12);
         client_state.normal_font2 = ui_load_font2(world->ui, "uiassets/arialbd.ttf",0,18);
+
+        load_texture("rdm2/intro_logo.png");
+        client_state.logo_title_tex = get_texture("rdm2/intro_logo.png");
 
         char mdlname[64];
         for(int i = 0; i < __WEAPON_MAX; i++)
@@ -910,10 +961,12 @@ void sglthing_init_api(struct world* world)
 
     world->cam.position[0] = 0.f;
     world->cam.position[2] = 0.f;
-    world->cam.position[1] = 32.f;
+    world->cam.position[1] = 0.f;
     world->cam.lock = true;
     world->gfx.far_boundary = 1000.f;
     world->gfx.fog_mindist = RENDER_CHUNK_SIZE * CUBE_SIZE;
+
+    client_state.logo_title = world->time + 5.f;
 
     glm_vec3_zero(client_state.player_velocity);
 

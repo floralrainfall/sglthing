@@ -12,7 +12,7 @@
 
 // TODO: completely remove the legacy TCP code as it makes the source look ugly
 
-#define CR_PACKET_VERSION 201
+#define CR_PACKET_VERSION 202
 #define NO_DATAPACKETS_TICK 512
 
 #define MAGIC_NUMBER 0x7930793179327934
@@ -136,7 +136,6 @@ struct network_packet_header {
     } packet_type;
     int packet_version;
     int packet_id;
-    int packet_checksum;
     int packet_size;
     bool acknowledge;
     int acknowledge_tries;
@@ -262,10 +261,10 @@ struct network {
 #endif
     double distributed_time;
     double time;
+    double next_tick;
     int network_frames;
 
     GArray* server_clients;
-    double next_tick;
     double client_default_tick;
     GArray* packet_unacknowledged;
     int packet_id;
@@ -284,6 +283,7 @@ struct network {
     void (*new_player_callback)(struct network* network, struct network_client* client);
     void (*del_player_callback)(struct network* network, struct network_client* client);
     void (*old_player_add_callback)(struct network* network, struct network_client* client, struct network_client* old_client);
+    void (*network_tick_callback)(struct network* network);
 
     GHashTable* players;
 

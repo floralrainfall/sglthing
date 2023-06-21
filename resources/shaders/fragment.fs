@@ -31,6 +31,8 @@ void main()
     out_color *= vec4(lighting,1.0);
     out_color *= color;
 
+    vec4 old_color = out_color;
+
     // color banding effect
     vec4 out_color_raw = out_color;
     out_color_raw *= 255.0;
@@ -49,10 +51,8 @@ void main()
     fog_factor = clamp(fog_factor, 0.0, 1.0);
 
     FragColor = mix(fog_color, out_color, fog_factor);
+    old_color = mix(fog_color, old_color, fog_factor);
 
-    float brightness = dot(FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-    if(brightness < 1.0)
-        BrightColor = vec4(FragColor.rgb, 1.0);
-    else
-        BrightColor = vec4(0.0, 0.0, 0.0, 1.0);
+    float brightness = max(dot(old_color.xyz, vec3(0.2126, 0.7152, 0.0722)) - 0.5,0);
+    BrightColor = vec4(FragColor.rgb * brightness, 1.0); 
 }

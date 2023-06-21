@@ -1,6 +1,7 @@
 #include "gamemode.h"
 #include "rdm_net.h"
 #include "rdm2.h"
+#include "objective.h"
 
 char* gamemode_name(enum rdm_gamemode gamemode)
 {
@@ -21,7 +22,7 @@ void gamemode_init(struct gamemode_data* data, bool server)
     data->secret = false;
     data->gamemode = GAMEMODE_SECRET;
     data->started = false;
-    data->gamemode_end = 5.f;
+    data->gamemode_end = 60.f;
     data->server = server;
     data->gamemode_nextannouncement = 1.f;
     if(data->server)
@@ -82,6 +83,8 @@ void gamemode_frame(struct gamemode_data* data, struct world* world)
 
                             player->team = data->last_team;
                         }
+
+                        antagonist_select(world->server.server_clients);
                     }
                     break;
                 case GAMEMODE_FREEFORALL:
@@ -125,9 +128,13 @@ void gamemode_player_add(struct gamemode_data* data, void* _player)
         case GAMEMODE_EXTENDED:
         case GAMEMODE_SECRET:
             if(data->last_team == TEAM_RED)
+            {
                 data->last_team = TEAM_BLUE;
+            }
             else if(data->last_team == TEAM_BLUE)
+            {
                 data->last_team = TEAM_RED;
+            }
             player->team = data->last_team;
             break;
 

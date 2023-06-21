@@ -36,7 +36,7 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
                 if(ray.player)
                 {
                     // damage player
-                    net_player_damage(network, ray.player, 10, client->player_id);                
+                    net_player_damage(network, ray.player, RDM_DAMAGE_AK47, 10, client->player_id);                
                     net_play_g_sound(network, "rdm2/sound/ouch.ogg", player->position);
                 }
                 else if(ray.object == RAYCAST_VOXEL)
@@ -120,6 +120,13 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
                     memcpy(_data->update_chunk.chunk_data, &server_state.map_server->chunk_x[ray.chunk_x].chunk_y[ray.chunk_z].x[ray.voxel_x],RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE);
                     network_transmit_packet_all(network, &_pak);
                     player->weapon_ammos[WEAPON_BLOCK]++;
+                }
+                else if(ray.object == RAYCAST_PLAYER)
+                {
+                    if(ray.distance > 1.5)
+                    {
+                        net_player_damage(network, ray.player, RDM_DAMAGE_SHOVEL, 25, player->player_id);
+                    }
                 }
                 player->primary_next_fire = network->time + 0.5;
                 break;

@@ -19,6 +19,20 @@ void snd_init(struct sndmgr* mgr)
 #endif
 }
 
+void snd_deinit(struct sndmgr* mgr)
+{
+#ifdef SOUND_ENABLED
+    for(int i = 0; i < mgr->sounds_playing->len; i++)
+    {
+        struct snd* snd = g_array_index(mgr->sounds_playing, struct snd*, i);
+        Pa_AbortStream(snd);
+        free2(snd);
+    }
+    Pa_Terminate();
+    g_array_free(mgr->sounds_playing, true);    
+#endif
+}
+
 void snd_frame(struct sndmgr* mgr)
 {
     profiler_event("snd_frame");

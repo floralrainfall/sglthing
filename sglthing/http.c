@@ -79,15 +79,7 @@ void http_create(struct http_client* client, char* http_base)
         printf("sglthing: using specified auth server: %s\n", client->httpbase);
     }
 
-    char* web_motd = http_get(client, "motd");
-    if(web_motd)
-    {
-        printf("sglthing: motd '%s'\n", web_motd);
-        strncpy(client->motd, web_motd, 64);
-        free(web_motd);
-    }
-    else
-        strncpy(client->motd, " ", 64);
+    http_update_motd(client);
 
     printf("sglthing: logging into sglnet as %s\n", config_string_get(&client->web_config, "user_username"));
     char postdata[256];
@@ -150,24 +142,17 @@ struct http_user http_get_userdata(struct http_client* client, char* key)
     }
 
     user.found = true;
-    char* token;
-    token = strtok(result, ",");
-    enum { TOKEN_USER_ID, TOKEN_REGISTRATION_DATE, TOKEN_ITEM_ID, TOKEN_STOP } token_id = 0;
-    while(token != NULL) {
-        switch(token_id)
-        {
-            case TOKEN_USER_ID:
-                user.user_id = atoi(token);
-                break;
-            case TOKEN_ITEM_ID:
-                user.item_id = atoi(token);
-                break;
-            case TOKEN_STOP:
-                break;
-        }
-        token = strtok(NULL, ",");
-        token_id++;
-    }
+
+    struct json_object* juser = json_tokener_parse(result);
+    strncpy(user.user_username, json_object_get_string(
+        json_object_object_get(juser, "user_username")
+    ), 64);
+    user.money = json_object_get_int(
+        json_object_object_get(juser, "user_coins")
+    );
+    user.user_id = json_object_get_int(
+        json_object_object_get(juser, "id")
+    );
     
     return user;
 }
@@ -221,4 +206,25 @@ void http_post_server(struct http_client* client, char* game_name, char* server_
     char* _heartbeat = http_post(client, "netplay/punch", postdata);
     printf("sglthing: punched master server (%s)\n", _heartbeat);
     free(_heartbeat);
+}
+
+void http_update_motd(struct http_client* client)
+{
+    char* web_motd = http_get(client, "motd");
+    if(web_motd)
+    {
+        printf("sglthing: motd '%s'\n", web_motd);
+        strncpy(client->motd, web_motd, 64);
+        free(web_motd);
+    }
+    else
+        strncpy(client->motd, "Receive motd failed", 64);
+}
+
+void http_delete(struct http_client* client)
+{
+    curl_easy_cleanup(client->easy);
+    client->login = false;
+    client->server = false;
+    g_key_file_free(client->web_config.key_file);
 }

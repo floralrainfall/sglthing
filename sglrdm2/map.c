@@ -2,6 +2,7 @@
 #include <sglthing/shader.h>
 #include <sglthing/texture.h>
 #include <sglthing/net.h>
+#include <sglthing/sglthing.h>
 #include "rdm_net.h"
 #include "rdm2.h"
 
@@ -88,9 +89,31 @@ static struct __render_chunk* __map_chunk_position(struct map_manager* map, int 
 
 void __map_render_chunk(struct world* world, struct map_manager* map, struct __render_chunk* chunk)
 {
+    int render_range = map->map_render_range;
+    int p_c_x = floorf((world->cam.position[0]+0.5f)/(RENDER_CHUNK_SIZE * CUBE_SIZE));
+    int p_c_y = floorf(world->cam.position[1]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
+    int p_c_z = floorf((world->cam.position[2]+0.5f)/(RENDER_CHUNK_SIZE * CUBE_SIZE));
+
+    if(chunk->chunk_x < p_c_x - render_range)
+        return;
+    if(chunk->chunk_x > p_c_x + render_range)
+        return;
+
+    if(chunk->chunk_y < p_c_y - render_range)
+        return;
+    if(chunk->chunk_y > p_c_y + render_range)
+        return;
+
+    if(chunk->chunk_z < p_c_z - render_range)
+        return;
+    if(chunk->chunk_z > p_c_z + render_range)
+        return;
+
+    vec3 chunk_position = {chunk->chunk_x*(RENDER_CHUNK_SIZE*CUBE_SIZE),chunk->chunk_y*(RENDER_CHUNK_SIZE*CUBE_SIZE),chunk->chunk_z*(RENDER_CHUNK_SIZE*CUBE_SIZE)};
+
     mat4 matrix;
     glm_mat4_identity(matrix);
-    glm_translate(matrix, (vec3){chunk->chunk_x*(RENDER_CHUNK_SIZE*CUBE_SIZE),chunk->chunk_y*(RENDER_CHUNK_SIZE*CUBE_SIZE),chunk->chunk_z*(RENDER_CHUNK_SIZE*CUBE_SIZE)});
+    glm_translate(matrix, chunk_position);
 
     sglc(glUseProgram(world->gfx.shadow_pass ? map->cube_program_light : map->cube_program));
 
@@ -132,17 +155,34 @@ void map_render_chunks(struct world* world, struct map_manager* map)
 void map_update_chunks(struct map_manager* map, struct world* world)
 {
     profiler_event("map_update_chunks");
-    float chunk_render_distance = RENDER_CHUNK_SIZE * CUBE_SIZE * 4;
+    int request_range = map->map_request_range;
+    int render_range = map->map_dealloc_range;
+
+    int p_c_x = floorf((world->cam.position[0]+0.5f)/(RENDER_CHUNK_SIZE * CUBE_SIZE));
+    int p_c_y = floorf(world->cam.position[1]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
+    int p_c_z = floorf((world->cam.position[2]+0.5f)/(RENDER_CHUNK_SIZE * CUBE_SIZE));
+    
     for(int i = 0; i < map->chunk_list->len; i++)
     {
         struct __render_chunk* chunk = g_array_index(map->chunk_list, struct __render_chunk*, i);
-        vec3 chunk_position = {
-            chunk->chunk_x * (RENDER_CHUNK_SIZE * CUBE_SIZE),
-            chunk->chunk_y * (RENDER_CHUNK_SIZE * CUBE_SIZE),
-            chunk->chunk_z * (RENDER_CHUNK_SIZE * CUBE_SIZE),
-        };
-        float chunk_distance = glm_vec3_distance(chunk_position, (vec3){world->cam.position[0],0.f,world->cam.position[2]});
-        if(chunk_distance > chunk_render_distance)
+
+        bool pass = true;
+        if(chunk->chunk_x < p_c_x - render_range)
+            pass = false;
+        if(chunk->chunk_x > p_c_x + render_range)
+            pass = false;
+
+        if(chunk->chunk_y < p_c_y - render_range)
+            pass = false;
+        if(chunk->chunk_y > p_c_y + render_range)
+            pass = false;
+
+        if(chunk->chunk_z < p_c_z - render_range)
+            pass = false;
+        if(chunk->chunk_z > p_c_z + render_range)
+            pass = false;
+
+        if(!pass)
         {
             if(chunk->vbo)
                 sglc(glDeleteBuffers(1, &chunk->vbo));
@@ -151,43 +191,50 @@ void map_update_chunks(struct map_manager* map, struct world* world)
         }
     }
 
-    int p_c_x = floorf((world->cam.position[0]+0.5f)/(RENDER_CHUNK_SIZE * CUBE_SIZE));
-    int p_c_y = floorf(world->cam.position[1]/(RENDER_CHUNK_SIZE * CUBE_SIZE));
-    int p_c_z = floorf((world->cam.position[2]+0.5f)/(RENDER_CHUNK_SIZE * CUBE_SIZE));
-
-    int request_range = map->map_request_range;
-
     if(client_state.local_player && world->time > map->next_map_rq)
     {
-        map->next_map_rq = world->time + 1.5f;        
-        for(int x = -request_range-1; x <= request_range; x++)
+        if(map->map_data_wanted == 0)
         {
-            if(p_c_x + x < 0)
-                continue;
-            if(p_c_x + x > MAP_SIZE)
-                continue;
-            for(int y = -request_range-1; y <= request_range; y++)
+            for(int x = -request_range-1; x <= request_range; x++)
             {
-                if(p_c_z + y < 0)
+                if(p_c_x + x < 0)
                     continue;
-                if(p_c_z + y > MAP_SIZE)
+                if(p_c_x + x > MAP_SIZE)
                     continue;
-                struct __render_chunk* c = __map_chunk_position(map, p_c_x + x, 0, p_c_z + y);
-                if(!c)
-                {    
-                    struct network_packet _pak;
-                    union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
+                for(int y = -request_range-1; y <= request_range; y++)
+                {
+                    if(p_c_z + y < 0)
+                        continue;
+                    if(p_c_z + y > MAP_SIZE)
+                        continue;
+                    struct __render_chunk* c = __map_chunk_position(map, p_c_x + x, 0, p_c_z + y);
+                    if(!c)
+                    {    
+                        if(map->map_data_wanted > (RENDER_CHUNK_SIZE * map->chunk_limit))
+                            break;
 
-                    _pak.meta.packet_type = RDM_PACKET_REQUEST_CHUNK;
-                    _pak.meta.acknowledge = true;
-                    _pak.meta.packet_size = sizeof(union rdm_packet_data);
-                    _data->update_chunk.chunk_x = MAX(p_c_x + x, 0);
-                    _data->update_chunk.chunk_y = 0;
-                    _data->update_chunk.chunk_z = MAX(p_c_z + y, 0);
+                        struct network_packet _pak;
+                        union rdm_packet_data* _data = (union rdm_packet_data*)&_pak.packet.data;
 
-                    network_transmit_packet(client_state.local_player->client->owner, &client_state.local_player->client->owner->client, &_pak);
+                        _pak.meta.packet_type = RDM_PACKET_REQUEST_CHUNK;
+                        _pak.meta.acknowledge = true;
+                        _pak.meta.packet_size = sizeof(union rdm_packet_data);
+                        _data->update_chunk.chunk_x = MAX(p_c_x + x, 0);
+                        _data->update_chunk.chunk_y = 0;
+                        _data->update_chunk.chunk_z = MAX(p_c_z + y, 0);
+
+                        network_transmit_packet(client_state.local_player->client->owner, &client_state.local_player->client->owner->client, &_pak);
+
+                        map->map_data_wanted += RENDER_CHUNK_SIZE;
+                    }
                 }
             }
+            map->next_map_rq = world->time + 1.5f;        
+        }
+        if(world->time > (map->next_map_rq + 10.f))
+        {
+            printf("rdm2: failed to receive %i chunks\n", map->map_data_wanted);
+            map->map_data_wanted = 0;
         }
     }
     profiler_end();
@@ -226,6 +273,10 @@ void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_
             block->obscure = chunk_data[y*RENDER_CHUNK_SIZE+z];
         }
 
+    map->map_data_wanted--;
+    if(map->map_data_wanted < 0)
+        map->map_data_wanted = 0;
+
     __map_render_chunk_update(new_chunk);
 }
 
@@ -244,7 +295,11 @@ void map_init(struct map_manager* map)
     map->chunk_list = g_array_new(true, true, sizeof(struct __render_chunk*));
 
     map->next_map_rq = 0.f;
-    map->map_request_range = 2;
+    map->map_request_range = 4;
+    map->map_dealloc_range = 6;
+    map->map_render_range = 4;
+    map->map_data_wanted = 0;
+    map->chunk_limit = 4;
 }
 
 void map_server_init(struct map_server* map)
@@ -424,4 +479,9 @@ void map_color_to_rgb(unsigned char color_id, vec3 output)
     output[0] = (((float)data_r)/4.f);
     output[1] = (((float)data_g)/4.f);
     output[2] = (((float)data_b)/4.f);
+}
+
+void map_client_clear(struct map_manager* map)
+{
+    g_array_remove_range(map->chunk_list, 0, map->chunk_list->len);
 }

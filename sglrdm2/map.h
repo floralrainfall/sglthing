@@ -39,7 +39,9 @@ struct map_manager
     int map_x; // in center
     int map_y;
     int map_request_range;
-    
+    int map_render_range;
+    int map_dealloc_range;
+
     GArray* chunk_list;
 
     struct model* cube;
@@ -48,6 +50,8 @@ struct map_manager
     int cube_texture;
 
     double next_map_rq;
+    int map_data_wanted;
+    int chunk_limit;
 };
 
 
@@ -68,6 +72,8 @@ void map_render_chunks(struct world* world, struct map_manager* map);
 void map_update_chunks(struct map_manager* map, struct world* world);
 void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_x, unsigned char* chunk_data);
 void map_color_to_rgb(unsigned char color_id, vec3 output);
+
+void map_client_clear(struct map_manager* map);
 
 bool map_determine_collision_client(struct map_manager* map, vec3 position);
 bool map_determine_collision_server(struct map_server* map, vec3 position);

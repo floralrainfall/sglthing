@@ -91,6 +91,7 @@ void network_init(struct network* network, struct script_system* script)
     network->del_player_callback = NULL;
     network->new_player_callback = NULL;
     network->old_player_add_callback = NULL;
+    network->network_tick_callback = NULL;
     network->shutdown_ready = false;
     network->shutdown_empty = false;
     network->players = g_hash_table_new(g_int_hash, g_int_equal);
@@ -342,7 +343,6 @@ void network_connect(struct network* network, char* ip, int port)
         }
 #endif
 
-        network->next_tick = network->distributed_time + 0.01;
 #ifdef NETWORK_TCP
     }
 #endif
@@ -707,7 +707,7 @@ static void network_manage_packet(struct network* network, struct network_client
                 printf("sglthing: authenticated to server %s, motd: %s\n", in_packet->packet.serverinfo.server_name, in_packet->packet.serverinfo.server_motd);
                 network->client.player_id = in_packet->packet.serverinfo.player_id;
                 strncpy(network->server_name, in_packet->packet.serverinfo.server_name, 64);
-                strncpy(network->server_motd, in_packet->packet.serverinfo.server_name, 128);
+                strncpy(network->server_motd, in_packet->packet.serverinfo.server_motd, 128);
                 network->client.client_version = in_packet->packet.serverinfo.sglthing_revision;
                 network->client.authenticated = true;
                 network->client.verified = in_packet->packet.serverinfo.verified;
@@ -1006,6 +1006,14 @@ void network_frame(struct network* network, float delta_time, double time)
             profiler_end();
             return;
         }
+
+        if(network->time > network->next_tick)
+        {
+            if(network->network_tick_callback)
+                network->network_tick_callback(network);
+            network->next_tick = network->distributed_time + 0.01;
+        }
+
 #ifndef NETWORK_TCP
         network_manage_socket(network, &network->client);
 #endif
@@ -1202,6 +1210,14 @@ void network_close(struct network* network)
     }
     else
     {
+#ifdef OPUS_ENABLED
+        opus_decoder_destroy(network->voice_chat_decoder);
+        opus_encoder_destroy(network->voice_chat_encoder);
+        free2(network->voice_chat_captured_buf);
+        free2(network->voice_chat_decoded_buf);
+        free2(network->voice_chat_encoded_buf);
+        Pa_StopStream(network->voice_chat_stream);
+#endif
         network_disconnect_player(network,true,"Disconnect by user",&network->client);
     }
     network->status = NETWORKSTATUS_DISCONNECTED;

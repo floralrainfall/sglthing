@@ -2,6 +2,7 @@
 #define RDM2_H
 
 #include <sglthing/world.h>
+#include <sglthing/http.h>
 #include "rdm_net.h"
 #include "map.h"
 #include "gamemode.h"
@@ -26,6 +27,7 @@ struct rdm2_state
     struct snd* playing_music;
     struct snd* roundstart_sound;
 
+    struct http_user local_http_user;
     struct rdm_player* local_player;
     struct map_manager* map_manager;
     int local_player_id;
@@ -40,6 +42,7 @@ struct rdm2_state
     int mouse_block_x;
     int mouse_block_y;
     int mouse_block_z;
+    struct rdm_player* mouse_player;
     bool mouse_block_v;
 
     struct gamemode_data gamemode;
@@ -60,6 +63,9 @@ struct rdm2_state
 
     vec3 last_position;
     float mouse_update_diff;
+
+    float logo_title;
+    int logo_title_tex;
 };
 
 extern struct rdm2_state client_state;

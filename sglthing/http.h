@@ -34,17 +34,23 @@ struct http_user
 {
     bool found;
 
+    char user_username[64];
+
     int item_id;
     int user_id; 
+    int money;
 };
 
 void http_create(struct http_client* client, char* http_base);
+void http_delete(struct http_client* client);
 char* http_get(struct http_client* client, char* url);
 char* http_post(struct http_client* client, char* url, char* postdata);
+struct http_user http_my_info(struct http_client* client);
 
 bool http_check_sessionkey(struct http_client* client, char* key);
 struct http_user http_get_userdata(struct http_client* client, char* key);
 void http_get_servers(struct http_client* client, char* game_name, GArray* servers_out);
 void http_post_server(struct http_client* client, char* game_name, char* server_name, char* server_desc, char* server_ip, int server_port);
+void http_update_motd(struct http_client* client);
 
 #endif
