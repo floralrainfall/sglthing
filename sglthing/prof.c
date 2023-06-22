@@ -3,7 +3,7 @@
 #include "ui.h"
 #include "world.h"
 
-#define PROFILER_ENABLE
+// #define PROFILER_ENABLE
 
 static int event_id_last = 0;
 

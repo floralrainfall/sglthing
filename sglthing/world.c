@@ -90,15 +90,18 @@ struct world* world_init(char** argv, int argc, void* p)
 
     world->enable_script = (config_number_get(&world->config, "script_enabled") == 1.0);
 
+#ifndef HEADLESS
     load_texture("uiassets/sglthing.png");
     world->gfx.sgl_background_image = get_texture("uiassets/sglthing.png");
     load_texture("uiassets/text_input_bar.png");
     world->gfx.chat_bar_image = get_texture("uiassets/text_input_bar.png");
+#endif
 
     if(!network_download)
         world->script = script_init("scripts/game.lua", world);
     world->script->enabled = world->enable_script ? world->script->enabled : false;
 
+#ifndef HEADLESS
     world->gfx.shadow_pass = false;
     int ls_v = compile_shader("shaders/shadow_pass.vs",GL_VERTEX_SHADER);
     int ls_f = compile_shader("shaders/shadow_pass.fs",GL_FRAGMENT_SHADER);
@@ -121,6 +124,7 @@ struct world* world_init(char** argv, int argc, void* p)
     int q_g = compile_shader("shaders/quad.gs",GL_GEOMETRY_SHADER); attach_program_shader(world->gfx.quad_shader, q_g);
     int q_f = compile_shader("shaders/quad.fs",GL_FRAGMENT_SHADER); attach_program_shader(world->gfx.quad_shader, q_f);
     link_programv(world->gfx.quad_shader);
+#endif
 
 #ifndef HEADLESS
     add_input((struct keyboard_mapping){.key_positive = GLFW_KEY_D, .key_negative = GLFW_KEY_A, .name = "x_axis"});
@@ -274,7 +278,7 @@ struct world* world_init(char** argv, int argc, void* p)
 #ifdef HEADLESS
     if(strcmp(net_mode,"server")!=0)
     {
-        printf("sglthing: headless mode only supports dedicated server\n");
+        printf("sglthing: headless mode only supports having network_mode=server\n");
         exit(-1);
     }
 #endif
@@ -314,10 +318,12 @@ struct world* world_init(char** argv, int argc, void* p)
 
     world->profiler_on = false;
 
+#ifndef HEADLESS
     load_texture("uiassets/white.png");
     world->gfx.white_texture = get_texture("uiassets/white.png");
     load_texture("uiassets/alpha.png");
     world->gfx.alpha_texture = get_texture("uiassets/alpha.png");
+#endif
 
     return world;
 }

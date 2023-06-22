@@ -35,6 +35,7 @@ void snd_deinit(struct sndmgr* mgr)
 
 void snd_frame(struct sndmgr* mgr)
 {
+#ifdef SOUND_ENABLED
     profiler_event("snd_frame");
     for(int i = 0; i < mgr->sounds_playing->len; i++)
     {
@@ -53,10 +54,12 @@ void snd_frame(struct sndmgr* mgr)
         }
     }
     profiler_end();
+#endif
 }
 
 void snd_rmref(struct sndmgr* mgr, struct snd* snd)
 {
+#ifdef SOUND_ENABLED
     for(int i = 0; i < mgr->sounds_playing->len; i++)
     {
         struct snd* _snd = g_array_index(mgr->sounds_playing, struct snd*, i);
@@ -66,6 +69,7 @@ void snd_rmref(struct sndmgr* mgr, struct snd* snd)
             return;
         }
     }
+#endif
 }
 
 struct snd* get_snd(char* file_name)

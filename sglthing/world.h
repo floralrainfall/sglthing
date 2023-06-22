@@ -22,7 +22,6 @@
 
 #define SHADOW_WIDTH 2048
 #define SHADOW_HEIGHT 2048
-#define FBO_ENABLED
 
 enum world_state {
     WORLD_STATE_MAINMENU,

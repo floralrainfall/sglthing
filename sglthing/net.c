@@ -1122,7 +1122,7 @@ void network_frame(struct network* network, float delta_time, double time)
     else
     {
 #ifdef OPUS_ENABLED
-        if(Pa_GetStreamReadAvailable(network->voice_chat_stream) > OPUS_VOICE_BUFSIZE && keys_down[GLFW_KEY_V])
+        if(Pa_GetStreamReadAvailable(network->voice_chat_stream) > OPUS_VOICE_BUFSIZE && keys_down[GLFW_KEY_V] && network->time > network->next_vc_check)
         {
             struct network_packet response; // for sizeof, probably bad
             Pa_ReadStream(network->voice_chat_stream, network->voice_chat_captured_buf, OPUS_VOICE_BUFSIZE);
@@ -1137,7 +1137,10 @@ void network_frame(struct network* network, float delta_time, double time)
                 printf("sglthing: unable to encode voice packet (%i)\n", enc_bytes);
             }
             else
+            {
                 network_transmit_packet(network, &network->client, voice_packet);
+                network->next_vc_check = network->time + (1.0 / ((double)OPUS_VOICE_SAMPLERATE));
+            }
             free2(voice_packet);
         }
 #endif

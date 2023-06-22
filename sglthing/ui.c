@@ -214,8 +214,9 @@ bool ui_draw_button(struct ui_data* ui, float position_x, float position_y, floa
            rel_m_py < position_y &&
            rel_m_py > position_y-size_y)
            {
-               ui->debounce = true;
-               return true;
+                ui->debounce = true;
+                profiler_end();
+                return true;
            }
     }
     if(!mouse_state.mouse_button_l)
@@ -435,6 +436,7 @@ void ui_draw_image(struct ui_data* ui, float position_x, float position_y, float
 
 void ui_init(struct ui_data* ui)
 {
+#ifndef HEADLESS
     glm_mat4_identity(ui->transform);
 
     int ui_vertex = compile_shader("uiassets/shaders/ui.vs", GL_VERTEX_SHADER);
@@ -508,6 +510,7 @@ void ui_init(struct ui_data* ui)
     }
 
     ui->shadow = true;
+#endif
 }
 
 void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, vec3 camera_front, vec3 position, float fov, mat4 m, mat4 vp, char* text)
@@ -515,7 +518,6 @@ void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, ve
     #ifndef HEADLESS
     if(ui->ui_elements > MAX_UI_ELEMENTS || (keys_down[GLFW_KEY_GRAVE_ACCENT] && !ui->persist))
         return;
-    #endif
 
     profiler_event("ui_draw_text_3d");
         
@@ -539,10 +541,12 @@ void ui_draw_text_3d(struct ui_data* ui, vec4 viewport, vec3 camera_position, ve
     }
 
     profiler_end();
+    #endif
 }
 
 struct ui_font* ui_load_font(char* file, float cx, float cy, float cw, float ch)
 {
+    #ifndef HEADLESS
     struct texture_load_info tex_info = load_texture(file);
     int font_texture = get_texture(file);
     if(font_texture)
@@ -560,11 +564,13 @@ struct ui_font* ui_load_font(char* file, float cx, float cy, float cw, float ch)
 
         return new_font;
     }
+    #endif
     return NULL;
 }
 
 void ui_font2_render(struct ui_data* ui, struct ui_font2* font)
 {
+    #ifndef HEADLESS
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     for(unsigned char c; c < MAX_FONT_GLYPHS; c++)
     {
@@ -594,10 +600,12 @@ void ui_font2_render(struct ui_data* ui, struct ui_font2* font)
         glm_vec2_copy((vec2){font->face->glyph->bitmap_left, font->face->glyph->bitmap_top}, chara->bearing);
         chara->advance = font->face->glyph->advance.x;
     }
+    #endif
 }
 
 struct ui_font2* ui_load_font2(struct ui_data* ui, char* file, int font_w, int font_h)
 {
+    #ifndef HEADLESS
     char path[256];
     if(file_get_path(path, 256, file) != -1)
     {
@@ -622,11 +630,13 @@ struct ui_font2* ui_load_font2(struct ui_data* ui, char* file, int font_w, int f
     }
     else
         printf("sglthing: couldn't find font file %s\n",file);
+    #endif
     return NULL;
 }
 
 void ui_font2_text(struct ui_data* ui, float position_x, float position_y, struct ui_font2* font, char* text, float depth)
 {
+    #ifndef HEADLESS
     profiler_event("ui_font2_text");
     glUseProgram(ui->ui_ttf_program);
 
@@ -684,6 +694,7 @@ void ui_font2_text(struct ui_data* ui, float position_x, float position_y, struc
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
     profiler_end();
+    #endif
 }
 
 float ui_font2_text_len(struct ui_font2* font, char* text)

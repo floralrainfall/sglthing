@@ -12,6 +12,7 @@ static void rdm_frame(struct world* world)
 {
     if(world->state == WORLD_STATE_GAME)
     {
+#ifndef HEADLESS
         if(client_state.local_player)
         {
             world->gfx.fog_maxdist = client_state.map_manager->map_render_range * RENDER_CHUNK_SIZE * CUBE_SIZE;
@@ -211,6 +212,7 @@ static void rdm_frame(struct world* world)
 
         //world->cam.position[2] = sinf(world->time/2.f)*64.f;
         //world->cam.position[0] = cosf(world->time/2.f)*64.f;
+#endif
     }
     else
     {
@@ -250,6 +252,7 @@ static void __player_voice_chat_ui(gpointer key, gpointer value, gpointer user_d
 
 static void rdm_frame_ui(struct world* world)
 {
+#ifndef HEADLESS
     if(world->client_on)
     {
         if(world->client.client.lag > 1)
@@ -691,8 +694,11 @@ static void rdm_frame_ui(struct world* world)
         ui_font2_text(world->ui, (world->gfx.screen_width / 2.f) - (ui_font2_text_len(client_state.normal_font2, player_hover) / 2.f), (world->gfx.screen_height / 2.f) - 32.f, client_state.normal_font2, player_hover, 1.f);
     }
 
+    m2_draw_dbg((void*)world);
+
     __pvc_v_id = 0;
     g_hash_table_foreach(world->client.players, __player_voice_chat_ui, world);
+#endif
 }
 
 static void __player_frame(gpointer key, gpointer value, gpointer user_data)
@@ -705,6 +711,7 @@ static void __player_frame(gpointer key, gpointer value, gpointer user_data)
 
 static void __player_render(gpointer key, gpointer value, gpointer user_data)
 {
+#ifndef HEADLESS
     struct world* world = (struct world*)user_data;
     struct network_client* client = (struct network_client*)value;
     struct rdm_player* player = (struct rdm_player*)client->user_data;
@@ -785,13 +792,15 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
         glm_translate_x(vc_bubble_mat, 0.7f);
         world_draw_model(world, client_state.vc_bubble, client_state.object_shader, vc_bubble_mat, true);
     }
+#endif
 }
 
 static void rdm_frame_render(struct world* world)
 {
+#ifndef HEADLESS
     if(!world->gfx.shadow_pass)
     {
-        glDepthMask(GL_FALSE);  
+        sglc(glDepthMask(GL_FALSE));  
 
         mat4 skybox_mat;
         glm_mat4_identity(skybox_mat);
@@ -802,7 +811,7 @@ static void rdm_frame_render(struct world* world)
         glm_scale(skybox_mat, (vec3){15.f,1.f,15.f});
         world_draw_model(world, client_state.cloud_layer, client_state.cloud_layer_shader, skybox_mat, true);
 
-        glDepthMask(GL_LESS);  
+        sglc(glDepthMask(GL_LESS));  
     }
 
     if(world->state == WORLD_STATE_MAINMENU)
@@ -849,6 +858,7 @@ static void rdm_frame_render(struct world* world)
             glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), 1.f, 1.f, 1.f, 1.f);
         }
     }
+#endif
 }
 
 void sglthing_init_api(struct world* world)
@@ -856,7 +866,6 @@ void sglthing_init_api(struct world* world)
     printf("rdm2: hello world\n");
 #ifndef HEADLESS
     glfwSetWindowTitle(world->gfx.window, "RDM2");
-#endif
 
     if(world->client_on)
     {
@@ -933,6 +942,7 @@ void sglthing_init_api(struct world* world)
         client_state.roundstart_sound = load_snd("rdm2/sound/round_start.ogg");
         client_state.roundstart_sound->loop = false;
     }
+#endif 
 
     world->world_frame_user = rdm_frame;
     world->world_frame_ui_user = rdm_frame_ui;
@@ -977,7 +987,7 @@ void sglthing_init_api(struct world* world)
         client_state.server_motd_dismissed = false;
         client_state.local_player = NULL;
 
-        client_state.map_manager = (struct map_manager*)malloc(sizeof(struct map_manager));
+        client_state.map_manager = (struct map_manager*)malloc2(sizeof(struct map_manager));
         map_init(client_state.map_manager);
     }
 

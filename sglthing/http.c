@@ -96,13 +96,13 @@ void http_create(struct http_client* client, char* http_base)
         {
             strncpy(client->sessionkey, sessionkey, 256);
             printf("sglthing: logged in\n");
-            free(sessionkey);
         }
         else
         {
             printf("sglthing: key received but check failed\n");
             client->login = false;
-        }
+        }            
+        free(sessionkey);
     }
     else
     {
@@ -121,6 +121,7 @@ bool http_check_sessionkey(struct http_client* client, char* key)
     if(!result)
         return false;
     printf("sglthing: check = %s\n", result);
+    free(result);
     return (strcmp(result,"1")==0);
 }
 
@@ -153,6 +154,9 @@ struct http_user http_get_userdata(struct http_client* client, char* key)
     user.user_id = json_object_get_int(
         json_object_object_get(juser, "id")
     );
+    json_tokener_free(juser);
+
+    free(result);
     
     return user;
 }
@@ -190,6 +194,7 @@ void http_get_servers(struct http_client* client, char* game_name, GArray* serve
 
         g_array_append_val(servers_out, server);
     }
+    json_tokener_free(jobj);
     free(_server_list);
 }
 

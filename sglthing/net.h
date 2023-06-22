@@ -302,6 +302,7 @@ struct network {
     uint16_t* voice_chat_captured_buf;
     uint16_t* voice_chat_decoded_buf;
     uint16_t* voice_chat_encoded_buf;
+    double next_vc_check;
 #endif
 
     sqlite3 *database;    

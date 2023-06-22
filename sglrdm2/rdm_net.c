@@ -175,13 +175,13 @@ static void net_info_player(struct network* network, struct network_client* new_
 
 static void net_del_player(struct network* network, struct network_client* client)
 {
-    free(client->user_data);
+    free2(client->user_data);
 }
 
 static void net_new_player(struct network* network, struct network_client* client)
 {
     printf("rdm2[%s]: new player %s\n", net_name_manager(network), client->client_name);
-    client->user_data = (struct rdm_player*)malloc(sizeof(struct rdm_player));
+    client->user_data = (struct rdm_player*)malloc2(sizeof(struct rdm_player));
     struct rdm_player* player = (struct rdm_player*)client->user_data;
     player->client = client;
 
@@ -382,6 +382,8 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                     stop_snd(client_state.playing_music);
                 client_state.playing_music = 0;
                 play_snd2(client_state.roundstart_sound);
+
+                map_client_clear(client_state.map_manager);
             }
             return false;
         case RDM_PACKET_WEAPON_FIRE:
@@ -494,6 +496,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                     printf("rdm2[%s]: RDM_PACKET_UPDATE_WEAPON on unreg player id (%i)\n", net_name_manager(network), packet_data->update_position.player_id);
             }
             return false;
+#ifndef HEADLESS
         case RDM_PACKET_REPLICATE_SOUND:
             if(network->mode == NETWORKMODE_CLIENT)
             {
@@ -509,6 +512,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                     printf("rdm2[%s]: RDM_PACKET_REPLICATE_SOUND on non existent song (%s)\n", net_name_manager(network), packet_data->replicate_sound.sound_name);
             }
             return false;
+#endif
         case RDM_PACKET_PLAYER_DEATH:
             if(network->mode == NETWORKMODE_CLIENT)
             {

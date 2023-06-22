@@ -137,7 +137,7 @@ void __map_render_chunk(struct world* world, struct map_manager* map, struct __r
     sglc(glVertexAttribDivisor(8, 1));  
 
     if(world->gfx.shadow_pass)
-        glUniform1i(glGetUniformLocation(map->cube_program_light,"sel_map"), world->gfx.current_map);
+        sglc(glUniform1i(glGetUniformLocation(map->cube_program_light,"sel_map"), world->gfx.current_map));
     sglc(glBindBuffer(GL_ARRAY_BUFFER, 0)); 
 
     sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_mesh->element_buffer));
