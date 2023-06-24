@@ -58,8 +58,6 @@ static void sighandler(int sig)
     }
 }
 
-#define YES_WSL
-
 int main(int argc, char** argv)
 {
     char v_name[32];
@@ -225,8 +223,8 @@ int main(int argc, char** argv)
 #ifdef HEADLESS
         if(world->time > next_dedi_announcement)
         {
-            printf("sglthing: %fs up, %f frames/sec (%i), %i in universe\n", world->time, world->fps, world->frames, world->server.server_clients->len);
-            next_dedi_announcement = world->time + 1.f;
+            printf("sglthing: %fs up, %f frames/sec (%i), %i in universe, dT: %f\n", world->time, world->fps, world->frames, world->server.server_clients->len, world->delta_time);
+            next_dedi_announcement = world->time + 2.5f;
         }
 #endif
 

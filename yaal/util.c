@@ -35,6 +35,7 @@ void yaal_update_player_transform(struct player* player)
 
 void yaal_update_song()
 {
+#ifndef HEADLESS
     char song_fname[128];
     snprintf(song_fname,128,"yaal/snd/mus/theme_%i.mp3",yaal_state.current_map_song_id);                
     if(yaal_state.current_song)
@@ -63,4 +64,5 @@ void yaal_update_song()
         yaal_state.current_song->multiplier = 0.1f;
         yaal_state.current_song->loop = true;
     }
+#endif
 }

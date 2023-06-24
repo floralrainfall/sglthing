@@ -567,9 +567,13 @@ static void network_manage_packet(struct network* network, struct network_client
                 if(strlen(network->server_pass) == 0 || strncmp(in_packet->packet.clientinfo.server_pass, network->server_pass, 64) == 0)
                 {
                     client->verified = true;
-                    if(!http_check_sessionkey(&network->http_client, in_packet->packet.clientinfo.session_key))
+                    client->user = http_get_userdata(&network->http_client, in_packet->packet.clientinfo.session_key);
+                    if(!client->user.found)
                     {
                         printf("sglthing: client '%s' failed key\n", in_packet->packet.clientinfo.client_name);
+
+                        snprintf(in_packet->packet.clientinfo.client_name, 64, "Guest%i", g_random_int_range(0,9999));
+
                         if(network->security)
                             network_disconnect_player(network, true, "Bad key", client);
                         client->verified = false;
@@ -582,7 +586,6 @@ static void network_manage_packet(struct network* network, struct network_client
                     }
                     else
                     {
-                        client->user = http_get_userdata(&network->http_client, in_packet->packet.clientinfo.session_key);
                         if(client->user.found)
                         {
                             printf("sglthing: was able to get web userdata, id = %i\n", client->user.user_id);
@@ -767,7 +770,7 @@ static void network_manage_packet(struct network* network, struct network_client
         case PACKETTYPE_PLAYER_REMOVE:
             if(network->mode == NETWORKMODE_CLIENT)
             {
-                printf("sglthing: client del player %i\n", in_packet->packet.player_remove.player_id);
+                printf("sglthing: client del player %i, reason '%s'\n", in_packet->packet.player_remove.player_id, in_packet->packet.player_remove.reason);
                 struct network_client* old_client = g_hash_table_lookup(network->players, &in_packet->packet.player_remove.player_id);
                 if(network->del_player_callback)
                     network->del_player_callback(network, client);
@@ -964,6 +967,16 @@ void network_frame(struct network* network, float delta_time, double time)
     //if(glfwGetTime() > network->next_tick)
     //    return;
 
+    int frame_avg_rx = 0;
+    int frame_avg_tx = 0;
+    for(int i = 0; i < NETWORK_HISTORY_FRAMES; i++)
+    {
+        frame_avg_rx += network->packet_rx_numbers[i];
+        frame_avg_tx += network->packet_tx_numbers[i];
+    }
+    network->rx_a = frame_avg_rx / 16.0;
+    network->tx_a = frame_avg_tx / 16.0;
+    
     network->packet_time = network->network_frames % NETWORK_HISTORY_FRAMES;
     network->packet_tx_numbers[network->packet_time] = 0;
     network->packet_rx_numbers[network->packet_time] = 0;
@@ -1155,6 +1168,7 @@ void network_disconnect_player(struct network* network, bool transmit_disconnect
     {            
         struct network_packet response;
         ZERO(response);
+        response.meta.packet_size = sizeof(response.packet.disconnect);
         response.meta.packet_type = PACKETTYPE_DISCONNECT;
         strncpy(response.packet.disconnect.disconnect_reason, reason, 32);
         network_transmit_packet(network, client, &response);
@@ -1173,7 +1187,9 @@ void network_disconnect_player(struct network* network, bool transmit_disconnect
         if(client->authenticated && transmit_disconnect)
         {
             response.meta.packet_type = PACKETTYPE_PLAYER_REMOVE;
+            response.meta.packet_size = sizeof(response.packet.player_remove);
             response.packet.player_remove.player_id = client->player_id;
+            strncpy(response.packet.player_remove.reason, reason, 32);
             network_transmit_packet_all(network, &response);
         }
     }
@@ -1184,6 +1200,7 @@ void network_disconnect_player(struct network* network, bool transmit_disconnect
             struct network_packet response;
             ZERO(response);
             response.meta.packet_type = PACKETTYPE_DISCONNECT;
+            response.meta.packet_size = sizeof(response.packet.disconnect);
             strncpy(response.packet.disconnect.disconnect_reason, reason, 32);
             network_transmit_packet(network, client, &response);
         }
@@ -1260,17 +1277,8 @@ void network_dbg_ui(struct network* network, struct ui_data* ui)
         }
         glm_vec4_copy(oldfg, ui->foreground_color);
         glm_vec4_copy(oldbg, ui->background_color);
-        int frame_avg_rx = 0;
-        int frame_avg_tx = 0;
-        for(int i = 0; i < NETWORK_HISTORY_FRAMES; i++)
-        {
-            snprintf(tx,256,"%03i\n%03i",network->packet_rx_numbers[i],network->packet_tx_numbers[i]);
-            ui_draw_text(ui,(16.f*(i*2)),199.f-16.f,tx,1.f);
-            frame_avg_rx += network->packet_rx_numbers[i];
-            frame_avg_tx += network->packet_tx_numbers[i];
-        }
 
-        snprintf(tx,256,"dT=%f, tx_a: %fpr, rx_a: %fpr", network->distributed_time, frame_avg_tx / 16.f, frame_avg_rx / 16.f);
+        snprintf(tx,256,"dT=%f, tx_a: %fpr, rx_a: %fpr", network->distributed_time, network->tx_a / 16.f, network->rx_a / 16.f);
         ui_draw_text(ui,pos_base[0],pos_base[1],tx,1.f);
     }
     else
@@ -1294,17 +1302,8 @@ void network_dbg_ui(struct network* network, struct ui_data* ui)
             ui_draw_text(ui, 0, 0, tx, 1.f);
             ui->foreground_color[2] = 1.f;
         }            
-        int frame_avg_rx = 0;
-        int frame_avg_tx = 0;
-        for(int i = 0; i < NETWORK_HISTORY_FRAMES; i++)
-        {
-            snprintf(tx,256,"%03i\n%03i",network->packet_rx_numbers[i],network->packet_tx_numbers[i]);
-            ui_draw_text(ui,(16.f*(i*2)),199.f+24.f,tx,1.f);
-            frame_avg_rx += network->packet_rx_numbers[i];
-            frame_avg_tx += network->packet_tx_numbers[i];
-        }
 
-        snprintf(tx,256,"dT=%f, tx_a: %fpr, rx_a: %fpr", network->distributed_time, frame_avg_tx / 16.f, frame_avg_rx / 16.f);
+        snprintf(tx,256,"dT=%f, tx_a: %fpr, rx_a: %fpr", network->distributed_time, network->tx_a / 16.f, network->rx_a / 16.f);
         ui_draw_text(ui,pos_base[0],pos_base[1],tx,1.f);
     }
     glm_vec4_copy(oldfg, ui->foreground_color);

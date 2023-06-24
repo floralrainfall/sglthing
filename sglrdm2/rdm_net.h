@@ -17,6 +17,7 @@ enum rdm_packet_type
     RDM_PACKET_UPDATE_HOTBAR,
     RDM_PACKET_UPDATE_INVENTORY,
     RDM_PACKET_REQUEST_CHUNK,
+    RDM_PACKET_REQUEST_CHUNK_DONE,
     RDM_PACKET_DESTROY_CHUNK,
     RDM_PACKET_UPDATE_GAMEMODE,
     RDM_PACKET_GAME_START,
@@ -65,7 +66,7 @@ union rdm_packet_data
         
         struct {
             char chunk_data[RENDER_CHUNK_SIZE]; // z
-        } chunk_data[RENDER_CHUNK_SIZE]; // y
+        } chunk_data[RENDER_CHUNK_SIZE_Y]; // y
     } update_chunk;
     struct
     {
@@ -141,6 +142,7 @@ struct rdm_player
     int max_health;
 
     int player_id;
+    int chunks_wanted;
 };
 
 struct pending_packet

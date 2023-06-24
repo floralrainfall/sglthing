@@ -82,8 +82,8 @@ void http_create(struct http_client* client, char* http_base)
     http_update_motd(client);
 
     printf("sglthing: logging into sglnet as %s\n", config_string_get(&client->web_config, "user_username"));
-    char postdata[256];
-    snprintf(postdata, 256, "user_username=%s&user_password=%s&server=%s", 
+    char postdata[1024];
+    snprintf(postdata, 1024, "user_username=%s&user_password=%s&server=%s", 
         config_string_get(&client->web_config, "user_username"),
         config_string_get(&client->web_config, "user_password"),
         client->server ? "true" : "false");
@@ -92,14 +92,16 @@ void http_create(struct http_client* client, char* http_base)
     if(sessionkey)
     {
         client->login = true;
-        if(http_check_sessionkey(client, sessionkey))
+        
+        struct http_user user_data = http_get_userdata(client, sessionkey);
+        if(user_data.found)
         {
             strncpy(client->sessionkey, sessionkey, 256);
-            printf("sglthing: logged in\n");
+            printf("sglthing: logged in (sesk: %s)\n", sessionkey);
         }
         else
         {
-            printf("sglthing: key received but check failed\n");
+            printf("sglthing: key received but couldnt find user data\n");
             client->login = false;
         }            
         free(sessionkey);
@@ -109,20 +111,6 @@ void http_create(struct http_client* client, char* http_base)
         printf("sglthing: did not receive key\n");
     }
 
-}
-
-bool http_check_sessionkey(struct http_client* client, char* key)
-{
-    if(!client->login)
-        return false;
-    char url[256];
-    snprintf(url, 256, "auth/check?sessionkey=%s", key);
-    char* result = http_get(client, url);
-    if(!result)
-        return false;
-    printf("sglthing: check = %s\n", result);
-    free(result);
-    return (strcmp(result,"1")==0);
 }
 
 struct http_user http_get_userdata(struct http_client* client, char* key)
@@ -154,7 +142,6 @@ struct http_user http_get_userdata(struct http_client* client, char* key)
     user.user_id = json_object_get_int(
         json_object_object_get(juser, "id")
     );
-    json_tokener_free(juser);
 
     free(result);
     

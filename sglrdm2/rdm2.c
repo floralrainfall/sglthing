@@ -13,7 +13,7 @@ static void rdm_frame(struct world* world)
     if(world->state == WORLD_STATE_GAME)
     {
 #ifndef HEADLESS
-        if(client_state.local_player)
+        if(client_state.local_player && client_state.gamemode.started)
         {
             world->gfx.fog_maxdist = client_state.map_manager->map_render_range * RENDER_CHUNK_SIZE * CUBE_SIZE;
             world->gfx.fog_mindist = (float)(RENDER_CHUNK_SIZE * CUBE_SIZE)/2.f;
@@ -320,12 +320,13 @@ static void rdm_frame_ui(struct world* world)
             ui_font2_text(world->ui, 8.f, world->ui->current_panel->size_y / 2.f, client_state.big_font, dbginfo, 0.2f);
             world->ui->foreground_color[1] = 1.f;
             world->ui->foreground_color[2] = 1.f;
-            for(int i = 0; i < sizeof(client_state.local_player->antagonist_data.objectives) / sizeof(struct objective); i++)
+            for(int i = 0; i < client_state.local_player->antagonist_data.objective_count; i++)
             {
                 struct objective obj = client_state.local_player->antagonist_data.objectives[i];
-                char obj_desc[512];
-                objective_description(obj_desc, 512, obj);
-                ui_font2_text(world->ui, 8.f, (world->ui->current_panel->size_y / 2.f) + 24.f + (i * 12.f), client_state.normal_font, obj_desc, 0.2f);
+                char obj_desc[255], obj_desc2[255];
+                objective_description(obj_desc, 255, obj);
+                snprintf(obj_desc2, 255, "%i. %s", i + 1, obj_desc);
+                ui_font2_text(world->ui, 8.f, (world->ui->current_panel->size_y / 2.f) + 24.f + (i * 12.f), client_state.normal_font, obj_desc2, 0.2f);
             }
         }
 
@@ -425,6 +426,16 @@ static void rdm_frame_ui(struct world* world)
                 }
             }
         }
+        else
+        {
+            if(!client_state.context_mode)
+            {
+                ui_draw_panel(world->ui, 8, world->gfx.screen_height - 56, world->gfx.screen_width - 16, world->gfx.screen_height - 72, 0.5f);
+                ui_font2_text(world->ui, (world->gfx.screen_width / 2.f) - (ui_font2_text_len(client_state.big_font,"Round Lobby") / 2.f), 24.f, client_state.big_font, "Round Lobby", 0.25f);
+
+                ui_end_panel(world->ui);
+            }
+        }
 
         if(get_focus() && mouse_state.mouse_button_m && client_state.server_motd_dismissed && !client_state.context_mode)
         {
@@ -444,6 +455,8 @@ static void rdm_frame_ui(struct world* world)
 
         if(client_state.context_mode)
         {            
+            set_focus(world->gfx.window, false);
+
             ui_draw_panel(world->ui, world->gfx.screen_width / 2 - 128.f, world->gfx.screen_height / 2 + 150.f, 255.f, 300.f, 1.f);
             ui_font2_text(world->ui, 8.f, 24.f, client_state.big_font, "Context Menu", 0.7f);
 
@@ -694,7 +707,8 @@ static void rdm_frame_ui(struct world* world)
         ui_font2_text(world->ui, (world->gfx.screen_width / 2.f) - (ui_font2_text_len(client_state.normal_font2, player_hover) / 2.f), (world->gfx.screen_height / 2.f) - 32.f, client_state.normal_font2, player_hover, 1.f);
     }
 
-    m2_draw_dbg((void*)world);
+    if(keys_down[GLFW_KEY_F3])
+        m2_draw_dbg((void*)world);
 
     __pvc_v_id = 0;
     g_hash_table_foreach(world->client.players, __player_voice_chat_ui, world);
@@ -830,7 +844,8 @@ static void rdm_frame_render(struct world* world)
 
     map_render_chunks(world, client_state.map_manager);
 
-    g_hash_table_foreach(world->client.players, __player_render, world);
+    if(client_state.gamemode.started)
+        g_hash_table_foreach(world->client.players, __player_render, world);
 
     if(!world->gfx.shadow_pass)
     {
@@ -997,6 +1012,9 @@ void sglthing_init_api(struct world* world)
         server_state.map_server->map_ready = false;
         server_state.chunk_packets_pending = g_array_new(true, true, sizeof(struct pending_packet));
     }
+
+    server_state.network = &world->server;
+    client_state.network = &world->client;
 
     net_init(world);
 

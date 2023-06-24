@@ -202,6 +202,7 @@ struct network_packet {
         } player_add;
         struct {
             int player_id;
+            char reason[32];
         } player_remove;
         struct {
             int type_id;
@@ -268,6 +269,9 @@ struct network {
     double client_default_tick;
     GArray* packet_unacknowledged;
     int packet_id;
+
+    double tx_a;
+    double rx_a;
 
     float next_punch;
 

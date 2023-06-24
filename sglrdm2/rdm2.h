@@ -3,6 +3,7 @@
 
 #include <sglthing/world.h>
 #include <sglthing/http.h>
+#include <sglthing/net.h>
 #include "rdm_net.h"
 #include "map.h"
 #include "gamemode.h"
@@ -66,6 +67,8 @@ struct rdm2_state
 
     float logo_title;
     int logo_title_tex;
+
+    struct network* network;
 };
 
 extern struct rdm2_state client_state;

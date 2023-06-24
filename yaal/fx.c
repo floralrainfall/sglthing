@@ -21,6 +21,7 @@ void add_fx(struct fx_manager* manager, struct fx fx)
     fx.progress = 0.f;
     fx.dead = false;
 
+#ifndef HEADLESS
     switch(fx.type)
     {
         case FX_BOMB_THROW:
@@ -32,6 +33,7 @@ void add_fx(struct fx_manager* manager, struct fx fx)
             }
             break;
     }
+#endif
 
     g_array_append_val(manager->fx_active, fx);
 }
@@ -124,8 +126,10 @@ void render_fx(struct world* world, struct fx_manager* manager)
             glm_vec3_mix(fx->start, fx->target, fx->progress, dest_pos);
             glm_translate(fx_mat, dest_pos);
 
+#ifndef HEADLESS
             if(fx->snd)
                 glm_vec3_copy(dest_pos, fx->snd->sound_position);
+#endif 
 
             switch(fx->type)
             {

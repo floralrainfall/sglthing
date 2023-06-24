@@ -110,7 +110,7 @@ void net_send_chunk(struct network* network, struct network_client* client, int 
         _data->update_chunk.chunk_z = c_z;        
         _data->update_chunk.chunk_data_x = x;
 
-        memcpy(_data->update_chunk.chunk_data, chunk->x[x].y, RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE);
+        memcpy(_data->update_chunk.chunk_data, chunk->x[x].y, RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE_Y);
 
         g_array_append_val(server_state.chunk_packets_pending, pending);
         //network_transmit_packet(network, client, _pak);
@@ -219,6 +219,7 @@ static void net_new_player(struct network* network, struct network_client* clien
     player->weapon_ammos[WEAPON_BLOCK] = 60;
     player->weapon_block_color = MAP_PAL(2,2,2);
     player->antagonist_data.type = RDM_ANTAGONIST_NEUTRAL;
+    player->antagonist_data.objective_count = 0;
 
     if(network->mode == NETWORKMODE_CLIENT)
     {
@@ -359,6 +360,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                 if(packet_data->request_chunk.chunk_z < 0)
                     return false;
                 net_send_chunk(network, client, packet_data->request_chunk.chunk_x, 0, packet_data->request_chunk.chunk_z, &server_state.map_server->chunk_x[packet_data->request_chunk.chunk_x].chunk_y[packet_data->request_chunk.chunk_z]);
+                remote_player->chunks_wanted += MAP_SIZE;
             }
             return false;
         case RDM_PACKET_DESTROY_CHUNK:
@@ -390,6 +392,8 @@ static bool net_receive_packet(struct network* network, struct network_client* c
             if(network->mode == NETWORKMODE_SERVER)
             {
                 if(remote_player->weapon_ammos[net_player_get_weapon(remote_player)] == 0)
+                    return false;
+                if(!server_state.gamemode.started)
                     return false;
                 bool fired = false;
                 glm_quat_copy(packet_data->weapon_fire.direction, remote_player->direction);
@@ -531,13 +535,37 @@ static void net_tick(struct network* network)
     {
         profiler_event("net: send queued packets");
         struct pending_packet packet = g_array_index(server_state.chunk_packets_pending, struct pending_packet, 0);
+        struct rdm_player* packet_player = (struct rdm_player*)packet.client->user_data;
         if(packet.giveup < network->time)
         {
+            printf("rdm2: gave up on sending chunk packet\n");
             g_array_remove_index(server_state.chunk_packets_pending, 0);
+            if((packet_player->chunks_wanted - MAP_SIZE) >= 0)
+            {
+                packet_player->chunks_wanted = 0;
+                struct network_packet done_pak;
+                done_pak.meta.packet_size = 0;
+                done_pak.meta.packet_type = RDM_PACKET_REQUEST_CHUNK_DONE;              
+                done_pak.meta.acknowledge = true;  
+                network_transmit_packet(network, packet.client, &done_pak);
+            }
+            else
+                packet_player->chunks_wanted -= MAP_SIZE;
         }
         else
         {
-            network_transmit_packet(network, packet.client, packet.packet);
+            network_transmit_packet(network, packet.client, packet.packet);            
+            if((packet_player->chunks_wanted - MAP_SIZE) >= 0)
+            {
+                packet_player->chunks_wanted = 0;
+                struct network_packet done_pak;
+                done_pak.meta.packet_size = 0;
+                done_pak.meta.packet_type = RDM_PACKET_REQUEST_CHUNK_DONE;                                
+                done_pak.meta.acknowledge = true;  
+                network_transmit_packet(network, packet.client, &done_pak);
+            }
+            else
+                packet_player->chunks_wanted -= MAP_SIZE;
             g_array_remove_index(server_state.chunk_packets_pending, 0);
             free2(packet.packet);
         }
@@ -545,7 +573,7 @@ static void net_tick(struct network* network)
     }
 
     // packet limit
-    if(server_state.chunk_packets_pending->len > 600) 
+    if(server_state.chunk_packets_pending->len > 2048) 
     {
         printf("rdm2[server]: clearing chunk packet queue (%i packets in queue)\n",server_state.chunk_packets_pending->len);
         while(server_state.chunk_packets_pending->len != 0)

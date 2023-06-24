@@ -84,7 +84,7 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
                     _data->update_chunk.chunk_y = c_y;
                     _data->update_chunk.chunk_z = c_z;
                     _data->update_chunk.chunk_data_x = v_x;
-                    memcpy(_data->update_chunk.chunk_data, &server_state.map_server->chunk_x[c_x].chunk_y[c_z].x[v_x],RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE);
+                    memcpy(_data->update_chunk.chunk_data, &server_state.map_server->chunk_x[c_x].chunk_y[c_z].x[v_x],RENDER_CHUNK_SIZE_Y*RENDER_CHUNK_SIZE);
                     network_transmit_packet_all(network, &_pak);
                 }
                 else
@@ -117,7 +117,7 @@ bool weapon_fire_primary(struct network* network, int player_id, bool server)
                     _data->update_chunk.chunk_y = ray.chunk_y;
                     _data->update_chunk.chunk_z = ray.chunk_z;
                     _data->update_chunk.chunk_data_x = ray.voxel_x;
-                    memcpy(_data->update_chunk.chunk_data, &server_state.map_server->chunk_x[ray.chunk_x].chunk_y[ray.chunk_z].x[ray.voxel_x],RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE);
+                    memcpy(_data->update_chunk.chunk_data, &server_state.map_server->chunk_x[ray.chunk_x].chunk_y[ray.chunk_z].x[ray.voxel_x],RENDER_CHUNK_SIZE_Y*RENDER_CHUNK_SIZE);
                     network_transmit_packet_all(network, &_pak);
                     player->weapon_ammos[WEAPON_BLOCK]++;
                 }

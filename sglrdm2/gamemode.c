@@ -22,7 +22,7 @@ void gamemode_init(struct gamemode_data* data, bool server)
     data->secret = false;
     data->gamemode = GAMEMODE_SECRET;
     data->started = false;
-    data->gamemode_end = 60.f;
+    data->gamemode_end = 10.f;
     data->server = server;
     data->gamemode_nextannouncement = 1.f;
     if(data->server)
@@ -56,6 +56,8 @@ void gamemode_frame(struct gamemode_data* data, struct world* world)
 
                 network_transmit_packet_all(&world->server, &_pak);
 
+                server_state.map_server->map_seed = g_random_int_range(0,99999);
+                printf("rdm2: using seed %i\n", server_state.map_server->map_seed);
                 map_server_init(server_state.map_server);
             }
 

@@ -1,8 +1,9 @@
 #ifndef MAP_H
 #define MAP_H
 
-#define RENDER_CHUNK_SIZE 16
-#define MAP_SIZE 64
+#define RENDER_CHUNK_SIZE 8
+#define RENDER_CHUNK_SIZE_Y 16
+#define MAP_SIZE 14
 #define CUBE_SIZE 1
 // [0-3],[0-3],[0-3]
 #define MAP_PAL(r,g,b) r * 16 + g * 4 + b
@@ -29,7 +30,7 @@ struct map_chunk
     struct {
         struct {
             unsigned char z[RENDER_CHUNK_SIZE];
-        } y[RENDER_CHUNK_SIZE];
+        } y[RENDER_CHUNK_SIZE_Y];
     } x[RENDER_CHUNK_SIZE];
     enum chunk_attr attr;
 };

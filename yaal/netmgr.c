@@ -374,6 +374,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                 yaal_state.map_downloaded_count = 0;
                 strncpy(yaal_state.level_name, x_data->packet.yaal_level.level_name, 64);
 
+#ifndef HEADLESS
                 if(x_data->packet.yaal_level.song_id != -1)
                 {
                     printf("yaal: playing theme %i\n", x_data->packet.yaal_level.song_id);
@@ -384,6 +385,7 @@ static bool __sglthing_packet(struct network* network, struct network_client* cl
                     if(yaal_state.mode == YAAL_STATE_GAME)
                         yaal_update_song();
                 }
+#endif
 
                 if(yaal_state.current_player)
                     yaal_state.current_player->level_id = yaal_state.current_level_id;

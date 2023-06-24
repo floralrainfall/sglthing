@@ -59,11 +59,11 @@ struct ray_cast_info ray_cast(struct network* network, vec3 starting_position, v
             info.real_voxel_z = floorf((info.position[2]+0.5f) / CUBE_SIZE);
 
             info.chunk_x = floorf((float)info.real_voxel_x / RENDER_CHUNK_SIZE);
-            info.chunk_y = floorf((float)info.real_voxel_y / RENDER_CHUNK_SIZE);
+            info.chunk_y = floorf((float)info.real_voxel_y / RENDER_CHUNK_SIZE_Y);
             info.chunk_z = floorf((float)info.real_voxel_z / RENDER_CHUNK_SIZE);
 
             info.voxel_x = info.real_voxel_x - (info.chunk_x * RENDER_CHUNK_SIZE);
-            info.voxel_y = info.real_voxel_y - (info.chunk_y * RENDER_CHUNK_SIZE);
+            info.voxel_y = info.real_voxel_y - (info.chunk_y * RENDER_CHUNK_SIZE_Y);
             info.voxel_z = info.real_voxel_z - (info.chunk_z * RENDER_CHUNK_SIZE);
 
             if(forward[0] > 0.5)
@@ -111,13 +111,13 @@ struct ray_cast_info ray_cast(struct network* network, vec3 starting_position, v
 
 
 
-#define C_SZ(x)                                       \
-    if(info.voxel_ ## x == -1) { info.chunk_ ## x--; info.voxel_ ## x = RENDER_CHUNK_SIZE-1; } \
-    if(info.voxel_ ## x == RENDER_CHUNK_SIZE) { info.chunk_ ## x++; info.voxel_ ## x = 0; }
+#define C_SZ(x,s)                                     \
+    if(info.voxel_ ## x == -1) { info.chunk_ ## x--; info.voxel_ ## x = s-1; } \
+    if(info.voxel_ ## x == s) { info.chunk_ ## x++; info.voxel_ ## x = 0; }
 
-                    C_SZ(x);
-                    C_SZ(y);
-                    C_SZ(z);
+                    C_SZ(x,RENDER_CHUNK_SIZE);
+                    C_SZ(y,RENDER_CHUNK_SIZE_Y);
+                    C_SZ(z,RENDER_CHUNK_SIZE);
             }
 
             info.object = RAYCAST_VOXEL;

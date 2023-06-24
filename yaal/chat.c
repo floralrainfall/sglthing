@@ -25,11 +25,13 @@ void chat_render_player(struct world* world, struct chat_system* chat, struct pl
 void chat_new_message(struct chat_system* chat, struct chat_message message)
 {
     g_array_append_val(chat->chat_messages, message);
+#ifndef HEADLESS
     if(yaal_state.mode == YAAL_STATE_GAME)
     {
         struct snd* notif_sound = play_snd("yaal/snd/notification.wav");
         notif_sound->multiplier = 0.1f;
     }
+#endif
 }
 
 void chat_init(struct chat_system* chat)
