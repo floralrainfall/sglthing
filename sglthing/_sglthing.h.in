@@ -1,1 +1,2 @@
 #cmakedefine GIT_COMMIT_COUNT @GIT_COMMIT_COUNT@
+#cmakedefine GIT_BRANCH "@GIT_BRANCH@"

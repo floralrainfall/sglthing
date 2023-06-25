@@ -61,7 +61,7 @@ static void sighandler(int sig)
 int main(int argc, char** argv)
 {
     char v_name[32];
-    snprintf(v_name, 32, "sglthing r%i", GIT_COMMIT_COUNT);
+    snprintf(v_name, 32, "sglthing-" GIT_BRANCH " r%i", GIT_COMMIT_COUNT);
     printf("%s\n",v_name);
     #ifndef HEADLESS
     GLFWwindow* window = NULL;

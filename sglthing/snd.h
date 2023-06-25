@@ -1,7 +1,9 @@
 #ifndef SND_H
 #define SND_H
+#ifdef SOUND_ENABLED
 #include <portaudio.h>
 #include <sndfile.h>
+#endif
 
 #include <stdbool.h>
 #include <cglm/cglm.h>

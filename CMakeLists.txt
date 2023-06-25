@@ -7,8 +7,14 @@ endif()
 
 execute_process(COMMAND git rev-list --count HEAD
     OUTPUT_VARIABLE GIT_COMMIT_COUNT)
+execute_process(
+    COMMAND git rev-parse --abbrev-ref HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_BRANCH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 
-message(STATUS "configuring sglthing r" ${GIT_COMMIT_COUNT})
+message(STATUS "configuring sglthing-" ${GIT_BRANCH} " r" ${GIT_COMMIT_COUNT})
 
 set(ASSIMP_HUNTER_ENABLED FALSE)
 
