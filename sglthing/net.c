@@ -100,6 +100,7 @@ void network_init(struct network* network, struct script_system* script)
     network->server_open = true;
     network->client_capabilities = CAPABILITY_OPUS_VOICE_CHAT;
     network->http_client.easy = 0;
+    strcpy(network->game_id,"sglthing");
 }
 
 void network_start_download(struct network_downloader* network, char* ip, int port, char* rqname, char* pass)
@@ -347,8 +348,6 @@ void network_connect(struct network* network, char* ip, int port)
     }
 #endif
 }
-
-extern const char *__progname;
 
 void network_open(struct network* network, char* ip, int port)
 {
@@ -1007,7 +1006,7 @@ void network_frame(struct network* network, float delta_time, double time)
     {
         if(network->time > network->next_punch)
         {
-            http_post_server(&network->http_client, __progname, network->server_name, network->server_motd, network->server_ip, network->server_port);
+            http_post_server(&network->http_client, network->game_id, network->server_name, network->server_motd, network->server_ip, network->server_port);
             network->next_punch = network->time + 60.f;
         }
 

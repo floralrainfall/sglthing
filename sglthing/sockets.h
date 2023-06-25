@@ -99,7 +99,9 @@ typedef int socklen_t;
 /* POSIX ssize_t is not a thing on Windows */
 typedef signed long long int ssize_t;
 /* Allow the use of close() (which is POSIX) for Winsock */
+# ifndef closesocket
 # define close(x) closesocket(x)
+# endif
 #else
 typedef int socket_t;
 // winsock has INVALID_SOCKET which is returned by socket(),

@@ -947,6 +947,7 @@ void sglthing_init_api(struct world* world)
         f = compile_shader("rdm2/shaders/stencil.fs", GL_FRAGMENT_SHADER);
         client_state.stencil_shader = link_program(v, f);
 
+#ifdef SOUND_ENABLED
         client_state.lobby_music = load_snd("rdm2/music/lobby0.mp3");
         client_state.lobby_music->loop = true;
         client_state.lobby_music->multiplier = 0.1f;
@@ -956,6 +957,7 @@ void sglthing_init_api(struct world* world)
             client_state.playing_music = 0;
         client_state.roundstart_sound = load_snd("rdm2/sound/round_start.ogg");
         client_state.roundstart_sound->loop = false;
+#endif
     }
 #endif 
 

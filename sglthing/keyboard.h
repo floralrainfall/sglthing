@@ -1,7 +1,7 @@
 #ifndef KEYBOARD_H
 #define KEYBOARD_H
 #ifndef HEADLESS
-#include <GLFW/glfw3.h>
+#include <glfw/glfw3.h>
 #endif
 #include <cglm/cglm.h>
 #include <stdbool.h>
