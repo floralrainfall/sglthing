@@ -9,7 +9,7 @@ Estimated Requirements
 
 ## Warning
 
-# This version of sglthing is instable! This is a testing fork for Windows porting.
+# This version of sglthing is unstable! This is a testing fork for Windows porting.
 
 This engine and its deritative games may potentially have visuals that may trigger seizures for those with photosensitive epilepsy. Viewer discretion is advised.
 
