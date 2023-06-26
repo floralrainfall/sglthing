@@ -740,6 +740,7 @@ void world_frame(struct world* world)
     profiler_end();
 }
 
+/*
 void world_uniforms(struct world* world, int shader_program, mat4 model_matrix)
 {
 #ifndef HEADLESS
@@ -886,7 +887,7 @@ void world_draw_primitive(struct world* world, int shader, int fill, enum primit
             break;
     }
 #endif
-}
+}*/
 
 // TODO: this
 void world_deinit(struct world* world)

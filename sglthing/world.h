@@ -163,6 +163,8 @@ void world_deinit(struct world* world);
 void world_frame(struct world* world);
 void world_frame_render(struct world* world);
 void world_frame_light_pass(struct world* world, float quality, int framebuffer, int framebuffer_x, int framebuffer_y);
+
+/* old api
 void world_draw(struct world* world, int count, int vertex_array, int shader_program, mat4 model_matrix);
 void world_draw_model(struct world* world, struct model* model, int shader_program, mat4 model_matrix, bool set_textures);
 
@@ -174,6 +176,8 @@ enum primitive_type
 };
 void world_draw_primitive(struct world* world, int shader, int fill, enum primitive_type type, mat4 model_matrix, vec4 color);
 void world_uniforms(struct world* world, int shader_program, mat4 model_matrix);
+*/
+
 void world_updres(struct world* world);
 void world_start_game(struct world* world); // for clients that are in WORLD_STATE_MAINMENu
 
