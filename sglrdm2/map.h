@@ -2,7 +2,7 @@
 #define MAP_H
 
 #define RENDER_CHUNK_SIZE 8
-#define RENDER_CHUNK_SIZE_Y 16
+#define RENDER_CHUNK_SIZE_Y 8
 #define MAP_SIZE 14
 #define CUBE_SIZE 1
 // [0-3],[0-3],[0-3]
@@ -25,11 +25,25 @@ enum chunk_attr
     CHUNK_FLAT,
 };
 
+enum block_type
+{
+    BLOCK_AIR,
+    BLOCK_CONCRETE,
+    BLOCK_BRICKS,
+    BLOCK_SKYSCRAPERWALL,
+    BLOCK_REDSPAWNBLOCK,
+    BLOCK_BLUESPAWNBLOCK,
+    BLOCK_NEUTRALSPAWNBLOCK,
+    BLOCK_DIRT,
+    BLOCK_GRASS,
+    BLOCK_GLASS,
+} __attribute__((packed));
+
 struct map_chunk
 {
     struct {
         struct {
-            unsigned char z[RENDER_CHUNK_SIZE];
+            enum block_type z[RENDER_CHUNK_SIZE];
         } y[RENDER_CHUNK_SIZE_Y];
     } x[RENDER_CHUNK_SIZE];
     enum chunk_attr attr;
@@ -42,6 +56,7 @@ struct map_manager
     int map_request_range;
     int map_render_range;
     int map_dealloc_range;
+    int map_texture_atlas;
 
     GArray* chunk_list;
 
@@ -71,7 +86,7 @@ void map_server_init(struct map_server* map);
 void map_init(struct map_manager* map);
 void map_render_chunks(struct world* world, struct map_manager* map);
 void map_update_chunks(struct map_manager* map, struct world* world);
-void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_x, unsigned char* chunk_data);
+void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_x, enum block_type* chunk_data);
 void map_color_to_rgb(unsigned char color_id, vec3 output);
 
 void map_client_clear(struct map_manager* map);

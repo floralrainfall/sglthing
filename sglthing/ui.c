@@ -574,13 +574,14 @@ void ui_font2_render(struct ui_data* ui, struct ui_font2* font)
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     for(unsigned char c; c < MAX_FONT_GLYPHS; c++)
     {
-        if(FT_Load_Char(font->face, c, FT_LOAD_RENDER))
+        if(FT_Load_Char(font->face, c, FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT))
         {
             printf("sglthing: cant load glyph %i\n", c);
             continue;
         }
-        
+
         struct ui_font2_chara* chara = &font->characters[c];
+        
         glGenTextures(1, &chara->texture);
         glBindTexture(GL_TEXTURE_2D, chara->texture);
         glTexImage2D(GL_TEXTURE_2D,

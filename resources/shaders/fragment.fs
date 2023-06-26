@@ -50,6 +50,9 @@ void main()
                     (fog_maxdist - fog_mindist);
     fog_factor = clamp(fog_factor, 0.0, 1.0);
 
+    if(out_color.a == 0)
+        discard;
+
     FragColor = mix(fog_color, out_color, fog_factor);
     old_color = mix(fog_color, old_color, fog_factor);
 

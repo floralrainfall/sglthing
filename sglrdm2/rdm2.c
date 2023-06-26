@@ -15,7 +15,7 @@ static void rdm_frame(struct world* world)
 #ifndef HEADLESS
         if(client_state.local_player && client_state.gamemode.started)
         {
-            world->gfx.fog_maxdist = client_state.map_manager->map_render_range * RENDER_CHUNK_SIZE * CUBE_SIZE;
+            world->gfx.fog_maxdist = client_state.map_manager->map_dealloc_range * RENDER_CHUNK_SIZE * CUBE_SIZE;
             world->gfx.fog_mindist = (float)(RENDER_CHUNK_SIZE * CUBE_SIZE)/2.f;
 
             vec3 player_move = {0};

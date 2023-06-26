@@ -31,6 +31,16 @@ void gamemode_init(struct gamemode_data* data, bool server)
 
 void gamemode_frame(struct gamemode_data* data, struct world* world)
 {
+    if(data->server && g_hash_table_size(world->server.players) == 0)
+    {
+        data->gamemode_end = world->time + 10.f;
+        return;
+    }    
+    if(!data->server && g_hash_table_size(world->client.players) == 0)
+    {
+        data->gamemode_end = world->time + 10.f;
+        return;
+    }    
     profiler_event("gamemode_frame");
     data->network_time = data->server ? world->server.distributed_time : world->client.distributed_time;
     if(data->started)
@@ -41,6 +51,7 @@ void gamemode_frame(struct gamemode_data* data, struct world* world)
     {
         if(data->gamemode_end < data->network_time)
         {
+
             data->started = true;
             data->gamemode_end = data->network_time + 1740.f; 
 

@@ -130,18 +130,21 @@ struct http_user http_get_userdata(struct http_client* client, char* key)
         return user;
     }
 
-    user.found = true;
 
     struct json_object* juser = json_tokener_parse(result);
-    strncpy(user.user_username, json_object_get_string(
-        json_object_object_get(juser, "user_username")
-    ), 64);
-    user.money = json_object_get_int(
-        json_object_object_get(juser, "user_coins")
-    );
-    user.user_id = json_object_get_int(
-        json_object_object_get(juser, "id")
-    );
+    if(juser)
+    {
+        strncpy(user.user_username, json_object_get_string(
+            json_object_object_get(juser, "user_username")
+        ), 64);
+        user.money = json_object_get_int(
+            json_object_object_get(juser, "user_coins")
+        );
+        user.user_id = json_object_get_int(
+            json_object_object_get(juser, "id")
+        );
+        user.found = true;
+    }
 
     free(result);
     
@@ -159,29 +162,31 @@ void http_get_servers(struct http_client* client, char* game_name, GArray* serve
         return;
     }
     struct json_object* jobj = json_tokener_parse(_server_list);
-    int obj_len = json_object_array_length(jobj);
     g_array_remove_range(servers_out, 0, servers_out->len);
-    for(int i = 0; i < obj_len; i++)
+    if(jobj)
     {
-        struct http_server server;
-        struct json_object* jserver = json_object_array_get_idx(jobj, i);
+        int obj_len = json_object_array_length(jobj);
+        for(int i = 0; i < obj_len; i++)
+        {
+            struct http_server server;
+            struct json_object* jserver = json_object_array_get_idx(jobj, i);
 
-        strncpy(server.ip, json_object_get_string(
-            json_object_object_get(jserver, "server_ip")
-        ), 64);
-        strncpy(server.name, json_object_get_string(
-            json_object_object_get(jserver, "server_name")
-        ), 64);
-        strncpy(server.desc, json_object_get_string(
-            json_object_object_get(jserver, "server_desc")
-        ), 128);
-        server.port = json_object_get_int(
-            json_object_object_get(jserver, "server_port")
-        );
+            strncpy(server.ip, json_object_get_string(
+                json_object_object_get(jserver, "server_ip")
+            ), 64);
+            strncpy(server.name, json_object_get_string(
+                json_object_object_get(jserver, "server_name")
+            ), 64);
+            strncpy(server.desc, json_object_get_string(
+                json_object_object_get(jserver, "server_desc")
+            ), 128);
+            server.port = json_object_get_int(
+                json_object_object_get(jserver, "server_port")
+            );
 
-        g_array_append_val(servers_out, server);
+            g_array_append_val(servers_out, server);
+        }
     }
-    json_tokener_free(jobj);
     free(_server_list);
 }
 

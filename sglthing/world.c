@@ -289,8 +289,8 @@ struct world* world_init(char** argv, int argc, void* p)
     if(strcmp(net_mode,"server")==0)
     {
 #ifndef HEADLESS
-        char v_name[32];
-        snprintf(v_name,32,"sglthing-" GIT_BRANCH " r%i DEDICATED SERVER",GIT_COMMIT_COUNT);
+        char v_name[64];
+        snprintf(v_name,64,"sglthing-" GIT_BRANCH " r%i DEDICATED SERVER",GIT_COMMIT_COUNT);
         glfwSetWindowTitle(world->gfx.window, v_name);
 #endif
         network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
@@ -707,8 +707,8 @@ void world_frame(struct world* world)
     }
 
     world->ui->persist = true;
-    char sglthing_v_name[32];
-    snprintf(sglthing_v_name,32,"sglthing-" GIT_BRANCH " r%i (%.2f fps)", GIT_COMMIT_COUNT, world->fps);
+    char sglthing_v_name[64];
+    snprintf(sglthing_v_name,64,"sglthing-" GIT_BRANCH " r%i (%.2f fps)", GIT_COMMIT_COUNT, world->fps);
     ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, sglthing_v_name, 15.f);
     world->ui->persist = false;
 
