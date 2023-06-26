@@ -636,6 +636,7 @@ struct ui_font2* ui_load_font2(struct ui_data* ui, char* file, int font_w, int f
 
 void ui_font2_text(struct ui_data* ui, float position_x, float position_y, struct ui_font2* font, char* text, float depth)
 {
+    return;
     #ifndef HEADLESS
     profiler_event("ui_font2_text");
     glUseProgram(ui->ui_ttf_program);

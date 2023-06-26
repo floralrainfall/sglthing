@@ -501,6 +501,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
             }
             return false;
 #ifndef HEADLESS
+#ifdef SOUND_ENABLED
         case RDM_PACKET_REPLICATE_SOUND:
             if(network->mode == NETWORKMODE_CLIENT)
             {
@@ -515,6 +516,7 @@ static bool net_receive_packet(struct network* network, struct network_client* c
                 else
                     printf("rdm2[%s]: RDM_PACKET_REPLICATE_SOUND on non existent song (%s)\n", net_name_manager(network), packet_data->replicate_sound.sound_name);
             }
+#endif
             return false;
 #endif
         case RDM_PACKET_PLAYER_DEATH:

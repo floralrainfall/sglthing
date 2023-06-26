@@ -130,18 +130,21 @@ struct http_user http_get_userdata(struct http_client* client, char* key)
         return user;
     }
 
-    user.found = true;
+    user.found = false;
 
     struct json_object* juser = json_tokener_parse(result);
-    strncpy(user.user_username, json_object_get_string(
-        json_object_object_get(juser, "user_username")
-    ), 64);
-    user.money = json_object_get_int(
-        json_object_object_get(juser, "user_coins")
-    );
-    user.user_id = json_object_get_int(
-        json_object_object_get(juser, "id")
-    );
+    if(juser) {
+        strncpy(user.user_username, json_object_get_string(
+            json_object_object_get(juser, "user_username")
+        ), 64);
+        user.money = json_object_get_int(
+            json_object_object_get(juser, "user_coins")
+        );
+        user.user_id = json_object_get_int(
+            json_object_object_get(juser, "id")
+        );
+        user.found = true;
+    }
 
     free(result);
     

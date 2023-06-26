@@ -5,7 +5,20 @@
 #include "script.h"
 #endif 
 #include <glib.h>
-#include "sockets.h"
+
+#ifdef _WIN32
+  #ifndef _WIN32_WINNT
+    #define _WIN32_WINNT 0x0501
+  #endif
+  #include <winsock2.h>
+  #include <Ws2tcpip.h>
+#else
+  #include <sys/socket.h>
+  #include <arpa/inet.h>
+  #include <netdb.h>
+  #include <unistd.h>
+#endif
+
 #include "http.h"
 #include <sqlite3.h> 
 #include "memory.h"
@@ -252,6 +265,7 @@ struct network {
     char server_motd[128];
     char server_name[64];
     char server_pass[64];
+    char game_id[16];
     char debugger_pass[64];
     char server_ip[64];
     int server_port;

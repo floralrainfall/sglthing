@@ -18,6 +18,14 @@
 #include "memory.h"
 #include "prof.h"
 
+#ifdef _WIN32
+  #ifdef _WIN32_WINNT
+    #define _WIN32_WINNT 0x0501
+  #endif
+  #include <winsock2.h>
+  #include <Ws2tcpip.h>
+#endif
+
 #ifndef SGLTHING_COMPILE
 #error "sglthing/sglthing.c should be compiled with SGLTHING_COMPILE"
 #endif
@@ -32,6 +40,7 @@ static void glerror(int error, const char* description)
     fprintf(stderr, "GLFW error %i: %s\n", error, description);
 }
 
+#ifdef ENABLE_SIGHANDLER
 static void sighandler(int sig)
 {
     printf("sglthing: received %s\n", strsignal(sig));
@@ -57,6 +66,7 @@ static void sighandler(int sig)
             break;
     }
 }
+#endif
 
 int main(int argc, char** argv)
 {
@@ -65,6 +75,11 @@ int main(int argc, char** argv)
     printf("%s\n",v_name);
     #ifndef HEADLESS
     GLFWwindow* window = NULL;
+
+#ifdef _WIN32
+    WSADATA wsa_data; // start up winsock
+    WSAStartup(MAKEWORD(1,1), &wsa_data);
+#endif
 
 #ifndef YES_WSL
     FILE* wsl_test = fopen("/proc/sys/fs/binfmt_misc/WSLInterop", "r");
@@ -92,11 +107,13 @@ int main(int argc, char** argv)
         return -2;    
     #endif
 
+#ifdef ENABLE_SIGHANDLER
     signal(SIGINT, sighandler);
     signal(SIGHUP, sighandler);
     signal(SIGTERM, sighandler);
     signal(SIGSEGV, sighandler);
-    
+#endif    
+
     #ifndef HEADLESS
     printf("sglthing: window created\n");
     #else
@@ -174,6 +191,8 @@ int main(int argc, char** argv)
 
     vec4 old_viewport;
     glfwGetFramebufferSize(window, &world->gfx.screen_width, &world->gfx.screen_height);
+    if(world->gfx.screen_width > 0 || world->gfx.screen_height > 0)
+         { world->gfx.screen_width = 640; world->gfx.screen_height = 480; }
     glm_vec4_copy(world->viewport, old_viewport);
     while(!glfwWindowShouldClose(window) && !should_close)
 #else
@@ -236,6 +255,11 @@ int main(int argc, char** argv)
     }
 
     world_deinit(world);
+
+#ifdef _WIN32
+    WSACleanup();
+#endif
+
 #ifndef HEADLESS
     glfwDestroyWindow(window);
     glfwTerminate();
