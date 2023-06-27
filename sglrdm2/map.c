@@ -30,7 +30,7 @@ struct __render_chunk
         } y[RENDER_CHUNK_SIZE_Y];
     } x[RENDER_CHUNK_SIZE];
 
-    unsigned int vbo;
+    struct graphic_bref bref;
 };
 
 static void __map_render_chunk_init(struct __render_chunk* chunk)
@@ -50,7 +50,8 @@ static void __map_render_chunk_init(struct __render_chunk* chunk)
                 chunk->x[x].y[y].z[z].obscure = 0;
                 chunk->x[x].y[y].z[z].blk_id = 0;
             }
-    sglc(glGenBuffers(1,&chunk->vbo));
+
+    graphic_bref_upload(&chunk->bref, &chunk->x, sizeof(chunk->x));
 }
 
 static void __map_render_chunk_update(struct __render_chunk* chunk)
@@ -125,9 +126,7 @@ static void __map_render_chunk_update(struct __render_chunk* chunk)
                 }
             }
     
-    sglc(glBindBuffer(GL_ARRAY_BUFFER,chunk->vbo));
-    sglc(glBufferData(GL_ARRAY_BUFFER,sizeof(chunk->x),&chunk->x,GL_STATIC_DRAW));
-    sglc(glBindBuffer(GL_ARRAY_BUFFER, 0)); 
+    graphic_bref_upload(&chunk->bref, &chunk->x, sizeof(chunk->x));
     profiler_end();
 }
 
@@ -172,14 +171,15 @@ void __map_render_chunk(struct world* world, struct map_manager* map, struct __r
     glm_mat4_identity(matrix);
     glm_translate(matrix, chunk_position);
 
-    sglc(glUseProgram(world->gfx.shadow_pass ? map->cube_program_light : map->cube_program));
+    int shader = world->gfx.shadow_pass ? map->cube_program_light : map->cube_program;
 
-    world_uniforms(world, map->cube_program, matrix);
+    sglc(glUseProgram(shader));
+
+    //world_uniforms(world, map->cube_program, matrix);
 
     struct mesh* cube_mesh = &map->cube->meshes[0];
-    model_bind_vbos(cube_mesh);
-
-    sglc(glBindBuffer(GL_ARRAY_BUFFER, chunk->vbo));
+    graphic_varray_bind(&cube_mesh->vertex_array);
+    graphic_bref_bind(&chunk->bref);
 
     sglc(glEnableVertexAttribArray(6));
     sglc(glVertexAttribPointer(6, 3, GL_FLOAT, GL_FALSE, sizeof(struct __render_chunk_block), (void*)0)); // vec3: offset
@@ -194,11 +194,9 @@ void __map_render_chunk(struct world* world, struct map_manager* map, struct __r
     sglc(glVertexAttribDivisor(8, 1));  
 
     if(world->gfx.shadow_pass)
-        sglc(glUniform1i(glGetUniformLocation(map->cube_program_light,"sel_map"), world->gfx.current_map));
-    sglc(glBindBuffer(GL_ARRAY_BUFFER, 0)); 
+        sglc(glUniform1i(glGetUniformLocation(shader,"sel_map"), world->gfx.current_map));
 
-    sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_mesh->element_buffer));
-    sglc(glDrawElementsInstanced(GL_TRIANGLES, cube_mesh->element_count, GL_UNSIGNED_INT, 0, RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE_Y*RENDER_CHUNK_SIZE));
+    graphic_render_varray_instanced(&cube_mesh->vertex_array, shader, matrix, RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE_Y*RENDER_CHUNK_SIZE);
 }
 
 void map_render_chunks(struct world* world, struct map_manager* map)
@@ -243,8 +241,7 @@ void map_update_chunks(struct map_manager* map, struct world* world)
 
         if(!pass)
         {
-            if(chunk->vbo)
-                sglc(glDeleteBuffers(1, &chunk->vbo));
+            graphic_bref_delete(&chunk->bref);
             free2(chunk);
             g_array_remove_index(map->chunk_list, i);
             i--;
@@ -309,7 +306,7 @@ void map_update_chunk(struct map_manager* map, int c_x, int c_y, int c_z, int d_
         _chunk->chunk_y = c_y;
         _chunk->chunk_z = c_z;
         _chunk->chunk_id = last_render_chunk_id++;
-        _chunk->vbo = 0;
+        graphic_bref_create(&_chunk->bref, SLOT_VERTEX_ARRAY);
         // printf("rdm2: creating new render chunk at %ix%ix%i\n", c_x, c_y, c_z);
         new_chunk = _chunk;
         __map_render_chunk_init(_chunk);

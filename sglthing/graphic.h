@@ -34,35 +34,16 @@ struct vertex_normal
 }
 #endif
 
-struct graphic_context
+enum render_type
 {
-    struct graphic_context* parent_context;
+    RT_ARRAYS,
+    RT_ELEMENTS,
 };
 
-enum uniform_type
+enum render_mode
 {
-    UT_INTEGER,
-    UT_FLOAT,
-    UT_VECTOR2,
-    UT_VECTOR2_INT,
-    UT_VECTOR3,
-    UT_VECTOR3_INT,
-    UT_VECTOR4,
-    UT_VECTOR4_INT,
-    UT_MATRIX4,    
-};
-
-struct graphic_context_uniform
-{
-    enum uniform_type type;
-    char uniform_name[64];
-};
-
-// Vertex Array
-struct graphic_varray
-{
-    GArray* v_entries;
-    int gl_vao_id;
+    RM_TRIANGLES,
+    RM_QUADS,
 };
 
 enum bref_slot
@@ -78,6 +59,19 @@ struct graphic_bref
     int buff_len;
     int gl_buff_id;
     enum bref_slot slot;
+};
+
+// Vertex Array
+struct graphic_varray
+{
+    GArray* v_entries;
+    int gl_vao_id;
+    int gl_count;
+    enum render_type render_type;
+    enum render_mode render_mode;
+
+    struct graphic_bref* bref_array;
+    struct graphic_bref* bref_elements;
 };
 
 enum data_type
@@ -97,8 +91,40 @@ struct graphic_varray_entry
     enum data_type type;
 };
 
+struct graphic_context
+{
+    struct graphic_context* parent_context;
+
+    struct {
+        mat4 view;
+        mat4 projection;
+        mat4 lsm;
+        mat4 lsm_far;
+        vec3 position;
+    } cam;
+    struct {
+        float fog_maxdist;
+        float fog_mindist;
+        vec4 fog_color;
+        vec4 viewport;
+        vec3 sun_direction;
+        vec3 sun_position;
+        vec3 diffuse;
+        vec3 ambient;
+        vec3 specular;
+        int depth_map_texture;
+        int depth_map_texture_far;
+        int banding_effect;
+        int current_map;
+        int lighting_shader;
+        bool shadow_pass;
+    } gfx;
+
+    float time;
+};
+
 // create vertex array
-void graphic_varray_create(struct graphic_varray* varray_out);
+void graphic_varray_create(struct graphic_varray* varray_out, enum render_type render_type);
 // bind vertex array to hw
 void graphic_varray_bind(struct graphic_varray* varray);
 // add entry to vertex array
@@ -116,7 +142,28 @@ void graphic_bref_upload(struct graphic_bref* bref, void* data, int data_len);
 void graphic_bref_delete(struct graphic_bref* bref_out);
 
 // render vertex array
-void graphic_render_varray(struct graphic_varray* varray, int shader);
+void graphic_render_varray(struct graphic_varray* varray, int shader, mat4 model);
+// render vertex array (using instancing)
+void graphic_render_varray_instanced(struct graphic_varray* varray, int shader, mat4 model, int instances);
+
+enum texture_type
+{
+    TT_DIFFUSE,
+    TT_SPECULAR,
+};
+// bind texture to hw
+void graphic_texture_bind(int shader, enum texture_type type, int slot, int id);
+
+// push new empty context to the graphic context stack
+void graphic_context_push();
+// push a copy of empty context
+void graphic_context_push_copy();
+// get the reference to the current context
+struct graphic_context* graphic_context_current();
+// upload all context variables to shader
+void graphic_context_upload(struct graphic_context* context, int shader);
+// pop latest context on the graphic context stack
+void graphic_context_pop();
 
 #define ASSIMP_TO_GLM(a,g)                                                                                                                                                                                            \
     g[0][0] = a.a1; g[0][1] = a.b1; g[0][2] = a.c1; g[0][3] = a.d1; \

@@ -2,6 +2,7 @@
 #define MODEL_H
 #include <cglm/cglm.h>
 #include "memory.h"
+#include "graphic.h"
 
 #define MAX_BONE_WEIGHTS 4
 void load_model(char* file);
@@ -30,10 +31,16 @@ struct mesh
     struct model_vertex* vtx_data;
     int* idx_data;
     int vtx_data_count;
+    mat4 offset_matrix;
 
-    int vertex_array;
-    int element_buffer;
-    int vertex_buffer;
+    // int vertex_array;
+    // int element_buffer;
+    // int vertex_buffer;
+
+    struct graphic_varray vertex_array;
+    struct graphic_bref vertex_buffer;
+    struct graphic_bref element_buffer;
+
     int element_count;
     
     int diffuse_texture[3];
@@ -61,7 +68,6 @@ struct model
 };
 
 void model_find_bone_info(struct mesh* mesh, char* name, struct model_bone_info* info_out);
-int model_vao();
-void model_bind_vbos(struct mesh* mesh);
+void graphic_render_model(struct model* model, int shader, mat4 model_matrix);
 
 #endif

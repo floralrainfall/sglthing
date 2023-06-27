@@ -70,7 +70,6 @@ struct map_manager
     int chunk_limit;
 };
 
-
 struct map_server
 {
     struct 

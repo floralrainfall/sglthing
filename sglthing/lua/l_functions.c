@@ -151,7 +151,7 @@ static int l_gl_render_model(lua_State* l)
     struct model* model = l_get_model(l, 2);
     struct __matrix_data* mat = (struct __matrix_data*)lua_topointer(l, 3);
     int shader = lua_tointeger(l, 4);
-    world_draw_model(world, model, shader, mat->data, true);
+    //world_draw_model(world, model, shader, mat->data, true);
     return 0;
 }
 

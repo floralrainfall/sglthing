@@ -748,21 +748,10 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
     if(player->health == 0)
         glm_rotate_x(player_rotated_matrix, 1.f, player_rotated_matrix);
 
+    int shader = world->gfx.shadow_pass ? world->gfx.lighting_shader : client_state.object_shader;
+
     if(client->player_id != client_state.local_player_id || world->gfx.shadow_pass)
-    {
-        if(client_state.client_stencil)
-        {
-            vec4* team_color = &team_colors[player->team];
-            glm_scale(player_rotated_matrix, (vec3){1.1f,1.1f,1.1f});
-            glUniform4fv(glGetUniformLocation(client_state.stencil_shader,"stencil_color"), 1, *team_color);
-            glGetError(); // pop possible error
-            world_draw_model(world, client_state.rdm_guy, client_state.stencil_shader, player_rotated_matrix, true);            
-        }
-        else
-        {
-            world_draw_model(world, client_state.rdm_guy, client_state.object_shader, player_rotated_matrix, true);
-        }
-    }
+        graphic_render_model(client_state.rdm_guy, shader, player_rotated_matrix);
     struct model* weapon_model = client_state.weapons[player->active_weapon_type];
     if(weapon_model)
     {
@@ -772,27 +761,16 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
         glm_quat_rotate(weapon_matrix, player->direction, weapon_matrix);
         glm_translate(weapon_matrix, (vec3){-0.3f,0.5f,0.1f});
 
-        if(client_state.client_stencil)
+        if(!world->gfx.shadow_pass && player->active_weapon_type == WEAPON_BLOCK)
         {
-            vec4* team_color = &team_colors[player->team];
-            glm_scale(weapon_matrix, (vec3){1.1f,1.1f,1.1f});
-            glUniform4fv(glGetUniformLocation(client_state.stencil_shader,"stencil_color"), 1, *team_color);
-            glGetError(); // pop possible error
-            world_draw_model(world, weapon_model, client_state.stencil_shader, weapon_matrix, true);            
+            vec3 block_color;
+            map_color_to_rgb(player->weapon_block_color, block_color);
+            sglc(glUseProgram(client_state.object_shader));
+            sglc(glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), block_color[0], block_color[1], block_color[2], 1.0f));
         }
-        else
-        {
-            if(!world->gfx.shadow_pass && player->active_weapon_type == WEAPON_BLOCK)
-            {
-                vec3 block_color;
-                map_color_to_rgb(player->weapon_block_color, block_color);
-                sglc(glUseProgram(client_state.object_shader));
-                sglc(glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), block_color[0], block_color[1], block_color[2], 1.0f));
-            }
-            world_draw_model(world, weapon_model, client_state.object_shader, weapon_matrix, true);
-            if(!world->gfx.shadow_pass)
-                sglc(glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), 1.0f, 1.0f, 1.0f, 1.0f));
-        }
+        graphic_render_model(weapon_model, shader, weapon_matrix);
+        if(!world->gfx.shadow_pass)
+            sglc(glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), 1.0f, 1.0f, 1.0f, 1.0f));
     }
 
     if(world->time - client->last_voice_packet < 0.1f)
@@ -804,7 +782,7 @@ static void __player_render(gpointer key, gpointer value, gpointer user_data)
         glm_scale(vc_bubble_mat, (vec3){0.5f,0.5f,0.5f});
         glm_rotate_y(vc_bubble_mat, world->time, vc_bubble_mat);
         glm_translate_x(vc_bubble_mat, 0.7f);
-        world_draw_model(world, client_state.vc_bubble, client_state.object_shader, vc_bubble_mat, true);
+        //world_draw_model(world, client_state.vc_bubble, client_state.object_shader, vc_bubble_mat, true);
     }
 #endif
 }
@@ -823,7 +801,9 @@ static void rdm_frame_render(struct world* world)
 
         glm_translate_y(skybox_mat, 0.2);
         glm_scale(skybox_mat, (vec3){15.f,1.f,15.f});
-        world_draw_model(world, client_state.cloud_layer, client_state.cloud_layer_shader, skybox_mat, true);
+        //world_draw_model(world, client_state.cloud_layer, client_state.cloud_layer_shader, skybox_mat, true);
+
+        graphic_render_varray(&client_state.cloud_layer->meshes[0].vertex_array, client_state.cloud_layer_shader, skybox_mat);
 
         sglc(glDepthMask(GL_LESS));  
     }
@@ -834,7 +814,7 @@ static void rdm_frame_render(struct world* world)
         glm_mat4_identity(menu_player_mat);
         glm_translate(menu_player_mat, (vec3){2.5f, 0.f, -1.0f});
         glm_rotate_y(menu_player_mat, world->time / 2.f, menu_player_mat);
-        world_draw_model(world, client_state.rdm_guy, client_state.object_shader, menu_player_mat, true);
+        //world_draw_model(world, client_state.rdm_guy, client_state.object_shader, menu_player_mat, true);
     }
 
     // mat4 test_cube;
@@ -869,7 +849,7 @@ static void rdm_frame_render(struct world* world)
                 map_color_to_rgb(client_state.local_player->weapon_block_color, block_color);
                 glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), block_color[0], block_color[1], block_color[2], fabsf(sinf(world->time*5.f)));
             }
-            world_draw_model(world, client_state.map_manager->cube, client_state.object_shader, block_selection_matrix, false);
+            //world_draw_model(world, client_state.map_manager->cube, client_state.object_shader, block_selection_matrix, false);
             glUniform4f(glGetUniformLocation(client_state.object_shader,"color"), 1.f, 1.f, 1.f, 1.f);
         }
     }

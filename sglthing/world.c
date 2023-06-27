@@ -347,8 +347,8 @@ void world_frame_light_pass(struct world* world, float quality, int framebuffer,
 {
     #ifndef HEADLESS
     profiler_event("world_frame_light_pass");
+    struct graphic_context* curr_context = graphic_context_current();
     glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Light Pass");
-    world->gfx.shadow_pass = true;
 
     sglc(glViewport(0,0,framebuffer_x,framebuffer_y));
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, framebuffer));
@@ -358,8 +358,6 @@ void world_frame_light_pass(struct world* world, float quality, int framebuffer,
     sglc(glCullFace(GL_BACK));
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     sglc(glViewport(0,0,world->viewport[2],world->viewport[3]));
-    
-    world->gfx.shadow_pass = false;
     glPopDebugGroupKHR();   
     profiler_end();
     #endif
@@ -512,14 +510,50 @@ void world_frame(struct world* world)
         glm_mat4_mul(light_projection_far, light_view_far, world->gfx.light_space_matrix_far);
     }
 
+    graphic_context_push();
+    struct graphic_context* curr_context = graphic_context_current();
+    glm_mat4_copy(world->v, curr_context->cam.view);
+    glm_mat4_copy(world->p, curr_context->cam.projection);
+    glm_mat4_copy(world->gfx.light_space_matrix, curr_context->cam.lsm);
+    glm_mat4_copy(world->gfx.light_space_matrix_far, curr_context->cam.lsm_far);
+    glm_vec3_copy(world->cam.position, curr_context->cam.position);
+
+    curr_context->gfx.fog_maxdist = world->gfx.fog_maxdist;
+    curr_context->gfx.fog_mindist = world->gfx.fog_mindist;
+
+    glm_vec4_copy(world->gfx.fog_color, curr_context->gfx.fog_color);
+    glm_vec4_copy(world->viewport, curr_context->gfx.viewport);
+    glm_vec3_copy(world->gfx.sun_direction, curr_context->gfx.sun_direction);
+    glm_vec3_copy(world->gfx.sun_position, curr_context->gfx.sun_position);
+    glm_vec3_copy(world->gfx.diffuse, curr_context->gfx.diffuse);
+    glm_vec3_copy(world->gfx.ambient, curr_context->gfx.ambient);
+    glm_vec3_copy(world->gfx.specular, curr_context->gfx.specular);
+
+    curr_context->gfx.depth_map_texture = world->gfx.depth_map_texture;
+    curr_context->gfx.depth_map_texture_far = world->gfx.depth_map_texture_far;
+    curr_context->gfx.banding_effect = world->gfx.banding_effect;
+    curr_context->gfx.current_map = world->gfx.current_map;
+    curr_context->gfx.lighting_shader = world->gfx.lighting_shader;
+    curr_context->gfx.shadow_pass = world->gfx.shadow_pass;
+
+    curr_context->time = world->time;
+
     if(world->client.status == NETWORKSTATUS_CONNECTED && !world->assets_downloading || world->state == WORLD_STATE_MAINMENU)
     {
         if(world->gfx.enable_sun)
         {
+            graphic_context_push_copy();
+            struct graphic_context* curr_context = graphic_context_current();
+            world->gfx.shadow_pass = true;
+            curr_context->gfx.shadow_pass = true;
             world->gfx.current_map = 0;
+            curr_context->gfx.current_map = 0;
             world_frame_light_pass(world,15.f,world->gfx.depth_map_fbo,SHADOW_WIDTH,SHADOW_HEIGHT);
             world->gfx.current_map = 1;
+            curr_context->gfx.current_map = 1;
             world_frame_light_pass(world,50.f,world->gfx.depth_map_fbo_far,SHADOW_WIDTH,SHADOW_HEIGHT);
+            graphic_context_pop();
+            world->gfx.shadow_pass = false;
         }
 
     #ifdef FBO_ENABLED
@@ -732,6 +766,8 @@ void world_frame(struct world* world)
         free(pixels);
     }
 #endif
+
+    graphic_context_pop();
 
     if(!world->frames)
         printf("sglthing: frame 1 done\n");
