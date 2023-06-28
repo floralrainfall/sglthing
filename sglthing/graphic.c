@@ -4,13 +4,14 @@
 static struct graphic_context* current_context = 0;
 
 #define __gl_check_error() __gl_check_error2(__FILE__, __LINE__);
-static void __gl_check_error2(char* file, int line)
+static int __gl_check_error2(char* file, int line)
 {
     int error = glGetError();
     if(error)
     {
         printf("sglthing: gl error %04x (%s:%i)\n", error, file, line);
     }
+    return error;
 }
 
 static int __gl_slot_to_target(enum bref_slot slot)
@@ -25,6 +26,11 @@ static int __gl_slot_to_target(enum bref_slot slot)
             break;
     }
     return slot; // if its not a known value then the program has probably passed in its own hw specific value
+}
+
+static void __gl_clear_error()
+{
+    while(glGetError()!=0);
 }
 
 void graphic_varray_create(struct graphic_varray* varray_out, enum render_type render_type)
@@ -76,13 +82,15 @@ void graphic_varray_upload(struct graphic_varray* varray)
                 break;
         }
 
-        printf("sglthing: bound %i (e: %i) %i s: %i S: %i to buf %p\n", entry.layout_id, entry.buff_array_len, gl_type, entry.buff_array_size, entry.buff_array_stride, entry.buff);
+        printf("sglthing: varray bound %i (e: %i) %i s: %i S: %i to buf %p\n", entry.layout_id, entry.buff_array_len, gl_type, entry.buff_array_size, entry.buff_array_stride, entry.buff);
 
         sglc(glVertexAttribPointer(entry.layout_id, entry.buff_array_len, gl_type, GL_FALSE, entry.buff_array_size, (void*)entry.buff_array_stride));
         __gl_check_error();
         sglc(glEnableVertexAttribArray(entry.layout_id));
         __gl_check_error();
     }
+
+    printf("sglthing: varray uploaded (vbuf: %p, ebuf: %p)\n", varray->bref_array, varray->bref_elements);
 }
 
 void graphic_bref_create(struct graphic_bref* bref_out, enum bref_slot slot)
@@ -135,13 +143,12 @@ void graphic_render_varray(struct graphic_varray* varray, int shader, mat4 model
 
     glUseProgram(shader);
 
-    if(graphic_context_current())
-    {
-        graphic_context_upload(graphic_context_current(), shader);
-    }
-    glUniformMatrix4fv(glGetUniformLocation(shader,"model"), 1, GL_FALSE, model[0]);
-
     __gl_check_error();
+
+    if(graphic_context_current())
+        graphic_context_upload(graphic_context_current(), shader);
+    glUniformMatrix4fv(glGetUniformLocation(shader,"model"), 1, GL_FALSE, model[0]);
+    __gl_clear_error();
 
     int render_mode = 0;
     switch(varray->render_mode)
@@ -182,8 +189,7 @@ void graphic_render_varray_instanced(struct graphic_varray* varray, int shader, 
         graphic_context_upload(graphic_context_current(), shader);
     }
     glUniformMatrix4fv(glGetUniformLocation(shader,"model"), 1, GL_FALSE, model[0]);
-
-    __gl_check_error();
+    __gl_clear_error();
 
     int render_mode = 0;
     switch(varray->render_mode)
@@ -268,7 +274,7 @@ void graphic_context_upload(struct graphic_context* context, int shader_program)
     glBindTexture(GL_TEXTURE_2D, context->gfx.depth_map_texture_far);
     glUniform1i(glGetUniformLocation(shader_program,"depth_map_far"), 8);
 
-    while(glGetError()!=0);
+    __gl_clear_error();
 }
 
 void graphic_texture_bind(int shader, enum texture_type type, int slot, int id)
@@ -282,4 +288,81 @@ void graphic_texture_bind(int shader, enum texture_type type, int slot, int id)
     glActiveTexture(GL_TEXTURE0 + slot);
     glBindTexture(GL_TEXTURE_2D, id);
     glUniform1i(glGetUniformLocation(shader,text_uniform), slot);
+    
+    __gl_clear_error();
+}
+
+void graphic_framebuffer_create(struct graphic_framebuffer* framebuffer, enum framebuffer_type type, int resolution_x, int resolution_y)
+{
+    framebuffer->type = type;
+    framebuffer->gfx_init = true;
+    framebuffer->clear = true;
+    framebuffer->resolution_x = resolution_x;
+    framebuffer->resolution_y = resolution_y;
+    
+    glGenFramebuffers(1, &framebuffer->gl_framebuffer_id);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->gl_framebuffer_id);
+
+    glGenTextures(1, &framebuffer->texture);
+    glBindTexture(GL_TEXTURE_2D, framebuffer->texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA4, resolution_x, resolution_y, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuffer->texture, 0);
+
+    glGenTextures(1, &framebuffer->texture_depth);
+    glBindTexture(GL_TEXTURE_2D, framebuffer->texture_depth);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, resolution_x, resolution_y, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, framebuffer->texture_depth, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    __gl_check_error();
+}
+
+void graphic_framebuffer_bind(struct graphic_framebuffer* framebuffer)
+{
+    int gl_framebuffer_type = 0;
+    switch(framebuffer->type)
+    {
+        case FBT_NORMAL:
+            gl_framebuffer_type = GL_FRAMEBUFFER;
+    }
+
+    glBindFramebuffer(gl_framebuffer_type, framebuffer->gl_framebuffer_id);
+
+    if(framebuffer->gfx_init)
+    {
+        sglc(glEnable(GL_DEPTH_TEST));
+        sglc(glDepthMask(GL_TRUE));   
+        sglc(glViewport(0, 0, framebuffer->resolution_x, framebuffer->resolution_y)); 
+    }
+
+    if(framebuffer->clear)
+    {
+        sglc(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
+    }
+}
+
+void graphic_framebuffer_unbind(struct graphic_framebuffer* framebuffer)
+{
+    int gl_framebuffer_type = 0;
+    switch(framebuffer->type)
+    {
+        case FBT_NORMAL:
+            gl_framebuffer_type = GL_FRAMEBUFFER;
+    }
+
+    if(framebuffer->gfx_init)
+    {
+        sglc(glViewport(0, 0, current_context->gfx.viewport[2], current_context->gfx.viewport[3]));    
+    }
+
+    glBindFramebuffer(gl_framebuffer_type, 0);
 }

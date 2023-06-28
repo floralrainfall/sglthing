@@ -2,7 +2,7 @@
 #define MAP_H
 
 #define RENDER_CHUNK_SIZE 8
-#define RENDER_CHUNK_SIZE_Y 8
+#define RENDER_CHUNK_SIZE_Y 16
 #define MAP_SIZE 14
 #define CUBE_SIZE 1
 // [0-3],[0-3],[0-3]

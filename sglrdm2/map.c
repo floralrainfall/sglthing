@@ -50,14 +50,10 @@ static void __map_render_chunk_init(struct __render_chunk* chunk)
                 chunk->x[x].y[y].z[z].obscure = 0;
                 chunk->x[x].y[y].z[z].blk_id = 0;
             }
-
-    graphic_bref_upload(&chunk->bref, &chunk->x, sizeof(chunk->x));
 }
 
 static void __map_render_chunk_update(struct __render_chunk* chunk)
 {
-    profiler_event("__map_render_chunk_update");
-
     for(int x = 0; x < RENDER_CHUNK_SIZE; x++)
         for(int y = 0; y < RENDER_CHUNK_SIZE_Y; y++)
             for(int z = 0; z < RENDER_CHUNK_SIZE; z++)
@@ -76,58 +72,81 @@ static void __map_render_chunk_update(struct __render_chunk* chunk)
                     {
                         test_block = &chunk->x[x].y[y+1].z[z];
                         if(test_block->air)
+                        {
                             not_obscured = true;
+                        }
                     }
                     else
+                    {
                         not_obscured = true;
+                    }
                     if(x != RENDER_CHUNK_SIZE - 1)
                     {
                         test_block = &chunk->x[x+1].y[y].z[z];
                         if(test_block->air)
+                        {
                             not_obscured = true;
+                        }
                     }
                     else
+                    {
                         not_obscured = true;
+                    }
                     if(z != RENDER_CHUNK_SIZE - 1)
                     {
                         test_block = &chunk->x[x].y[y].z[z+1];
                         if(test_block->air)
+                        {
                             not_obscured = true;
+                        }
                     }
                     else
+                    {
                         not_obscured = true;
+                    }
 
                     if(y != 0)
                     {
                         test_block = &chunk->x[x].y[y-1].z[z];
                         if(test_block->air)
+                        {
                             not_obscured = true;
+                        }
                     }
                     else
+                    {
                         not_obscured = true;
+                    }
                     if(x != 0)
                     {
                         test_block = &chunk->x[x-1].y[y].z[z];
                         if(test_block->air)
+                        {
                             not_obscured = true;
+                        }
                     }
                     else
+                    {
                         not_obscured = true;
+                    }
                     if(z != 0)
                     {
                         test_block = &chunk->x[x].y[y].z[z-1];
                         if(test_block->air)
+                        {
                             not_obscured = true;
+                        }
                     }
                     else
+                    {
                         not_obscured = true;
+                    }
                     
                     block->obscure = not_obscured;
                 }
             }
-    
+
     graphic_bref_upload(&chunk->bref, &chunk->x, sizeof(chunk->x));
-    profiler_end();
 }
 
 static struct __render_chunk* __map_chunk_position(struct map_manager* map, int c_x, int c_y, int c_z)
@@ -192,7 +211,6 @@ void __map_render_chunk(struct world* world, struct map_manager* map, struct __r
     sglc(glEnableVertexAttribArray(8));
     sglc(glVertexAttribPointer(8, 1, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(struct __render_chunk_block), (void*)(offsetof(struct __render_chunk_block,blk_id)))); // char[3]: color
     sglc(glVertexAttribDivisor(8, 1));  
-
     if(world->gfx.shadow_pass)
         sglc(glUniform1i(glGetUniformLocation(shader,"sel_map"), world->gfx.current_map));
 

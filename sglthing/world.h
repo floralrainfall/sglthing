@@ -150,6 +150,8 @@ struct world {
 
     bool debug_mode;
     bool profiler_on;
+
+    GTimer* perf_timer;
 };
 
 #ifndef HEADLESS

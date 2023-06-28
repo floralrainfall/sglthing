@@ -251,6 +251,10 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
 
         graphic_varray_create(&model->meshes[model->mesh_count].vertex_array, RT_ELEMENTS);
 
+        model->meshes[model->mesh_count].vertex_array.bref_array = &model->meshes[model->mesh_count].vertex_buffer;
+        model->meshes[model->mesh_count].vertex_array.bref_elements = &model->meshes[model->mesh_count].element_buffer;
+        model->meshes[model->mesh_count].vertex_array.gl_count = idx_count;
+
         graphic_bref_create(&model->meshes[model->mesh_count].vertex_buffer, SLOT_VERTEX_ARRAY);
         graphic_bref_create(&model->meshes[model->mesh_count].element_buffer, SLOT_ELEMENT_ARRAY);
 
@@ -306,10 +310,6 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
             .type = DT_FLOAT,
         });
         graphic_varray_upload(&model->meshes[model->mesh_count].vertex_array);
-
-        model->meshes[model->mesh_count].vertex_array.bref_array = &model->meshes[model->mesh_count].vertex_buffer;
-        model->meshes[model->mesh_count].vertex_array.bref_elements = &model->meshes[model->mesh_count].element_buffer;
-        model->meshes[model->mesh_count].vertex_array.gl_count = idx_count;
 
         //int new_mesh = create_model_vao(vtx_array, vtx_count, idx_array, idx_count, &vertex_buffer, &element_buffer);
 

@@ -165,6 +165,30 @@ void graphic_context_upload(struct graphic_context* context, int shader);
 // pop latest context on the graphic context stack
 void graphic_context_pop();
 
+enum framebuffer_type
+{
+    FBT_DRAW,
+    FBT_READ,
+    FBT_NORMAL,
+};
+
+struct graphic_framebuffer
+{
+    int gl_framebuffer_id;
+    int texture;
+    int texture_depth;
+    int resolution_x;
+    int resolution_y;
+    enum framebuffer_type type;
+    bool gfx_init;
+    bool clear;
+};
+
+// create a framebuffer and its texture
+void graphic_framebuffer_create(struct graphic_framebuffer* framebuffer, enum framebuffer_type type, int resolution_x, int resolution_y);
+void graphic_framebuffer_bind(struct graphic_framebuffer* framebuffer);
+void graphic_framebuffer_unbind(struct graphic_framebuffer* framebuffer);
+
 #define ASSIMP_TO_GLM(a,g)                                                                                                                                                                                            \
     g[0][0] = a.a1; g[0][1] = a.b1; g[0][2] = a.c1; g[0][3] = a.d1; \
     g[1][0] = a.a2; g[1][1] = a.b2; g[1][2] = a.c2; g[1][3] = a.d2; \

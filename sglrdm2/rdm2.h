@@ -12,6 +12,8 @@ void sglthing_init_api(struct world* world);
 
 struct rdm2_state
 {
+    struct graphic_framebuffer ui_framebuffer;
+
     struct model* cloud_layer;
     struct model* sun;
     struct model* rdm_guy;
