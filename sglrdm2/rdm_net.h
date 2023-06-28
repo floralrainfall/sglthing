@@ -65,7 +65,7 @@ union rdm_packet_data
         int chunk_data_x;
         
         struct {
-            char chunk_data[RENDER_CHUNK_SIZE]; // z
+            enum block_type chunk_data[RENDER_CHUNK_SIZE]; // z
         } chunk_data[RENDER_CHUNK_SIZE_Y]; // y
     } update_chunk;
     struct

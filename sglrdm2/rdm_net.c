@@ -110,7 +110,7 @@ void net_send_chunk(struct network* network, struct network_client* client, int 
         _data->update_chunk.chunk_z = c_z;        
         _data->update_chunk.chunk_data_x = x;
 
-        memcpy(_data->update_chunk.chunk_data, chunk->x[x].y, RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE_Y);
+        memcpy(_data->update_chunk.chunk_data, chunk->x[x].y, RENDER_CHUNK_SIZE*RENDER_CHUNK_SIZE_Y*sizeof(enum block_type));
 
         g_array_append_val(server_state.chunk_packets_pending, pending);
         //network_transmit_packet(network, client, _pak);

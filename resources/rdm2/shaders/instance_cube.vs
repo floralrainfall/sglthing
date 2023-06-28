@@ -13,8 +13,8 @@ layout(location=4) in ivec4 v_bone_ids;
 layout(location=5) in vec4 v_weights;
 
 layout(location=6) in vec3 v_offset;
-layout(location=7) in int v_obscure;
-layout(location=8) in vec3 v_color_c;
+layout(location=7) in float v_obscure;
+layout(location=8) in float v_block_id;
 
 out vec3 f_pos;
 out vec3 f_m_pos;
@@ -28,12 +28,14 @@ out float f_affine;
 float near = 0.1; 
 float far  = 1000.0; 
 
+// uv size of cube is 3.125% in both directions assuming the image is 512x512
+
 void main()
 {
     vec4 position_model = (model * (vec4(v_pos + v_offset, 1.0)));
 
     f_normal = v_normal;
-    f_color = vec4(v_color_c,1.0);
+    f_color = vec4(1.0);
     //f_color = vec4(v_color_id/255.0,v_color_id/255.0,v_color_id/255.0,1.0);
     f_pos = position_model.xyz;
     f_pos_light = lsm * vec4(f_pos, 1.0);
@@ -48,6 +50,15 @@ void main()
     vec4 vertex_view = view * model * vec4(v_pos, 1.0);
     float dist = length(vertex_view);
     float affine = dist + ((gl_Position.w * 8.0) / dist) * 0.25;
-    f_uv = v_uv * affine;
+
+    int i_block_id = int(floor(v_block_id));
+    float spr_x = i_block_id % 64;
+    float spr_y = i_block_id / 64;
+    float i_pctg = 0.03125;
+    vec2 uv_2 = vec2(
+        (spr_x * i_pctg) + (v_uv.x * i_pctg),
+        (spr_y * i_pctg) + (v_uv.y * i_pctg)
+    );
+    f_uv = (uv_2) * affine;
     f_affine = affine;
 }

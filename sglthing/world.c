@@ -232,6 +232,8 @@ struct world* world_init(char** argv, int argc, void* p)
 
     world_updres(world);
 
+    world->perf_timer = g_timer_new();
+
     world->server.status = NETWORKSTATUS_DISCONNECTED;
     world->client.status = NETWORKSTATUS_DISCONNECTED;
     network_init(&world->server, world->script);
@@ -289,8 +291,8 @@ struct world* world_init(char** argv, int argc, void* p)
     if(strcmp(net_mode,"server")==0)
     {
 #ifndef HEADLESS
-        char v_name[32];
-        snprintf(v_name,32,"sglthing-" GIT_BRANCH " r%i DEDICATED SERVER",GIT_COMMIT_COUNT);
+        char v_name[64];
+        snprintf(v_name,64,"sglthing-" GIT_BRANCH " r%i DEDICATED SERVER",GIT_COMMIT_COUNT);
         glfwSetWindowTitle(world->gfx.window, v_name);
 #endif
         network_open(&world->server, config_string_get(&world->config,"network_ip"), config_number_get(&world->config,"network_port"));
@@ -347,8 +349,8 @@ void world_frame_light_pass(struct world* world, float quality, int framebuffer,
 {
     #ifndef HEADLESS
     profiler_event("world_frame_light_pass");
+    struct graphic_context* curr_context = graphic_context_current();
     glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Light Pass");
-    world->gfx.shadow_pass = true;
 
     sglc(glViewport(0,0,framebuffer_x,framebuffer_y));
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, framebuffer));
@@ -358,8 +360,6 @@ void world_frame_light_pass(struct world* world, float quality, int framebuffer,
     sglc(glCullFace(GL_BACK));
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     sglc(glViewport(0,0,world->viewport[2],world->viewport[3]));
-    
-    world->gfx.shadow_pass = false;
     glPopDebugGroupKHR();   
     profiler_end();
     #endif
@@ -374,6 +374,12 @@ void world_frame(struct world* world)
     sglc(glViewport(0, 0, world->gfx.screen_width, world->gfx.screen_height));
     world->viewport[2] = (float)world->gfx.screen_width;
     world->viewport[3] = (float)world->gfx.screen_height;
+
+    // statistics
+    float logic_time = 0.f;
+    float render_time = 0.f;
+    float shadow_time = 0.f;
+    float network_time = 0.f;
 
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     if(world->client.status == NETWORKSTATUS_CONNECTED || world->state == WORLD_STATE_MAINMENU)
@@ -421,12 +427,14 @@ void world_frame(struct world* world)
     sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 #endif
 
+    logic_time = g_timer_elapsed(world->perf_timer, NULL);
     if(world->world_frame_user)
     {
         profiler_event("world_frame_user");
         world->world_frame_user(world);
         profiler_end();
     }
+    logic_time = g_timer_elapsed(world->perf_timer, NULL) - logic_time;
 
     if(world->cam.lock)
     {
@@ -462,9 +470,11 @@ void world_frame(struct world* world)
 
     glm_mul(world->p, world->v, world->vp);
     
+    network_time = g_timer_elapsed(world->perf_timer, NULL);
     network_frame(&world->server, world->delta_time, world->time);
     if(!world->assets_downloading)
         network_frame(&world->client, world->delta_time, world->time);
+    network_time = g_timer_elapsed(world->perf_timer, NULL) - network_time;
 
     if(world->client.status != NETWORKSTATUS_CONNECTED || world->state == WORLD_STATE_MAINMENU)
     {
@@ -512,16 +522,55 @@ void world_frame(struct world* world)
         glm_mat4_mul(light_projection_far, light_view_far, world->gfx.light_space_matrix_far);
     }
 
+    graphic_context_push();
+    struct graphic_context* curr_context = graphic_context_current();
+    glm_mat4_copy(world->v, curr_context->cam.view);
+    glm_mat4_copy(world->p, curr_context->cam.projection);
+    glm_mat4_copy(world->gfx.light_space_matrix, curr_context->cam.lsm);
+    glm_mat4_copy(world->gfx.light_space_matrix_far, curr_context->cam.lsm_far);
+    glm_vec3_copy(world->cam.position, curr_context->cam.position);
+
+    curr_context->gfx.fog_maxdist = world->gfx.fog_maxdist;
+    curr_context->gfx.fog_mindist = world->gfx.fog_mindist;
+
+    glm_vec4_copy(world->gfx.fog_color, curr_context->gfx.fog_color);
+    glm_vec4_copy(world->viewport, curr_context->gfx.viewport);
+    glm_vec3_copy(world->gfx.sun_direction, curr_context->gfx.sun_direction);
+    glm_vec3_copy(world->gfx.sun_position, curr_context->gfx.sun_position);
+    glm_vec3_copy(world->gfx.diffuse, curr_context->gfx.diffuse);
+    glm_vec3_copy(world->gfx.ambient, curr_context->gfx.ambient);
+    glm_vec3_copy(world->gfx.specular, curr_context->gfx.specular);
+
+    curr_context->gfx.depth_map_texture = world->gfx.depth_map_texture;
+    curr_context->gfx.depth_map_texture_far = world->gfx.depth_map_texture_far;
+    curr_context->gfx.banding_effect = world->gfx.banding_effect;
+    curr_context->gfx.current_map = world->gfx.current_map;
+    curr_context->gfx.lighting_shader = world->gfx.lighting_shader;
+    curr_context->gfx.shadow_pass = world->gfx.shadow_pass;
+
+    curr_context->time = world->time;
+
     if(world->client.status == NETWORKSTATUS_CONNECTED && !world->assets_downloading || world->state == WORLD_STATE_MAINMENU)
     {
         if(world->gfx.enable_sun)
         {
+            shadow_time = g_timer_elapsed(world->perf_timer, NULL);
+            graphic_context_push_copy();
+            struct graphic_context* curr_context = graphic_context_current();
+            world->gfx.shadow_pass = true;
+            curr_context->gfx.shadow_pass = true;
             world->gfx.current_map = 0;
+            curr_context->gfx.current_map = 0;
             world_frame_light_pass(world,15.f,world->gfx.depth_map_fbo,SHADOW_WIDTH,SHADOW_HEIGHT);
             world->gfx.current_map = 1;
+            curr_context->gfx.current_map = 1;
             world_frame_light_pass(world,50.f,world->gfx.depth_map_fbo_far,SHADOW_WIDTH,SHADOW_HEIGHT);
+            graphic_context_pop();
+            world->gfx.shadow_pass = false;
+            shadow_time = g_timer_elapsed(world->perf_timer, NULL) - shadow_time;
         }
 
+        render_time = g_timer_elapsed(world->perf_timer, NULL);
     #ifdef FBO_ENABLED
         sglc(glBindFramebuffer(GL_FRAMEBUFFER, world->gfx.hdr_fbo));
         sglc(glEnable(GL_DEPTH_TEST));  
@@ -531,6 +580,7 @@ void world_frame(struct world* world)
         sglc(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     #endif
         world_frame_render(world);
+        render_time = g_timer_elapsed(world->perf_timer, NULL) - render_time;
 
     #ifdef FBO_ENABLED
         profiler_event("gfx: bloom");
@@ -606,7 +656,56 @@ void world_frame(struct world* world)
             glm_vec4_copy(oldfg, world->ui->foreground_color);
         }
 
-        if(config_number_get(&world->config,"debug_mode") == 1.0)
+        if(keys_down[GLFW_KEY_F2])
+        {           
+            vec4 oldbg;
+            glm_vec4_copy(world->ui->panel_background_color, oldbg);
+            float tgt_fps = 120.f;
+            float lag_ptg = (1.f / tgt_fps) / world->delta_time;
+            float scn_ptg = lag_ptg * (world->gfx.screen_width / 2.f);
+            world->ui->panel_background_color[0] = 1.0f - lag_ptg;
+            world->ui->panel_background_color[1] = lag_ptg;
+            world->ui->panel_background_color[2] = 0.f;
+            world->ui->panel_background_color[3] = 1.f;
+            ui_draw_panel(world->ui, 0.f, 32.f, scn_ptg, 32.f, 1.1f);
+            ui_end_panel(world->ui);
+
+            vec3 oldfg;
+
+            float tct = render_time + logic_time + shadow_time + network_time;
+            float sc2_ptg = 0.f;
+            float scn_off = 0.f;
+            int tx_e = 0;
+            char txt[64];
+
+            glm_vec3_copy(world->ui->foreground_color, oldfg);
+
+#define __TIME_PANEL_UI(v,c) {                                                                        \
+                glm_vec3_copy(c,world->ui->foreground_color);                                         \
+                glm_vec3_copy(c,world->ui->panel_background_color);                                   \
+                sc2_ptg = (v / tct) * (float)world->gfx.screen_width;                                 \
+                ui_draw_panel(world->ui, scn_off, 16.f, sc2_ptg, 16.f, 1.0f);                         \
+                ui_end_panel(world->ui);                                                              \
+                scn_off += sc2_ptg;                                                                   \
+                snprintf(txt, 64, "%s %.16f", # v, v);                                                \
+                ui_draw_text(world->ui, 0.f, world->gfx.screen_height / 2.f - (tx_e * 16), txt, 1.f); \
+                tx_e++;                                                                               \
+            }
+
+            __TIME_PANEL_UI(render_time,((vec3){1.0f,0.0f,0.0f}));
+            __TIME_PANEL_UI(logic_time,((vec3){1.0f,1.0f,0.0f}));
+            if(world->gfx.enable_sun)             
+                __TIME_PANEL_UI(shadow_time,((vec3){0.5f,0.5f,0.5f}));
+            __TIME_PANEL_UI(network_time,((vec3){0.0f,0.0f,1.0f}));
+
+            glm_vec4_copy(oldbg, world->ui->panel_background_color);
+            glm_vec3_copy(oldfg, world->ui->foreground_color);
+        }
+
+        if(keys_down[GLFW_KEY_F3])
+            m2_draw_dbg((void*)world);
+
+        if(config_number_get(&world->config,"debug_mode") == 1.0 || keys_down[GLFW_KEY_F4])
         {
             char dbg_info[512];
             int old_elements = world->ui->ui_elements;
@@ -707,8 +806,8 @@ void world_frame(struct world* world)
     }
 
     world->ui->persist = true;
-    char sglthing_v_name[32];
-    snprintf(sglthing_v_name,32,"sglthing-" GIT_BRANCH " r%i (%.2f fps)", GIT_COMMIT_COUNT, world->fps);
+    char sglthing_v_name[64];
+    snprintf(sglthing_v_name,64,"sglthing-" GIT_BRANCH " r%i (%.2f fps)", GIT_COMMIT_COUNT, world->fps);
     ui_draw_text(world->ui, 0.f, world->gfx.screen_height-16.f, sglthing_v_name, 15.f);
     world->ui->persist = false;
 
@@ -733,6 +832,8 @@ void world_frame(struct world* world)
     }
 #endif
 
+    graphic_context_pop();
+
     if(!world->frames)
         printf("sglthing: frame 1 done\n");
     world->frames++;
@@ -740,6 +841,7 @@ void world_frame(struct world* world)
     profiler_end();
 }
 
+/*
 void world_uniforms(struct world* world, int shader_program, mat4 model_matrix)
 {
 #ifndef HEADLESS
@@ -886,7 +988,7 @@ void world_draw_primitive(struct world* world, int shader, int fill, enum primit
             break;
     }
 #endif
-}
+}*/
 
 // TODO: this
 void world_deinit(struct world* world)

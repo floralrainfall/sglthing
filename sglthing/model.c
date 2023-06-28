@@ -239,7 +239,6 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
 
         model_parse_mesh(vtx_array, &vtx_count, idx_array, &idx_count, mesh, scene);
 
-        int element_buffer, vertex_buffer;
         model->meshes[model->mesh_count].idx_data = idx_array;
         model->meshes[model->mesh_count].element_count = idx_count;
         model->meshes[model->mesh_count].vtx_data = vtx_array;
@@ -249,24 +248,70 @@ static void model_parse_node(struct model* model, struct aiNode* node, const str
         model->meshes[model->mesh_count].bones = mesh->mNumBones;
         model_load_textures(&model->meshes[model->mesh_count], mesh, scene);
         model_extract_bone_weights(&model->meshes[model->mesh_count], vtx_array, mesh, scene);    
-        
-        sglc(glGenBuffers(1, &vertex_buffer));
-        sglc(glGenBuffers(1, &element_buffer));
 
-        model->meshes[model->mesh_count].vertex_array = model_vao();
+        graphic_varray_create(&model->meshes[model->mesh_count].vertex_array, RT_ELEMENTS);
 
-        sglc(glBindVertexArray(model->meshes[model->mesh_count].vertex_array));
+        model->meshes[model->mesh_count].vertex_array.bref_array = &model->meshes[model->mesh_count].vertex_buffer;
+        model->meshes[model->mesh_count].vertex_array.bref_elements = &model->meshes[model->mesh_count].element_buffer;
+        model->meshes[model->mesh_count].vertex_array.gl_count = idx_count;
 
-        sglc(glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer));
-        sglc(glBufferData(GL_ARRAY_BUFFER, vtx_count * sizeof(struct model_vertex), &vtx_array[0], GL_STATIC_DRAW));
+        graphic_bref_create(&model->meshes[model->mesh_count].vertex_buffer, SLOT_VERTEX_ARRAY);
+        graphic_bref_create(&model->meshes[model->mesh_count].element_buffer, SLOT_ELEMENT_ARRAY);
 
-        sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer));
-        sglc(glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx_count * sizeof(unsigned int), &idx_array[0], GL_STATIC_DRAW));
+        graphic_bref_upload(&model->meshes[model->mesh_count].vertex_buffer, vtx_array, vtx_count * sizeof(struct model_vertex));
+        graphic_bref_upload(&model->meshes[model->mesh_count].element_buffer, idx_array, idx_count * sizeof(int));
+
+        graphic_varray_add(&model->meshes[model->mesh_count].vertex_array,(struct graphic_varray_entry){ // vec3: position
+            .buff = &model->meshes[model->mesh_count].vertex_buffer,
+            .layout_id = 0,
+            .buff_array_len = 3,
+            .buff_array_size = sizeof(struct model_vertex),
+            .buff_array_stride = offsetof(struct model_vertex, position),
+            .type = DT_FLOAT,
+        });
+        graphic_varray_add(&model->meshes[model->mesh_count].vertex_array,(struct graphic_varray_entry){ // vec3: normal
+            .buff = &model->meshes[model->mesh_count].vertex_buffer,
+            .layout_id = 1,
+            .buff_array_len = 3,
+            .buff_array_size = sizeof(struct model_vertex),
+            .buff_array_stride = offsetof(struct model_vertex, normal),
+            .type = DT_FLOAT,
+        });
+        graphic_varray_add(&model->meshes[model->mesh_count].vertex_array,(struct graphic_varray_entry){ // vec4: color
+            .buff = &model->meshes[model->mesh_count].vertex_buffer,
+            .layout_id = 2,
+            .buff_array_len = 4,
+            .buff_array_size = sizeof(struct model_vertex),
+            .buff_array_stride = offsetof(struct model_vertex, color),
+            .type = DT_FLOAT,
+        });
+        graphic_varray_add(&model->meshes[model->mesh_count].vertex_array,(struct graphic_varray_entry){ // vec2: tex_coords
+            .buff = &model->meshes[model->mesh_count].vertex_buffer,
+            .layout_id = 3,
+            .buff_array_len = 2,
+            .buff_array_size = sizeof(struct model_vertex),
+            .buff_array_stride = offsetof(struct model_vertex, tex_coords),
+            .type = DT_FLOAT,
+        });
+        graphic_varray_add(&model->meshes[model->mesh_count].vertex_array,(struct graphic_varray_entry){ // int4: bone_ids
+            .buff = &model->meshes[model->mesh_count].vertex_buffer,
+            .layout_id = 4,
+            .buff_array_len = 4,
+            .buff_array_size = sizeof(struct model_vertex),
+            .buff_array_stride = offsetof(struct model_vertex, bone_ids),
+            .type = DT_INT,
+        });
+        graphic_varray_add(&model->meshes[model->mesh_count].vertex_array,(struct graphic_varray_entry){ // vec4: weights
+            .buff = &model->meshes[model->mesh_count].vertex_buffer,
+            .layout_id = 5,
+            .buff_array_len = 4,
+            .buff_array_size = sizeof(struct model_vertex),
+            .buff_array_stride = offsetof(struct model_vertex, weights),
+            .type = DT_FLOAT,
+        });
+        graphic_varray_upload(&model->meshes[model->mesh_count].vertex_array);
 
         //int new_mesh = create_model_vao(vtx_array, vtx_count, idx_array, idx_count, &vertex_buffer, &element_buffer);
-
-        model->meshes[model->mesh_count].vertex_buffer = vertex_buffer;
-        model->meshes[model->mesh_count].element_buffer = element_buffer;
 
         model->mesh_count++;
 
@@ -359,32 +404,16 @@ static void model_vao_pointers()
     sglc(glEnableVertexAttribArray(5));
 }
 
-int model_vao()
+void graphic_render_model(struct model* model, int shader, mat4 model_matrix)
 {
-    if(vertex_array)
-        return vertex_array;
-
-    sglc(glGenVertexArrays(1, &vertex_array));
-    sglc(glBindVertexArray(vertex_array));
-
-    model_vao_pointers();
-
-    sglc(glBindVertexArray(0));
-
-    return vertex_array;
-}
-
-void model_bind_vbos(struct mesh* mesh)
-{
-    if(!vertex_array)
-        vertex_array = model_vao();
-
-    sglc(glBindVertexArray(mesh->vertex_array));
-    sglc(glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffer));
-    sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->element_buffer));
-
-    model_vao_pointers();
-
-    sglc(glBindBuffer(GL_ARRAY_BUFFER, 0));
-    sglc(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+    for(int i = 0; i < model->mesh_count; i++)
+    {
+        struct mesh* mesh = &model->meshes[i];
+        int t_last = 0;
+        for(int i = 0; i < mesh->diffuse_textures; i++)
+            graphic_texture_bind(shader, TT_DIFFUSE, t_last++, mesh->diffuse_texture[i]);
+        for(int i = 0; i < mesh->specular_textures; i++)
+            graphic_texture_bind(shader, TT_SPECULAR, t_last++, mesh->specular_texture[i]);
+        graphic_render_varray(&mesh->vertex_array, shader, model_matrix);
+    }
 }
